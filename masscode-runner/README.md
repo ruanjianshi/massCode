@@ -1,0 +1,176 @@
+# ⚡ massCode Runner（伴生工具）
+
+给 [massCode](https://masscode.io/) 的代码片段增加 **运行 / 语法检查 / 格式化 / 编辑 / 代码大纲** 能力，**不改动 massCode 本体**。
+它直接读取 massCode 的 Markdown Vault（你的片段库），选一个片段就能跑、能改、能跳转。
+
+> **📦 已整体迁移到 iCloud Drive，自动云同步**（见下文「云同步」）。
+> 所在位置：`~/Library/Mobile Documents/com~apple~CloudDocs/massCode`（Finder 里就是 **iCloud Drive / massCode**）。
+
+## 目录结构
+
+```
+iCloud Drive/massCode/
+├── markdown-vault/            ← massCode 的片段库（code/ notes/ 等，随 iCloud 同步）
+├── masscode-runner/           ← 伴生工具本体（纯 Node，零依赖）
+│   ├── server.js              ← HTTP 服务（127.0.0.1:4877）
+│   ├── index.html             ← 界面
+│   ├── assets/                ← 高亮库等静态资源（离线可用）
+│   └── README.md
+└── 启动伴生工具.command        ← macOS 一键启动（前台运行，Ctrl+C 停止）
+└── 启动伴生工具.bat            ← Windows 一键启动（前台运行，Ctrl+C 停止）
+```
+
+## 快速开始
+
+**macOS**：在 Finder 打开 `iCloud Drive / massCode`，**双击「启动伴生工具.command」**
+- 终端窗口保持前台运行服务，浏览器自动打开 http://127.0.0.1:4877
+- 用完直接 **`Ctrl+C`**（或关掉终端窗口）即停止
+- 已运行时再次双击 → 只打开页面，不重复启动
+
+**Windows**：打开 `iCloud Drive/massCode`（或同步下来的 `massCode` 文件夹），**双击「启动伴生工具.bat」**
+- 黑窗口前台运行服务并自动打开浏览器；用完 `Ctrl+C` 或关窗口即停止
+- 首次使用需先装 [Node.js](https://nodejs.org)（脚本会自动检查并提示）
+
+**命令行（任意系统）**：
+```bash
+cd ~/Library/Mobile\ Documents/com~apple~CloudDocs/massCode/masscode-runner   # macOS
+cd masscode-runner                                                             # Windows / Linux
+node server.js
+```
+
+## 功能
+
+| 按钮 | 说明 |
+|------|------|
+| ▶ 运行 | 用对应解释器执行当前片段，显示 stdout/stderr/退出码/耗时，超时(10s)自动终止；支持传入 stdin 输入 |
+| ✓ 语法检查 | 不执行，只做语法校验 |
+| ✨ 格式化 | 按语言自动选工具（见下表），格式化后写回 vault（massCode 实时同步），格式偏好跟随 massCode 编辑器设置 |
+| ⌨ 输入 | 显示/隐藏 stdin 输入框；程序需要读输入（cin / input() / scanf 等）时在此填写，运行自动喂给程序 |
+| 👁 预览 | 仅 HTML 片段：在沙箱 iframe 中渲染 |
+| 📄 Markdown | markdown 片段默认**渲染成文档**（标题/表格/代码块/列表/引用），按钮可切换「📄 源码」查看原文；右侧大纲变成**标题目录**，点标题跳转到文档对应位置；点运行会提示"暂不支持"（文档无运行意义） |
+| 🧭 大纲 | 右侧代码大纲树：自动提取类/函数/方法（含行号），点击跳转到对应行并高亮；可开关、拖宽、编辑模式实时刷新 |
+| ▶ / ✓ / ✨ / ⌨（位置） | 运行/检查/格式化/输入按钮**固定在大纲面板顶部**，与大纲排在一起；点「🧭 大纲」收起大纲列表后，仍保留一列操作按钮，随时可用 |
+| ✏ 编辑 / 💾 保存 | 只读 ↔ 可编辑切换：**markdown** 编辑时左侧源码 / 右侧实时渲染文档并排（随输入更新，分割条可拖、宽度自动记忆）；**代码**编辑全宽直接改源码、**实时语法高亮**（透明编辑层叠加高亮，边打字边着色，中文输入法合成期临时显示明文）；Cmd/Ctrl+S 或点保存写回 vault（massCode 实时同步），编辑中自动同步不覆盖你的修改，原生撤销 Ctrl/⌘+Z 可用；运行/检查/格式化可直接作用于编辑框内容（未保存也生效） |
+| 🔍 环境 | 环境检测面板：列出每个工具是否可用、版本、用途；缺失时给出安装命令 |
+
+**布局与侧栏**：
+- 📐 **拖拽调整**：左侧列表宽度、右侧大纲宽度、底部输出窗口高度均可直接拖拽，自动记忆（左侧向右拉变宽；右侧**向左**拉变宽；输出向上拉变高）
+- 🏷 **标签栏**：位于左侧**底部**、**两栏**排列；点「🏷 标签」整行可折叠成一行（标签多时不挤占空间），折叠后标题仍显示总数与已选标签；状态记忆
+- 🔍 搜索 + 文件夹树（按 `.meta.yaml` 还原真实层级，空文件夹也显示，可折叠）
+
+> - 代码区带内置语法高亮（离线可用，无需联网）。
+> - **实时同步**：每 2.5s 自动检测 vault 变更（新增/修改/删除片段都会立刻反映），无需手动刷新；编辑模式不会被同步覆盖。
+> - **环境检测**：启动时自动检测 13 项工具并在日志输出汇总；界面「🔍 环境」可随时查看/重测。
+>   缺某个工具时，运行/检查/格式化会给出明确的「缺少 xx，安装: xxx」提示，而不是晦涩报错。
+
+## 多文件片段（.cpp + .hpp 一起编译）
+
+massCode 一个片段里可以有多个 fragment。**把 fragment 标签写成文件名**，运行时就会把所有 fragment
+写到同一临时目录并**一起编译/运行**：
+
+- **C/C++**：标签命名如 `main.cpp`、`calc.hpp` → 运行 = `g++ main.cpp ... -I<dir>` 一起编译（头文件用
+  `#include "calc.hpp"` 即可找到），再执行二进制。
+- **Python/JS/TS/Bash/Ruby/Swift/Go**：同样按文件名写进同一目录，跨文件 `import` / `require` 生效。
+- 标签不是文件名时自动兜底：单文件 `main.<ext>`，多文件 `file1.<ext>`、`file2.<ext>`…
+- 界面上多文件片段会显示「📦 N 个文件」徽章；大纲/编辑按当前选中的 fragment 生效。
+
+## 支持的语言
+
+| 语言 | 运行 | 检查 | 格式化 |
+|------|:--:|:--:|:--:|
+| JavaScript | node | node --check | Prettier |
+| TypeScript | node（原生剥离类型） | node --check | Prettier |
+| Python | python3 | py_compile | black |
+| Bash | bash | bash -n | Prettier |
+| C | gcc 编译+运行 | gcc -fsyntax-only | clang-format |
+| C/C++ | g++ 编译+运行 | g++ -fsyntax-only | clang-format |
+| Java | java（单文件源码运行） | javac | — |
+| Ruby | ruby | ruby -c | — |
+| Swift | swift | swiftc -typecheck | — |
+| Go | go run | go vet | gofmt |
+| JSON | —（校验结构） | JSON.parse | Prettier |
+| HTML | 预览渲染 | — | Prettier |
+| 其他 | 提示不支持 | — | 提示不支持 |
+
+> 格式化工具：C/C++ → clang-format，Go → gofmt，Python → black，其余 → Prettier。
+> Prettier 首次调用需联网（`npx -y prettier@3` 按需下载）；clang-format / gofmt / black 完全离线。
+
+## 配置
+
+- 端口：`MASSCODE_RUNNER_PORT`（默认 `4877`），仅绑定 `127.0.0.1`
+- 手动指定 vault：`MASSCODE_VAULT=/path/to/markdown-vault node server.js`
+- 自动从 massCode 偏好设置（`~/Library/Application Support/massCode/v2/preferences.json` 的 `storage.rootPath`）
+  读取 vault 路径（vault = rootPath 下的 `markdown-vault`）；读不到时按 `~/massCode/markdown-vault` 兜底
+- 日志：`/tmp/masscode-runner.log`（不写进工具目录，避免云同步到日志）
+
+## 云同步（iCloud Drive）
+
+**当前状态：整个 `massCode` 目录已放进 iCloud Drive，片段与工具自动同步到你的所有设备。**
+
+- **同步内容**：`markdown-vault/`（片段库）、`masscode-runner/`（工具本体）、`启动伴生工具.command`。
+  用任一台 Mac 修改片段，其他设备稍后自动同步（iCloud 后台上传/下载）。
+- **为什么能同步**：massCode 没有内置云同步，但它的片段就是普通 `.md` 文件；放进 iCloud Drive 后，
+  由 iCloud 负责跨设备同步文件。本工具和 massCode 的 vault 路径都指向 iCloud 里的同一份 `markdown-vault`，
+  所以两端读写的是同一份数据。
+- **修改文件后**：在 massCode 里能看到（它在监听 vault）；反之 massCode 里改的，本工具 2.5s 内自动刷新。
+
+### 换一台 Mac 的步骤
+
+1. 确保新 Mac 登录了**同一个 Apple ID 且开启 iCloud Drive**，等待 `iCloud Drive/massCode` 同步完成。
+2. 安装依赖（工具本体随 iCloud 走，无需拷贝）：
+   ```bash
+   brew install node                 # 必须：跑工具 + JS/TS
+   xcode-select --install            # 强烈建议：gcc/g++/clang-format/swift 全有了
+   brew install go                   # Go 运行 + gofmt（可选）
+   # 想跑哪种语言就装哪种运行时（Java/Ruby/Python-black 等，见「🔍 环境」面板提示）
+   ```
+3. 让 massCode 指向 iCloud 里的 vault：
+   - 方法一（推荐）：打开新 Mac 的 `~/Library/Application Support/massCode/v2/preferences.json`，
+     把 `storage.rootPath` 改成 iCloud 里的 `massCode` 路径，再启动 massCode；
+   - 方法二：给工具设环境变量 `MASSCODE_VAULT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/massCode/markdown-vault"`。
+4. 双击 `iCloud Drive/massCode/启动伴生工具.command` → 打开 http://127.0.0.1:4877 → 点「🔍 环境」检查缺什么。
+
+> **注意**：iCloud 为省空间可能把个别文件标记为「仅云端」（文件名带 ☁ 图标）。工具运行前会按需下载，
+> 一般无感；若某片段缺失，等它下载完即可。避免在**多台电脑同时编辑同一个片段**，以免 iCloud 版本冲突。
+
+### 常见场景
+- **只想片段同步**：只需把 `markdown-vault/` 放进 iCloud/云盘即可。
+- **不用 iCloud 也行**：换用 Dropbox / Google Drive / Syncthing / Git 仓库做同步目录，原理一样。
+- **Windows/Linux**：工具是纯 Node + 跨平台，同样可用；把 Homebrew 换成对应包管理器即可。
+
+## 跨系统（Windows / Linux）
+
+工具是**纯 Node + 浏览器**，逻辑上跨系统通用；已针对各平台做了适配与验证：
+
+| 项 | 适配情况 |
+|----|---------|
+| **vault 自动定位** | ① 优先找工具目录上级的 `markdown-vault`（整个文件夹一起放云盘/本地时一定成立，**跨系统最稳**）；② 再读 massCode 各平台偏好设置（macOS/Win/Linux 路径均已内置）；③ 最后常用路径兜底。Windows 上无需手动配置也能找到 vault |
+| **Python** | Windows 通常没有 `python3`，已自动回退用 `python` / `py`（运行、检查、black 均生效） |
+| **超时终止** | Windows 没有 POSIX 进程组，已改用在任何系统都能杀掉超时子进程的方式 |
+| **安装提示** | 「🔍 环境」面板按当前系统给出安装命令：mac→brew，Win→winget/安装包，Linux→apt |
+| **一键启动** | macOS `.command` / Windows `.bat`（前台运行、Ctrl+C 停止） |
+
+### 各平台开箱即用 / 需安装
+
+| 语言 | macOS | Windows | Linux |
+|------|:--:|:--:|:--:|
+| JS / TS | ✅ node | 装 Node.js 后 ✅ | 装 nodejs 后 ✅ |
+| Python | ✅ python3 | `python`/`py` 自动识别 ✅ | ✅ python3 |
+| Bash | ✅ 自带 | ⚠️ 默认无 bash，需 Git Bash 或 WSL | ✅ 自带 |
+| C / C++ | ✅ xcode 工具链 | ⚠️ 需 MinGW-w64 或 VS C++ 工具 | ⚠️ 需 `apt install gcc g++` |
+| Java / Ruby / Go | 装对应运行时 | 装对应运行时 | 装对应运行时 |
+| Swift | ✅ xcode 工具链 | ⚠️ 仅实验性工具链 | ⚠️ swift.org 工具链 |
+
+> 浏览器端（界面/大纲/高亮/标签/拖拽/编辑保存）无系统差异，Windows 上体验与 macOS 一致。
+> 唯一小坑：在 Windows 里**用 CRLF 换行创建的 bash 片段**可能报 `$'\r'` 错误——用 LF 即可（工具解析、写回都兼容 CRLF）。
+
+## 安全提示
+
+本工具会在本机以你的权限执行片段代码。片段库通常是你自己的代码，风险可控；
+但请勿在**共享/不信任的 vault** 上点击运行任意片段。
+
+## 局限
+
+- massCode 本身没有插件系统，所以这是「伴生工具」而非 app 内按钮；如需真正嵌进 app，需 fork 源码自行打包。
+- 不拦截系统调用：`rm -rf` 之类会真实执行（这就是"运行"的意义，使用时请留意）。
+- 本机没有的运行时（如 rustc/php/dotnet/perl）会提示不支持；装好后刷新环境面板即可。

@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>massCode Runner · 伴生工具</title>
+<link rel="stylesheet" href="/assets/hljs-theme.css">
+<script src="/assets/highlight.min.js" defer></script>
+<style>
+  :root {
+    --bg: #16181d; --panel: #1e2128; --panel2: #252932; --border: #30353f;
+    --text: #e6e8ee; --dim: #9aa3b2; --accent: #4f8cff; --ok: #3fb950; --err: #f85149;
+    --mono: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 15px; margin: 0; }
+  header .sub { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.on { border-color: var(--accent); color: var(--accent); }
+  .btn-run { background: #1d4b1d; border-color: #2f6f2f; color: #b7f0b7; }
+  .btn-run:hover { border-color: var(--ok); }
+  .btn-err { color: #ffb3b1; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #side { width: 320px; min-width: 180px; flex: none; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+  /* 拖拽分隔条：左侧宽度 / 输出高度 */
+  #split-v { flex: none; width: 7px; cursor: col-resize; position: relative; background: transparent; }
+  #split-v::after { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: transparent; }
+  #split-v:hover::after, #split-v.active::after { background: var(--accent); }
+  #split-h { flex: none; height: 7px; cursor: row-resize; position: relative; background: transparent; }
+  #split-h::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; transform: translateY(-50%); background: transparent; }
+  #split-h:hover::after, #split-h.active::after { background: var(--accent); }
+  #split-v2 { flex: none; width: 7px; cursor: col-resize; position: relative; background: transparent; }
+  #split-v2::after { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: transparent; }
+  #split-v2:hover::after, #split-v2.active::after { background: var(--accent); }
+  /* 右侧代码大纲面板 */
+  #outline-panel { width: 240px; min-width: 160px; flex: none; display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--border); }
+  #outline-panel.hidden { display: none; }
+  /* 操作按钮：固定在大纲顶部，与大纲排在一起 */
+  #outline-actions { display: flex; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  #outline-actions button { flex: 1; padding: 6px 4px; font-size: 12px; }
+  #outline-list { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+  /* 收起大纲：只剩一列操作按钮 */
+  #outline-panel.collapsed { width: 52px !important; min-width: 52px !important; }
+  #outline-panel.collapsed #outline-list { display: none; }
+  #outline-panel.collapsed #outline-actions { flex-direction: column; padding: 8px 6px; }
+  #outline-panel.collapsed #outline-actions button { flex: none; padding: 8px 0; font-size: 14px; }
+  #outline-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--dim); border-bottom: 1px solid var(--border); }
+  #outline-head .sp { flex: 1; }
+  #outline-count { font-size: 11px; color: var(--dim); font-weight: 400; }
+  #outline-body { flex: 1; overflow: auto; padding: 6px 4px; }
+  .ol-empty { display: block; padding: 10px 12px; color: var(--dim); font-size: 12px; font-style: italic; }
+  .ol-item { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 5px; font-size: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; color: var(--text); }
+  .ol-item:hover { background: var(--panel2); }
+  .ol-item .ol-ico { flex: none; opacity: .8; }
+  .ol-item.class { color: #79c0ff; font-weight: 600; }
+  .ol-item.fn { color: #d2a8ff; }
+  .ol-item .ol-ln { margin-left: auto; color: var(--dim); font-size: 10px; flex: none; }
+  .ol-item.active { background: rgba(79,140,255,.18); color: #fff; }
+  /* 跳转行高亮闪烁 */
+  #ln-flash { position: absolute; left: 0; right: 0; pointer-events: none; background: rgba(79,140,255,.22); z-index: 5; }
+  body.resizing { user-select: none; }
+  body.resizing-v { cursor: col-resize; }
+  body.resizing-h { cursor: row-resize; }
+  #search { margin: 10px 10px 0; padding: 7px 10px; background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); }
+  /* 标签区：固定在左侧底部，两栏排列 */
+  #tagbar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 10px 10px; border-top: 1px solid var(--border); max-height: 38vh; overflow-y: auto; }
+  #tagbar.hidden { display: none; }
+  #tagbar .tchip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #tag-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px 6px; cursor: pointer; color: var(--dim); font-size: 12px; font-weight: 600; user-select: none; border-top: 1px solid var(--border); }
+  #tag-head:hover { color: var(--text); }
+  #tag-head .arrow { width: 14px; text-align: center; flex: none; font-size: 10px; transition: transform .12s; }
+  #tag-head.collapsed .arrow { transform: rotate(-90deg); }
+  #tag-head .tag-active { color: var(--accent); font-size: 11px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #tag-head .count { margin-left: auto; color: var(--dim); font-size: 11px; background: var(--panel2); padding: 0 7px; border-radius: 9px; }
+  .tchip { display: inline-flex; align-items: center; gap: 5px; background: var(--panel2); color: var(--dim); border: 1px solid var(--border); border-radius: 12px; padding: 2px 9px; font-size: 12px; cursor: pointer; user-select: none; }
+  .tchip:hover { border-color: var(--accent); color: var(--text); }
+  .tchip.on { background: rgba(79,140,255,.18); border-color: var(--accent); color: var(--accent); }
+  .tchip .tc { color: var(--dim); font-size: 11px; }
+  .tchip.on .tc { color: var(--accent); }
+  .tchip-all { background: transparent; border-style: dashed; }
+  .tchip-all.on { background: var(--panel2); border-style: solid; color: var(--text); }
+  #list { flex: 1; overflow: auto; padding: 0 6px 12px; }
+  .folder { color: var(--dim); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 10px 8px 4px; }
+  .fnode { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text); }
+  .fnode:hover { background: var(--panel2); }
+  .fnode .arrow { color: var(--dim); width: 14px; text-align: center; flex: none; font-size: 10px; }
+  .fnode .ico { flex: none; }
+  .fnode .count { margin-left: auto; color: var(--dim); font-size: 11px; background: var(--panel2); padding: 0 7px; border-radius: 9px; }
+  .tree-children { overflow: hidden; }
+  .tree-children.hidden { display: none; }
+  .item { padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+  .item:hover { background: var(--panel2); }
+  .item.active { background: #2b3342; outline: 1px solid var(--accent); }
+  .item .nm { font-weight: 600; }
+  .item .desc { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .langs { margin-top: 3px; font-size: 11px; color: var(--accent); }
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; position: sticky; top: 0; z-index: 20; background: var(--panel); }
+  #toolbar .title { font-weight: 600; margin-right: auto; }
+  #tabs { display: flex; gap: 6px; padding: 8px 14px 0; }
+  .tab { padding: 5px 12px; border-radius: 6px 6px 0 0; border: 1px solid var(--border); border-bottom: none; background: transparent; color: var(--dim); }
+  .tab.active { background: var(--panel2); color: var(--text); }
+  #code-wrap { flex: 1; min-width: 0; display: flex; overflow: auto; position: relative; background: var(--panel2); margin: 10px 14px 0; border: 1px solid var(--border); border-radius: 8px; }
+  /* 编辑模式 左源码 / 右预览 的横向容器与分割条 */
+  #edit-split { flex: 1; display: flex; flex-direction: row; min-height: 0; min-width: 0; }
+  #edit-split-v { flex: none; width: 7px; cursor: col-resize; position: relative; background: transparent; display: none; }
+  #edit-split-v::after { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: transparent; }
+  #edit-split-v:hover::after, #edit-split-v.active::after { background: var(--accent); }
+  #ln { flex: none; padding: 14px 8px 14px 12px; text-align: right; color: #4b5263; font: 12px/1.7 var(--mono); user-select: none; background: #1b1e25; border-right: 1px solid var(--border); white-space: pre; }
+  #code { flex: 1; margin: 0; padding: 14px; font: 12px/1.7 var(--mono); white-space: pre; tab-size: 2; }
+  #code.hljs { background: transparent; }
+  /* ---- Markdown 渲染视图（只读 #md-view 与编辑预览 #edit-preview 共用 .md-doc 样式） ---- */
+  #md-view { display: none; flex: 1; overflow: auto; margin: 10px 14px 0; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; }
+  #edit-preview { display: none; flex: 1; min-width: 0; overflow: auto; min-height: 0; margin: 10px 14px 0 0; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; }
+  .md-doc { padding: 16px 20px 48px; font-size: 14px; line-height: 1.75; color: var(--text); }
+  .md-doc h1, .md-doc h2, .md-doc h3, .md-doc h4, .md-doc h5, .md-doc h6 { margin: 1.1em 0 .45em; line-height: 1.35; font-weight: 700; scroll-margin-top: 12px; }
+  .md-doc h1 { font-size: 1.7em; border-bottom: 1px solid var(--border); padding-bottom: .25em; }
+  .md-doc h2 { font-size: 1.35em; border-bottom: 1px solid var(--border); padding-bottom: .2em; }
+  .md-doc h3 { font-size: 1.15em; }
+  .md-doc h4, .md-doc h5, .md-doc h6 { font-size: 1.05em; }
+  .md-doc p { margin: .55em 0; }
+  .md-doc ul, .md-doc ol { margin: .5em 0 .5em 1.6em; }
+  .md-doc li { margin: .2em 0; }
+  .md-doc li > ul, .md-doc li > ol { margin-top: .15em; }
+  .md-doc code { background: rgba(127,132,142,.18); padding: .15em .4em; border-radius: 4px; font: 12px/1.5 var(--mono); }
+  .md-doc .md-pre { background: #15181f; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: .6em 0; }
+  .md-doc .md-pre code { background: none; padding: 0; display: block; font: 12px/1.6 var(--mono); }
+  .md-doc table { border-collapse: collapse; margin: .7em 0; font-size: 13px; display: block; overflow-x: auto; max-width: 100%; }
+  .md-doc th, .md-doc td { border: 1px solid var(--border); padding: 6px 10px; }
+  .md-doc th { background: rgba(127,132,142,.14); }
+  .md-doc blockquote { margin: .6em 0; padding: .2em 1em; border-left: 3px solid var(--accent); color: var(--dim); background: rgba(127,132,142,.08); border-radius: 0 6px 6px 0; }
+  .md-doc hr { border: none; border-top: 1px solid var(--border); margin: 1.2em 0; }
+  .md-doc a { color: #58a6ff; }
+  .md-doc img { max-width: 100%; border-radius: 6px; }
+  .md-doc code, .md-doc pre { white-space: pre; }
+  #code-edit { flex: 1; margin: 0; padding: 14px; font: 12px/1.7 var(--mono); white-space: pre; tab-size: 2; background: transparent; color: var(--text); border: none; outline: 1px solid var(--accent); outline-offset: -1px; border-radius: 8px; resize: none; }
+  /* 代码编辑的实时高亮：文字透明、光标可见，叠在 #code 高亮层上；聚焦时仍给编辑框描边 */
+  #code-edit.live-hl { color: transparent; caret-color: var(--text); -webkit-text-fill-color: transparent; position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+  #code-edit.live-hl.composing { color: var(--text); -webkit-text-fill-color: var(--text); }   /* 输入法合成期：临时显示明文 */
+  #code-edit:focus { outline: 2px solid var(--accent); }
+  #toolbar .sp { flex: 1; }
+  #btn-edit.on { background: rgba(79,140,255,.2); color: var(--accent); border-color: var(--accent); }
+  #btn-save { background: var(--ok); border-color: var(--ok); }
+  #btn-save:disabled { background: transparent; color: var(--dim); border-color: var(--border); }
+  #input-area { display: flex; flex-direction: column; border-top: 1px solid var(--border); background: var(--panel); padding: 8px 14px 10px; }
+  #input-area.hidden { display: none; }
+  .in-head { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 12px; padding-bottom: 6px; }
+  .in-dot { color: var(--dim); font-size: 11px; }
+  .in-dot.on { color: var(--ok); }
+  #input-box { width: 100%; min-height: 54px; background: #101216; color: var(--text); border: 1px solid var(--border); border-radius: 6px; font: 12px/1.5 var(--mono); padding: 8px; resize: vertical; outline: none; }
+  #input-box:focus { border-color: var(--accent); }
+  #code .k { color: #7db3ff; }        /* keyword */
+  #code .s { color: #a5e075; }        /* string */
+  #code .c { color: #6a7280; font-style: italic; } /* comment */
+  #code .n { color: #f0a35e; }        /* number */
+  #code .t { color: #ff8fb2; }        /* html tag */
+  #code .a { color: #8fd6ff; }        /* html attr */
+  #output { border-top: 1px solid var(--border); background: #101216; height: 200px; min-height: 90px; max-height: 62vh; flex: none; display: flex; flex-direction: column; }
+  #out-head { display: flex; gap: 10px; align-items: center; padding: 6px 14px; color: var(--dim); font-size: 12px; }
+  #out-head .sp { flex: 1; }
+  .pill { padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+  .pill.ok { background: rgba(63,185,80,.15); color: var(--ok); }
+  .pill.err { background: rgba(248,81,73,.15); color: var(--err); }
+  .pill.timeout { background: rgba(219,154,4,.15); color: #dbb904; }
+  .pill.idle { background: var(--panel2); color: var(--dim); }
+  #out-body { flex: 1; overflow: auto; padding: 4px 14px 14px; font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-all; }
+  #out-body .stderr { color: #ff9b95; }
+  #out-body .empty { color: var(--dim); font-style: italic; }
+  #preview { display: none; flex: 1; }
+  #preview iframe { width: 100%; height: 100%; border: none; background: #fff; }
+  .empty-state { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--dim); }
+  .tag { display: inline-block; background: rgba(79,140,255,.12); color: var(--accent); border-radius: 4px; padding: 0 5px; margin-right: 4px; font-size: 11px; }
+  .item .tags { margin-top: 3px; }
+  .item .tag-nm { background: rgba(219,154,4,.15); color: #dbb904; cursor: pointer; }
+  .item .tag-nm:hover { background: rgba(219,154,4,.3); }
+  .sync-dot { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font-size: 12px; }
+  .sync-dot::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .sync-dot.off::before { background: var(--err); box-shadow: 0 0 6px var(--err); }
+  #env-panel { display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 400px; max-width: 92vw; background: var(--panel); border-left: 1px solid var(--border); z-index: 50; box-shadow: -8px 0 30px rgba(0,0,0,.4); flex-direction: column; }
+  #env-panel.open { display: flex; }
+  #env-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  #env-head h2 { font-size: 14px; margin: 0; flex: 1; }
+  #env-body { flex: 1; overflow: auto; padding: 12px 16px; }
+  .env-summary { display: flex; gap: 10px; margin-bottom: 12px; }
+  .env-card { flex: 1; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
+  .env-card b { font-size: 20px; display: block; }
+  .env-card.good b { color: var(--ok); }
+  .env-card.bad b { color: var(--err); }
+  .env-card span { color: var(--dim); font-size: 12px; }
+  .tool-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--panel2); }
+  .tool-row .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .tool-row .dot.ok { background: var(--ok); }
+  .tool-row .dot.bad { background: var(--err); }
+  .tool-row .info { flex: 1; min-width: 0; }
+  .tool-row .info .nm { font-weight: 600; }
+  .tool-row .info .sub { color: var(--dim); font-size: 12px; }
+  .tool-row .ver { color: var(--accent); font: 11px var(--mono); white-space: nowrap; }
+  .hint { color: var(--err); font-size: 12px; font-family: var(--mono); word-break: break-all; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ massCode Runner</h1>
+  <div class="sub" id="vault-path">…</div>
+  <span class="sync-dot" id="sync-ind" title="每 2.5s 自动检测 vault 变更">实时同步</span>
+  <button id="btn-env">🔍 环境</button>
+  <button id="refresh">↻ 刷新</button>
+</header>
+<main>
+  <div id="side">
+    <input id="search" placeholder="搜索片段名称 / 描述 / 语言…">
+    <div id="list"></div>
+    <div id="tag-head" title="显示/隐藏标签栏">
+      <span id="tag-head-arrow" class="arrow">▾</span>
+      <span>🏷 标签</span>
+      <span id="tag-active" class="tag-active"></span>
+      <span id="tag-count" class="count"></span>
+    </div>
+    <div id="tagbar"></div>
+  </div>
+  <div id="split-v" title="拖拽调整左侧宽度"></div>
+  <div id="main">
+    <div id="toolbar">
+      <span class="title" id="snippet-title">选择一个片段</span>
+      <span id="snippet-desc" class="sub" style="color:var(--dim);font-size:12px"></span>
+      <span id="multi-badge" style="display:none;color:#dbb904;font-size:12px;background:rgba(219,154,4,.12);padding:2px 8px;border-radius:10px"></span>
+      <span class="sp"></span>
+      <button id="btn-outline" title="显示/隐藏代码大纲">🧭 大纲</button>
+      <button id="btn-edit" disabled>✏ 编辑</button>
+      <button id="btn-save" class="btn-run" disabled style="display:none">💾 保存</button>
+      <button id="btn-cancel" disabled style="display:none">✕ 放弃</button>
+    </div>
+    <div id="tabs"></div>
+    <div id="edit-split">
+      <div id="code-wrap"><div id="ln"></div><pre id="code"></pre><textarea id="code-edit" spellcheck="false" style="display:none"></textarea></div>
+      <div id="edit-split-v" title="拖动调整编辑 / 预览宽度"></div>
+      <div id="edit-preview"></div>
+      <div id="md-view" class="md-doc"></div>
+    </div>
+    <div id="preview"><iframe id="pframe" sandbox="allow-scripts allow-modals allow-forms"></iframe></div>
+    <div id="input-area" class="hidden">
+      <div class="in-head"><span>⌨ stdin 输入（程序读入的内容，如 cin / input() / scanf）</span><span class="sp"></span><span id="in-status" class="in-dot">未使用</span></div>
+      <textarea id="input-box" placeholder="示例：3 5&#10;程序需要多个输入时每行一个"></textarea>
+    </div>
+    <div id="split-h" title="拖拽调整输出窗口高度"></div>
+    <div id="output">
+      <div id="out-head">
+        <span id="out-label">输出</span>
+        <span class="sp"></span>
+        <span class="pill idle" id="status">空闲</span>
+        <span id="elapsed" style="font-variant-numeric:tabular-nums"></span>
+      </div>
+      <div id="out-body"><span class="empty">选择片段并点击「运行」查看输出</span></div>
+    </div>
+  </div>
+  <div id="split-v2" title="拖拽调整大纲宽度"></div>
+  <div id="outline-panel">
+    <div id="outline-actions">
+      <button id="btn-run" class="btn-run" title="运行代码">▶</button>
+      <button id="btn-check" title="语法检查">✓</button>
+      <button id="btn-format" title="格式化代码">✨</button>
+      <button id="btn-input" title="stdin 输入">⌨</button>
+      <button id="btn-preview" title="预览 HTML" style="display:none">👁</button>
+      <button id="btn-md" title="Markdown 渲染 / 源码切换" style="display:none">📄 源码</button>
+    </div>
+    <div id="outline-list">
+      <div id="outline-head"><span>🧭 大纲</span><span class="sp"></span><span id="outline-count"></span></div>
+      <div id="outline-body"><span class="ol-empty">选择片段后显示代码大纲</span></div>
+    </div>
+  </div>
+</main>
+<div id="env-panel">
+  <div id="env-head">
+    <h2>🔍 环境检测</h2>
+    <button id="btn-env-refresh">重新检测</button>
+    <button id="btn-env-close">✕</button>
+  </div>
+  <div id="env-body">
+    <div class="env-summary">
+      <div class="env-card good"><b id="env-ready">–</b><span>就绪</span></div>
+      <div class="env-card bad"><b id="env-missing">–</b><span>缺失</span></div>
+    </div>
+    <div id="env-meta" style="color:var(--dim);font-size:12px;margin-bottom:10px"></div>
+    <div id="env-list"></div>
+  </div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+let SNIPPETS = [], TAGS = [], FOLDERS = [], CURRENT = null, CINDEX = 0, lastRev = null;
+let EDITING = false; // 编辑模式：可修改代码并保存回 vault
+const activeTags = new Set(); // 选中的标签 id
+// 标签栏折叠状态（记忆到本地，避免标签多了挤满左侧）
+let tagsHidden = (() => { try { return localStorage.getItem('mc-tags-hidden') === '1'; } catch (_) { return false; } })();
+
+function editText() { return $('code-edit').value; }
+function currentCode() { return CURRENT && CURRENT.fragments[CINDEX] ? CURRENT.fragments[CINDEX].code : ''; }
+// 编辑框有未保存改动时，切换/离开需确认
+function confirmLeaveEdit() {
+  if (!EDITING) return true;
+  if (editText() !== currentCode()) return window.confirm('有未保存的修改，确定放弃？');
+  return true;
+}
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined);
+  return r.json();
+}
+
+function setSync(on) { $('sync-ind').classList.toggle('off', !on); }
+
+async function refresh(silent) {
+  const d = await api('/api/snippets');
+  if (d.error) { $('vault-path').textContent = '错误: ' + d.error; setSync(false); return; }
+  $('vault-path').textContent = 'Vault: ' + d.vault;
+  lastRev = d.rev;
+  setSync(true);
+  const prevFile = CURRENT && CURRENT.file;
+  const prevFrag = CURRENT && CINDEX;
+  const prevCode = prevFile && CURRENT.fragments[prevFrag] ? CURRENT.fragments[prevFrag].code : null;
+  SNIPPETS = d.snippets;
+  TAGS = d.tags || [];
+  FOLDERS = d.folders || [];
+  renderTagBar();
+  renderTagHead();
+  renderList();
+  if (silent) {
+    // 静默同步：尽量保留当前选中与输出面板；编辑模式下不覆盖编辑框内容
+    const n = prevFile ? SNIPPETS.find(s => s.file === prevFile) : null;
+    if (n) {
+      const codeChanged = prevCode === null || !(n.fragments[prevFrag] && n.fragments[prevFrag].code === prevCode);
+      CURRENT = n;
+      if (!EDITING) renderCode();
+      else { $('snippet-title').textContent = n.name; $('snippet-desc').textContent = n.description; } // 编辑中：仅更新标题，保留编辑框
+      if (codeChanged && !EDITING) { setStatus('idle', '已同步'); $('elapsed').textContent = ''; }
+    } else {
+      if (EDITING) { // 正在编辑的片段被删除
+        EDITING = false; renderCode(); setStatus('err', '片段已被删除');
+      } else { CURRENT = null; renderCode(); }
+    }
+  } else {
+    renderMain();
+  }
+}
+
+// 折叠状态（默认全部展开）；路径如 "A/B"
+const collapsed = new Set();
+
+function buildTree(snippets, folders) {
+  // 根：{ name:'', path:'', children:[], snippets:[], level:0 }
+  const root = { name: '', path: '', children: [], snippets: [], level: 0 };
+  const nodeByPath = { '': root };
+  // 1) 先按完整文件夹结构建节点（含空文件夹），顺序跟随 massCode 的 orderIndex
+  for (const f of folders || []) {
+    const parent = nodeByPath[f.parent] || root;
+    const node = { path: f.path, name: f.name || f.path.split('/').pop(), id: f.id, children: [], snippets: [], level: parent.level + 1, orderIndex: f.orderIndex };
+    parent.children.push(node);
+    nodeByPath[f.path] = node;
+  }
+  // 2) 把片段挂到对应文件夹（找不到则放根）
+  for (const s of snippets) (nodeByPath[s.folder] || root).snippets.push(s);
+  // 3) 同级排序：orderIndex 优先，其次按名称；并统计子树片段总数
+  const sortKids = (n) => {
+    n.children.sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0) || a.name.localeCompare(b.name, 'zh'));
+    n.children.forEach(sortKids);
+    n.total = n.snippets.length + n.children.reduce((sum, c) => sum + c.total, 0);
+  };
+  root.total = root.snippets.length + root.children.reduce((sum, c) => sum + c.total, 0);
+  sortKids(root);
+  return root;
+}
+
+function itemEl(s) {
+  const d = document.createElement('div');
+  d.className = 'item' + (CURRENT && CURRENT.file === s.file ? ' active' : '');
+  d.style.marginLeft = (12 + s._level * 14) + 'px';
+  const tagChips = (s.tags && s.tags.length)
+    ? `<div class="tags">${s.tags.map(t => `<span class="tag tag-nm" data-name="${escapeHtml(t)}">#${escapeHtml(t)}</span>`).join('')}</div>` : '';
+  d.innerHTML = `<div class="nm">${escapeHtml(s.name)}${s.isFavorites ? ' ⭐' : ''}</div>` +
+    (s.description ? `<div class="desc">${escapeHtml(s.description)}</div>` : '') +
+    `<div class="langs">${s.fragments.map(f => `<span class="tag">${escapeHtml(f.language)}</span>`).join('')}</div>` +
+    tagChips;
+  d.onclick = () => select(s);
+  // 点击片段上的标签 = 按该标签筛选
+  d.querySelectorAll('.tag-nm').forEach(chip => chip.onclick = (e) => {
+    e.stopPropagation();
+    const name = chip.getAttribute('data-name');
+    const t = TAGS.find(x => x.name === name);
+    if (!t) return;
+    activeTags.clear(); activeTags.add(t.id); renderTagBar(); renderTagHead(); renderList();
+  });
+  return d;
+}
+
+function renderTree(root, container) {
+  const renderNode = (node, boxContainer) => {
+    if (node.path) {
+      const isOpen = !collapsed.has(node.path);
+      const f = document.createElement('div');
+      f.className = 'fnode';
+      f.style.paddingLeft = (6 + (node.level - 1) * 14) + 'px';
+      f.innerHTML = `<span class="arrow">${isOpen ? '▾' : '▸'}</span><span class="ico">📁</span><span>${escapeHtml(node.name)}</span><span class="count">${node.total}</span>`;
+      f.onclick = () => { isOpen ? collapsed.add(node.path) : collapsed.delete(node.path); renderList(); };
+      boxContainer.appendChild(f);
+    }
+    const box = document.createElement('div');
+    box.className = 'tree-children' + (node.path && collapsed.has(node.path) ? ' hidden' : '');
+    for (const s of node.snippets) { s._level = node.level; box.appendChild(itemEl(s)); }
+    for (const c of node.children) renderNode(c, box);
+    if (box.children.length) boxContainer.appendChild(box);
+  };
+  // 根目录（无文件夹）的片段排最前
+  for (const s of root.snippets) { s._level = 0; container.appendChild(itemEl(s)); }
+  for (const c of root.children) renderNode(c, container);
+}
+
+function renderList() {
+  const q = $('search').value.trim().toLowerCase();
+  const list = $('list');
+  list.innerHTML = '';
+  const tagFilter = (s) => {
+    for (const id of activeTags) if (!s.tagIds || !s.tagIds.includes(id)) return false;
+    return true;
+  };
+  if (q || activeTags.size) {
+    // 搜索 / 标签筛选模式：扁平列表
+    let shown = 0;
+    for (const s of SNIPPETS) {
+      if (!tagFilter(s)) continue;
+      if (q && !(s.name + ' ' + s.description + ' ' + s.fragments.map(f => f.language).join(' ')).toLowerCase().includes(q)) continue;
+      s._level = 0;
+      list.appendChild(itemEl(s));
+      shown++;
+    }
+    if (!shown) list.innerHTML = '<div class="empty-state">没有匹配的片段</div>';
+    return;
+  }
+  const root = buildTree(SNIPPETS, FOLDERS);
+  renderTree(root, list);
+  if (!list.children.length) list.innerHTML = '<div class="empty-state">暂无片段</div>';
+}
+
+// 标签栏：全部 + 各标签（含数量），点击多选（AND）
+function renderTagBar() {
+  const bar = $('tagbar');
+  bar.classList.toggle('hidden', tagsHidden);
+  bar.innerHTML = '';
+  const countFor = (id) => SNIPPETS.filter(s => s.tagIds && s.tagIds.includes(id)).length;
+  const mk = (label, isAll, id) => {
+    const c = document.createElement('span');
+    c.className = 'tchip' + (isAll ? ' tchip-all' : '') + (activeTags.has(id) || (isAll && activeTags.size === 0) ? ' on' : '');
+    c.innerHTML = escapeHtml(label);
+    if (!isAll) c.innerHTML += ` <span class="tc">${countFor(id)}</span>`;
+    c.onclick = () => {
+      if (isAll) activeTags.clear();
+      else activeTags.has(id) ? activeTags.delete(id) : activeTags.add(id);
+      renderTagBar(); renderTagHead(); renderList();
+    };
+    bar.appendChild(c);
+  };
+  mk(activeTags.size ? '✕ 清除筛选' : '全部', true, -1);
+  for (const t of TAGS) mk(t.name, false, t.id);
+}
+
+// 标签栏折叠标题：箭头 + 计数 + 已选标签摘要
+function renderTagHead() {
+  const head = $('tag-head');
+  head.classList.toggle('collapsed', tagsHidden);
+  $('tag-head-arrow').textContent = tagsHidden ? '▸' : '▾';
+  $('tag-count').textContent = TAGS.length ? TAGS.length + ' 个' : '';
+  const names = TAGS.filter(t => activeTags.has(t.id)).map(t => '#' + t.name);
+  $('tag-active').textContent = activeTags.size ? '已选: ' + names.join(' ') : '';
+}
+
+function toggleTagHead() {
+  tagsHidden = !tagsHidden;
+  try { localStorage.setItem('mc-tags-hidden', tagsHidden ? '1' : '0'); } catch (_) {}
+  renderTagBar(); renderTagHead();
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+/* ---- 代码大纲：按语言提取类 / 函数 / 方法（含行号） ---- */
+const OL_CONTROL = new Set(['if','for','while','switch','catch','do','else','return','sizeof','new','delete','case','default','typeof','export','import','using','namespace','public','private','protected','static','inline','virtual','override','final','const','auto','void','int','double','float','char','bool','long','short','unsigned','signed','struct','class','enum','union','typedef','extern','template','synchronized','throws','extends','implements','this','super','yield','await','async','var','let','function','def','lambda','print','cout','cin','std','null','nullptr','true','false','struct','interface','protocol','extension','as','is','in','not','and','or','with','from','global','nonlocal']);
+function countCh(s, ch) { let n = 0; for (const c of s) if (c === ch) n++; return n; }
+function outlineFor(code, lang) {
+  const lines = code.split('\n');
+  const braceLang = !['python', 'ruby'].includes(lang);
+  const entries = [];
+  let depth = 0;
+  const indentStack = [];
+  let pending = null;          /* 匿名 typedef 定义暂存：`typedef struct {...} Name;` */
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+    if (braceLang) {
+      const d0 = depth;
+      let entryLine = i + 1;   /* 条目所在行（匿名 typedef 用起始行） */
+      let name = null, type = null;
+      if (lang === 'go') {
+        let m = line.match(/^\s*func\s+(?:\([^)]*\)\s*)?(\w+)\s*\(/);
+        if (m) { name = m[1]; type = 'fn'; }
+        else { m = line.match(/^\s*(?:type\s+)?(?:interface|struct)\s+(\w+)/); if (m) { name = m[1]; type = 'class'; } }
+      } else if (lang === 'javascript' || lang === 'typescript') {
+        let m = line.match(/\b(?:export\s+)?(?:abstract\s+)?class\s+(\w+)/);
+        if (m) { name = m[1]; type = 'class'; }
+        else { m = line.match(/\b(?:export\s+)?(?:async\s+)?function\s+(\w+)/); if (m) { name = m[1]; type = 'fn'; }
+          else { m = line.match(/\b(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>/); if (m) { name = m[1]; type = 'fn'; }
+            else { m = line.match(/^\s*(\w+)\s*\([^;{}]*\)\s*\{/); if (m) { name = m[1]; type = 'fn'; } } } }
+      } else {
+        // ---- C/C++：类 / 结构体 / 枚举 / 联合 / 命名空间 + 函数 ----
+        // 跳过注释行 / 预处理行（防止 ` *   uart_write(...);` 被误认为原型）
+        if (!/^\s*(?:\/\/|\/\*|\*|#)/.test(line)) {
+          let m = null;
+          // ① 单行匿名 typedef：`typedef struct { int x; } Name;`（允许行尾注释）
+          m = line.match(/^\s*typedef\s+(?:struct|union|enum|class)\s*\{.*\}\s*([A-Za-z_]\w*)\s*;\s*(\/\/.*|\/\*[\s\S]*\*\/\s*)?$/);
+          if (m) { name = m[1]; type = 'class'; pending = null; }
+          else {
+            // ② 多行匿名 typedef 起始（名字在闭合括号后）：`typedef struct {` / `typedef struct`
+            if (line.match(/^\s*(?:typedef\s+)?(?:struct|union|enum|class)\s*\{?\s*$/) && !line.includes(';')) {
+              pending = { line: i + 1 };
+            }
+            const close = line.match(/^\s*}\s*([A-Za-z_]\w*)\s*;/);
+            if (pending && close) {
+              name = close[1]; type = 'class'; entryLine = pending.line; pending = null;
+            } else {
+              // ③ 命名定义：名后同行有 {，或名字独立成行/仅带注释（大括号在下一行，Allman 风格）
+              m = line.match(/^\s*(?:typedef\s+)?(?:class|struct|enum|union|interface|protocol|extension|namespace)\s+([A-Za-z_]\w*)\b/);
+              if (m) {
+                const rest = line.slice(line.indexOf(m[1]) + m[1].length);
+                if (rest.includes('{') || /^\s*(\/\/.*|\/\*[\s\S]*\*\/)?\s*$/.test(rest)) { name = m[1]; type = 'class'; }
+              }
+              // ④ 函数定义：大括号同行或下一行；排除 if/for/while/return 等控制词与声明
+              else if (!line.replace(/\s+$/, '').endsWith(';')) {
+                m = line.match(/^\s*(?:[\w:<>,*&\[\]\s]+\s+)?([A-Za-z_~][\w:<>~]*)\s*\([^;{}]*\)\s*(?:const|override|noexcept|volatile)?\s*(?:\{|$)/);
+                if (m) { name = m[1]; type = 'fn'; }
+              }
+              // ⑤ 函数原型/声明（头文件 API）：`返回类型 名字(参数);`
+              //    名字前必须是"空白 + 返回类型"（排除裸调用）；排除赋值初始化 / 控制语句 / 函数指针
+              else {
+                const pi = line.indexOf('(');
+                const isControl = /^\s*(?:return|if|for|while|switch|case|default|sizeof|new|delete|yield|async|await|break|continue|goto|throw|catch|typeof|using)\b/.test(line);
+                const hasAssignBeforeParen = pi > 0 && line.slice(0, pi).includes('=');
+                if (!isControl && !hasAssignBeforeParen) {
+                  m = line.match(/^\s*(?:[\w:<>,*&\[\]]+\s+)+([A-Za-z_~][\w:<>~]*)\s*\([^;{}]*\)\s*;/);
+                  if (m && !OL_CONTROL.has(m[1])) { name = m[1]; type = 'fn'; }
+                }
+              }
+            }
+          }
+        }
+      }
+      if (name && !OL_CONTROL.has(name)) entries.push({ type, name, line: entryLine, depth: d0 });
+      depth += countCh(line, '{') - countCh(line, '}');
+    } else {
+      const indent = line.length - line.replace(/^\s*/, '').length;
+      let name = null, type = null;
+      if (lang === 'python') {
+        let m = line.match(/^\s*class\s+([A-Za-z_]\w*)/);
+        if (m) { name = m[1]; type = 'class'; }
+        else { m = line.match(/^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)/); if (m) { name = m[1]; type = 'fn'; } }
+      } else if (lang === 'ruby') {
+        let m = line.match(/^\s*(?:class|module)\s+(\w+)/);
+        if (m) { name = m[1]; type = 'class'; }
+        else { m = line.match(/^\s*def\s+(\w+)/); if (m) { name = m[1]; type = 'fn'; } }
+      }
+      if (name) {
+        while (indentStack.length && indent <= indentStack[indentStack.length - 1].indent) indentStack.pop();
+        entries.push({ type, name, line: i + 1, depth: indentStack.length });
+        indentStack.push({ indent });
+      }
+    }
+  }
+  return entries;
+}
+
+function renderOutline() {
+  const s = CURRENT;
+  const f = s && s.fragments[CINDEX];
+  const body = $('outline-body');
+  if (!f) { body.innerHTML = '<span class="ol-empty">选择片段后显示代码大纲</span>'; $('outline-count').textContent = ''; return; }
+  const src = EDITING ? editText() : f.code;
+  if (f.language === 'markdown') {        // Markdown：标题大纲（TOC）
+    const heads = [];
+    src.split('\n').forEach((ln, idx) => {
+      const m = ln.match(/^(#{1,6})\s+(.*)$/);
+      if (m) heads.push({ level: m[1].length, text: m[2], line: idx + 1 });
+    });
+    $('outline-count').textContent = heads.length ? heads.length + ' 项' : '';
+    if (!heads.length) { body.innerHTML = '<span class="ol-empty">未识别到标题（用 # 写标题）</span>'; return; }
+    body.innerHTML = '';
+    heads.forEach((h, k) => {
+      const d = document.createElement('div');
+      d.className = 'ol-item class';
+      d.dataset.line = h.line;
+      d.style.paddingLeft = (8 + (h.level - 1) * 14) + 'px';
+      d.innerHTML = `<span class="ol-ico">📄</span><span>${escapeHtml(stripMd(h.text))}</span><span class="ol-ln">:${h.line}</span>`;
+      d.onclick = () => jumpToMdHeading(k);
+      body.appendChild(d);
+    });
+    return;
+  }
+  const items = outlineFor(src, f.language);
+  $('outline-count').textContent = items.length ? items.length + ' 项' : '';
+  if (!items.length) { body.innerHTML = '<span class="ol-empty">未识别到函数 / 类</span>'; return; }
+  body.innerHTML = '';
+  for (const it of items) {
+    const d = document.createElement('div');
+    d.className = 'ol-item ' + it.type;
+    d.dataset.line = it.line;
+    d.style.paddingLeft = (8 + it.depth * 14) + 'px';
+    d.innerHTML = `<span class="ol-ico">${it.type === 'class' ? '▣' : 'ƒ'}</span><span>${escapeHtml(it.name)}</span><span class="ol-ln">:${it.line}</span>`;
+    d.onclick = () => jumpToLine(it.line);
+    body.appendChild(d);
+  }
+}
+
+// 跳转到某一行：滚动代码区 + 高亮闪烁该行 + 大纲项高亮
+function jumpToLine(line) {
+  const cw = $('code-wrap');
+  const lineH = parseFloat(getComputedStyle($('code')).lineHeight) || 20;
+  const padTop = parseFloat(getComputedStyle($('code')).paddingTop) || 0;
+  cw.scrollTop = Math.max(0, padTop + (line - 1) * lineH - cw.clientHeight * 0.3);
+  let fl = $('ln-flash');
+  if (!fl) { fl = document.createElement('div'); fl.id = 'ln-flash'; cw.appendChild(fl); }
+  // 闪烁条用【内容坐标】定位：绝对定位子元素在滚动容器内会自动随 scrollTop 移动，不能手动再减 scrollTop
+  const place = () => {
+    fl.style.top = (padTop + (line - 1) * lineH) + 'px';
+    fl.style.height = lineH + 'px';
+  };
+  place();
+  fl.style.opacity = 1;
+  clearTimeout(fl._t); fl._t = setTimeout(() => { fl.style.opacity = 0; }, 900);
+  document.querySelectorAll('.ol-item.active').forEach(el => el.classList.remove('active'));
+  const it = document.querySelector('.ol-item[data-line="' + line + '"]');
+  if (it) it.classList.add('active');
+}
+
+function toggleOutline() {
+  const show = $('outline-panel').classList.toggle('collapsed');   /* 收起大纲，保留操作按钮列 */
+  try { localStorage.setItem('mc-outline', show ? '0' : '1'); } catch (_) {}
+  $('btn-outline').classList.toggle('on', !show);
+}
+
+/* ---- 轻量语法高亮（内置分词器，离线可用） ---- */
+const KEYWORDS = {
+  javascript: 'const let var function return if else for while do switch case break continue new class extends super this typeof instanceof delete in of async await try catch finally throw default import export from yield static get set null undefined true false typeof',
+  typescript: 'const let var function return if else for while do switch case break continue new class extends super this typeof instanceof delete in of async await try catch finally throw default import export from yield static get set interface type enum namespace declare readonly public private protected implements null undefined true false',
+  python: 'def return if elif else for while in not and or import from as class try except finally raise with lambda None True False pass break continue global nonlocal yield assert del is self print',
+  c_cpp: 'int void char float double long short unsigned signed bool auto const static struct class namespace using include return if else for while do switch case break continue new delete this public private protected virtual override template typename sizeof typedef enum union extern inline try catch throw std true false',
+  go: 'package import func var const type struct interface map chan return if else for range go defer select switch case break continue default fallthrough goto nil true false iota make new len cap append copy delete print println error string int bool uint float64',
+  bash: 'if then else elif fi for while do done case esac function return echo exit export local set unset readonly true false',
+  json: 'true false null',
+};
+
+function highlight(code, lang) {
+  const kw = new Set((KEYWORDS[lang] || '').split(/\s+/).filter(Boolean));
+  const isIdStart = (c) => /[A-Za-z_$]/.test(c);
+  const isId = (c) => /[A-Za-z0-9_$]/.test(c);
+  const lineCmts = (lang === 'python' || lang === 'bash') ? '#' : '//';
+  const blockCmt = (lang === 'c_cpp' || lang === 'javascript' || lang === 'typescript' || lang === 'go') ? '/*' : null;
+  let out = '', i = 0, n = code.length;
+  const push = (s, cls) => { out += cls ? `<span class="${cls}">${escapeHtml(s)}</span>` : escapeHtml(s); };
+  while (i < n) {
+    const c = code[i], nxt = code[i + 1];
+    if (/\s/.test(c)) { let j = i; while (j < n && /\s/.test(code[j])) j++; push(code.slice(i, j)); i = j; continue; }
+    if (code.startsWith(lineCmts, i) || code.startsWith('<!--', i)) {
+      let j = code.indexOf('\n', i); if (j < 0) j = n; push(code.slice(i, j), 'c'); i = j; continue;
+    }
+    if (blockCmt && code.startsWith(blockCmt, i)) {
+      let j = code.indexOf('*/', i + 2); if (j < 0) j = n; else j += 2; push(code.slice(i, j), 'c'); i = j; continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      while (j < n) { if (code[j] === '\\') { j += 2; continue; } if (code[j] === c) { j++; break; } j++; }
+      if (j > n) j = n; push(code.slice(i, j), 's'); i = j; continue;
+    }
+    if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(nxt || ''))) {
+      let j = i; while (j < n && /[0-9a-fA-FxXbB_.]/.test(code[j])) j++; push(code.slice(i, j), 'n'); i = j; continue;
+    }
+    if (isIdStart(c)) {
+      let j = i; while (j < n && isId(code[j])) j++;
+      const w = code.slice(i, j);
+      push(w, kw.has(w) ? 'k' : null); i = j; continue;
+    }
+    if (lang === 'html' && c === '<' && /[A-Za-z/!]/.test(nxt || '')) {
+      let j = i + 1, tag = '';
+      while (j < n && !/\s/.test(code[j]) && code[j] !== '>' && code[j] !== '/') { tag += code[j]; j++; }
+      if (tag && tag[0] !== '/') {
+        push('<' + tag, 't');
+        while (j < n && code[j] !== '>') {
+          if (code[j] === '"' || code[j] === "'") {
+            const q = code[j]; let k = j + 1; while (k < n && code[k] !== q) k++; if (k < n) k++;
+            push(code.slice(j, k), 's'); j = k; continue;
+          }
+          if (/[A-Za-z_:]/.test(code[j])) {
+            let k = j; while (k < n && /[A-Za-z0-9_:.-]/.test(code[k])) k++;
+            push(code.slice(j, k), 'a'); j = k; continue;
+          }
+          push(code[j]); j++;
+        }
+        if (j < n) { push('>'); j++; }
+        i = j; continue;
+      }
+    }
+    push(c); i++;
+  }
+  return out;
+}
+
+function select(s) {
+  if (!confirmLeaveEdit()) return;
+  CURRENT = s; CINDEX = 0;
+  renderList(); renderMain();
+}
+
+function renderCode() {
+  const s = CURRENT;
+  if (!s) { $('snippet-title').textContent = '选择一个片段'; $('tabs').innerHTML = ''; $('code').innerHTML = ''; $('ln').textContent = ''; $('code-edit').value = ''; renderOutline(); return; }
+  $('snippet-title').textContent = s.name;
+  $('snippet-desc').textContent = s.description;
+  const tabs = $('tabs'); tabs.innerHTML = '';
+  s.fragments.forEach((f, i) => {
+    const t = document.createElement('button');
+    t.className = 'tab' + (i === CINDEX ? ' active' : '');
+    t.textContent = `${f.label || ('片段 ' + (i + 1))} · ${f.language}`;
+    t.title = '文件: ' + f.filename;
+    t.onclick = () => { if (!confirmLeaveEdit()) return; CINDEX = i; renderMain(); };
+    tabs.appendChild(t);
+  });
+  const multi = s.fragments.length > 1;
+  if (multi) {
+    $('multi-badge').style.display = '';
+    const isC = s.fragments.every(f => ['c_cpp', 'c'].includes(f.language));
+    $('multi-badge').textContent = isC
+      ? `📦 ${s.fragments.length} 个文件 · 运行将一起编译（.cpp/.hpp）`
+      : `📦 ${s.fragments.length} 个文件 · 运行共享目录`;
+  } else { $('multi-badge').style.display = 'none'; }
+  const f = s.fragments[CINDEX];
+  if (EDITING) {
+    // 编辑模式：代码 → 透明 textarea 叠加实时高亮层（直接编辑就是高亮文本）；markdown → 纯文本编辑（右侧渲染预览）
+    // 绝不在编辑中覆盖用户输入（保护内容 + 保留原生撤销栈）
+    const isMd = f && f.language === 'markdown';
+    $('code').style.display = isMd ? 'none' : '';
+    $('ln').style.display = 'none';
+    $('code-edit').style.display = '';
+    $('code-edit').classList.toggle('live-hl', !isMd);
+    $('code-wrap').style.overflow = isMd ? '' : 'hidden';
+    $('code').style.overflow = isMd ? '' : 'hidden';
+    if (!isMd) syncHighlight();
+  } else {
+    $('code-wrap').style.overflow = '';
+    $('code').style.overflow = '';
+    $('code-edit').classList.remove('live-hl', 'composing');
+    $('code-edit').style.display = 'none';
+    $('code').style.display = '';
+    $('ln').style.display = '';
+    $('code').innerHTML = f ? codeHtml(f.code, f.language) : '';
+    $('ln').textContent = f ? f.code.split('\n').map((_, i) => i + 1).join('\n') : '';
+  }
+  $('btn-run').disabled = $('btn-check').disabled = $('btn-format').disabled = $('btn-input').disabled = $('btn-edit').disabled = !f;
+  const isHtml = f && f.language === 'html';
+  $('btn-preview').style.display = isHtml ? '' : 'none';
+  $('btn-preview').disabled = !isHtml;
+  updateEditButtons();
+  renderOutline();
+  applyMdView();
+}
+
+// 编辑模式按钮状态：编辑时显示 保存/放弃，编辑按钮高亮
+function updateEditButtons() {
+  $('btn-edit').classList.toggle('on', EDITING);
+  $('btn-edit').textContent = EDITING ? '✏ 编辑中' : '✏ 编辑';
+  $('btn-save').style.display = EDITING ? '' : 'none';
+  $('btn-cancel').style.display = EDITING ? '' : 'none';
+  $('btn-save').disabled = !EDITING;
+  $('btn-cancel').disabled = !EDITING;
+}
+
+// massCode 语言码 -> highlight.js 语言
+const HL_LANG = {
+  c_cpp: 'cpp', c: 'c', javascript: 'javascript', typescript: 'typescript',
+  python: 'python', bash: 'bash', shell: 'bash', go: 'go', java: 'java',
+  ruby: 'ruby', swift: 'swift', json: 'json', json5: 'json', html: 'xml',
+  css: 'css', scss: 'scss', less: 'less', yaml: 'yaml', markdown: 'markdown',
+  plain_text: 'plaintext',
+};
+
+// 优先用 highlight.js（本地资源）；加载失败时回退到内置高亮
+function codeHtml(code, lang) {
+  if (window.hljs) {
+    const l = HL_LANG[lang] || 'plaintext';
+    try { return window.hljs.highlight(code, { language: l, ignoreIllegals: true }).value; }
+    catch (_) {
+      try { return window.hljs.highlightAuto(code).value; } catch (__) {}
+    }
+  }
+  return highlight(code, lang);
+}
+
+/* ---- Markdown 渲染（零依赖内置解析器） ---- */
+let MD_RENDER_MODE = true;   /* true=渲染视图，false=源码 */
+let MD_HEAD_ID = 0;
+function safeMdUrl(u) {
+  u = String(u || '').replace(/^\s*javascript:/i, '').trim();
+  return /^(https?:|mailto:|tel:|#|\/|\.)/i.test(u) ? u : '';
+}
+function stripMd(s) {
+  return String(s).replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/`([^`]+)`/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1').replace(/[#_]/g, '').trim();
+}
+function renderMarkdown(md) {
+  MD_HEAD_ID = 0;
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const inline = (s) => {
+    let t = esc(s), codes = [];
+    t = t.replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return '\u0001' + (codes.length - 1) + '\u0001'; });
+    t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    t = t.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    t = t.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+    t = t.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+    t = t.replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g, (_, alt, u) => { u = safeMdUrl(u); return u ? `<img src="${u}" alt="${esc(alt)}">` : ''; });
+    t = t.replace(/\[([^\]]+)\]\(([^)\s]+)[^)]*\)/g, (_, tx, u) => { u = safeMdUrl(u); return u ? `<a href="${u}" target="_blank" rel="noopener">${tx}</a>` : tx; });
+    t = t.replace(/\u0001(\d+)\u0001/g, (_, n) => '<code>' + codes[+n] + '</code>');
+    return t;
+  };
+  const codeBlock = (lang, body) => {
+    let val = null;
+    if (window.hljs) {
+      const l = lang && HL_LANG[lang] ? HL_LANG[lang] : '';
+      try { if (l) val = window.hljs.highlight(body, { language: l, ignoreIllegals: true }).value; } catch (_) {}
+    }
+    if (val === null) val = esc(body);
+    return '<pre class="md-pre"><code>' + val + '</code></pre>';
+  };
+  const lines = String(md).replace(/\r\n/g, '\n').split('\n');
+  let html = '', i = 0;
+  const blockStart = (l) => /^(```|#{1,6}\s|>\s?| {4}|\t|\s*([-*+]|\d+\.)\s|\s*\|)/.test(l) || /^\s*([-*_])\s*([-*_]\s*){1,}$/.test(l);
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    const fm = line.match(/^```(\w*)\s*$/);
+    if (fm) {                                   // 围栏代码块
+      const buf = []; let j = i + 1;
+      while (j < lines.length && !/^```\s*$/.test(lines[j])) buf.push(lines[j++]);
+      html += codeBlock(fm[1], buf.join('\n')); i = j + 1; continue;
+    }
+    const hm = line.match(/^(#{1,6})\s+(.*)$/);
+    if (hm) {                                   // 标题
+      const n = hm[1].length;
+      html += `<h${n} id="md-h-${MD_HEAD_ID++}">` + inline(hm[2]) + `</h${n}>`; i++; continue;
+    }
+    if (/^\s*([-*_])\s*([-*_]\s*){1,}$/.test(line)) { html += '<hr>'; i++; continue; }
+    if (/^\s*>\s?/.test(line)) {                // 引用
+      const buf = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) { buf.push(lines[i].replace(/^\s*>\s?/, '')); i++; }
+      html += '<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>'; continue;
+    }
+    if (/^\s*\|.*\|/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|/.test(lines[i + 1])) {  // 表格
+      const head = line.split('|').slice(1, -1).map(s => s.trim());
+      let j = i + 2; const rows = [];
+      while (j < lines.length && /^\s*\|.*\|/.test(lines[j])) { rows.push(lines[j].split('|').slice(1, -1).map(s => s.trim())); j++; }
+      html += '<table><thead><tr>' + head.map(h => '<th>' + inline(h) + '</th>').join('') + '</tr></thead><tbody>';
+      html += rows.map(r => '<tr>' + r.map(c => '<td>' + inline(c) + '</td>').join('') + '</tr>').join('');
+      html += '</tbody></table>'; i = j; continue;
+    }
+    if (/^( {4}|\t)/.test(line)) {              // 4 空格缩进代码块
+      const buf = [];
+      while (i < lines.length && (/^( {4}|\t)/.test(lines[i]) || !lines[i].trim())) {
+        if (lines[i].trim()) buf.push(lines[i].replace(/^( {4}|\t)/, '')); i++;
+      }
+      html += codeBlock('', buf.join('\n')); continue;
+    }
+    if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {    // 列表
+      const items = []; let isOl = false;
+      while (i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i])) {
+        const m = lines[i].match(/^\s*([-*+]|\d+\.)\s+(.*)$/);
+        if (/^\s*\d+\./.test(lines[i])) isOl = true;
+        items.push(inline(m[2])); i++;
+      }
+      html += (isOl ? '<ol>' : '<ul>') + items.map(x => '<li>' + x + '</li>').join('') + (isOl ? '</ol>' : '</ul>'); continue;
+    }
+    const buf = [line];                         // 段落
+    while (i + 1 < lines.length && lines[i + 1].trim() && !blockStart(lines[i + 1])) { i++; buf.push(lines[i]); }
+    html += '<p>' + inline(buf.join('\n')) + '</p>'; i++;
+  }
+  return html;
+}
+
+function applyMdView() {
+  const s = CURRENT, f = s && s.fragments[CINDEX];
+  const isMd = !EDITING && f && f.language === 'markdown';
+  $('btn-md').style.display = isMd ? '' : 'none';
+  $('btn-md').disabled = !isMd;
+  if (isMd) {
+    $('btn-md').textContent = MD_RENDER_MODE ? '📄 源码' : '👁 渲染';
+    $('md-view').innerHTML = renderMarkdown(f.code);
+    const show = MD_RENDER_MODE;
+    $('md-view').style.display = show ? 'block' : 'none';   /* block，不能 flex，否则块元素横排 */
+    $('code-wrap').style.display = show ? 'none' : '';
+    $('edit-preview').style.display = 'none';
+    applyEditSplit(false);
+  } else if (EDITING) {
+    // 编辑模式：markdown 左源码 / 右实时渲染（左右并排可拖）；代码直接全宽编辑，无预览
+    $('btn-md').style.display = 'none';
+    $('md-view').style.display = 'none';
+    $('md-view').innerHTML = '';
+    $('code-wrap').style.display = '';          /* 关键：编辑时必须显示编辑器（否则 markdown 编辑会整个不可见） */
+    const split = f && f.language === 'markdown';
+    applyEditSplit(split);
+    if (split) updateEditPreview(); else $('edit-preview').style.display = 'none';
+  } else {
+    $('md-view').style.display = 'none';
+    $('md-view').innerHTML = '';
+    $('edit-preview').style.display = 'none';
+    applyEditSplit(false);
+    // 不动 code-wrap：交给 renderMain / doPreview 管理
+  }
+}
+
+// 编辑模式左右分栏（仅 markdown）：显示分割条，并应用/重置记忆的源码宽度
+function applyEditSplit(splitMode) {
+  $('edit-split-v').style.display = splitMode ? 'block' : 'none';   /* 显式值：CSS 默认是 none，inline '' 无法覆盖 */
+  $('code-wrap').style.flex = '';
+  $('code-wrap').style.width = '';
+  if (splitMode) {
+    let dw = 0;
+    try { dw = parseInt(localStorage.getItem('mc-edit-split-w')) || 0; } catch (_) {}
+    if (dw >= 200) { $('code-wrap').style.flex = 'none'; $('code-wrap').style.width = dw + 'px'; }
+  }
+}
+
+// 编辑模式实时预览（仅 markdown）：渲染文档，跟随输入实时更新；代码编辑无预览
+function updateEditPreview() {
+  const p = $('edit-preview');
+  const f = CURRENT && CURRENT.fragments[CINDEX];
+  if (!EDITING || !f || f.language !== 'markdown') { p.style.display = 'none'; return; }
+  p.classList.add('md-doc');
+  p.innerHTML = renderMarkdown(editText());
+  p.style.display = 'block';
+}
+
+// 代码编辑实时高亮：把编辑框内容高亮进 #code（透明 textarea 下方的高亮层），并同步滚动
+function syncHighlight() {
+  const f = CURRENT && CURRENT.fragments[CINDEX];
+  if (!EDITING || !f || f.language === 'markdown') return;
+  const ta = $('code-edit'), pre = $('code');
+  pre.innerHTML = codeHtml(ta.value, f.language);
+  pre.scrollTop = ta.scrollTop;
+  pre.scrollLeft = ta.scrollLeft;
+}
+
+function jumpToMdHeading(k) {
+  if (EDITING) return;
+  if (!MD_RENDER_MODE) { MD_RENDER_MODE = true; try { localStorage.setItem('mc-md-view', '1'); } catch (_) {} applyMdView(); }
+  const h = document.getElementById('md-h-' + k);
+  if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderMain() {
+  renderCode();
+  $('preview').style.display = 'none';
+  $('edit-split').style.display = '';
+  $('code-wrap').style.display = '';
+  $('output').style.display = 'flex';
+  $('split-h').style.display = '';
+  setStatus('idle', '空闲'); $('elapsed').textContent = ''; $('out-body').innerHTML = '<span class="empty">选择片段并点击「运行」查看输出</span>';
+  applyMdView();
+}
+
+function setStatus(kind, text) {
+  const p = $('status'); p.className = 'pill ' + kind; p.textContent = text;
+}
+
+async function doRun() {
+  if (!CURRENT) return;
+  const inp = $('input-box').value;
+  $('in-status').textContent = inp ? '已传入 ' + inp.split('\n').length + ' 行' : '未使用';
+  $('in-status').className = 'in-dot' + (inp ? ' on' : '');
+  $('out-body').innerHTML = '<span class="empty">运行中…</span>';
+  setStatus('idle', '运行中…');
+  const t0 = performance.now();
+  const body = { file: CURRENT.file, fragment: CINDEX, input: inp };
+  if (EDITING) body.code = editText(); // 运行编辑框里的内容（未保存也先跑）
+  const r = await api('/api/run', body);
+  $('elapsed').textContent = ((performance.now() - t0) / 1000).toFixed(2) + 's';
+  if (r.unsupported) { setStatus('err', '不支持'); showOut(r.reason, '', false); return; }
+  if (!r.ok) {
+    if (r.timedOut) {
+      setStatus('err', 'timeout');
+      showOut(r.stdout, r.stderr + (inp ? '' : '\n提示：程序可能在等待输入——点「⌨ 输入」填写内容后重试'), false);
+    } else {
+      setStatus('err', '退出码 ' + (r.code ?? '?'));
+      showOut(r.stdout, r.stderr, false);
+    }
+    return;
+  }
+  setStatus('ok', '成功'); showOut(r.stdout, r.stderr, true);
+}
+
+async function doCheck() {
+  if (!CURRENT) return;
+  setStatus('idle', '检查中…');
+  const body = { file: CURRENT.file, fragment: CINDEX };
+  if (EDITING) body.code = editText();
+  const r = await api('/api/check', body);
+  if (r.unsupported) { setStatus('err', '不支持'); showOut(r.reason, '', false); return; }
+  if (r.ok) { setStatus('ok', '通过'); showOut('✓ 语法检查通过', r.stderr, true); }
+  else { setStatus('err', '失败'); showOut(r.stdout, r.stderr, false); }
+}
+
+async function doFormat() {
+  if (!CURRENT) return;
+  setStatus('idle', '格式化中…');
+  const body = { file: CURRENT.file, fragment: CINDEX };
+  if (EDITING) { body.code = editText(); body.writeBack = false; } // 编辑模式：只格式化编辑框，不写盘
+  const r = await api('/api/format', body);
+  if (!r.ok) { setStatus('err', '失败'); showOut(r.reason || '格式化失败', '', false); return; }
+  if (EDITING) {
+    $('code-edit').value = r.formatted.replace(/\n+$/, '');
+    setStatus('ok', '已格式化'); showOut(r.message, '', true);
+    return;
+  }
+  setStatus('ok', '完成'); showOut(r.message + '\n\n' + r.formatted, '', true);
+  if (r.written) { await refresh(); const n = SNIPPETS.find(s => s.file === CURRENT.file); if (n) select(n); }
+}
+
+// 编辑模式：进入 / 退出（不保存）
+function toggleEdit() {
+  if (EDITING) {
+    if (!confirmLeaveEdit()) return;
+    EDITING = false;
+    renderCode();
+  } else {
+    if (!CURRENT) return;
+    EDITING = true;
+    $('code-edit').value = currentCode();
+    renderCode();
+    $('code-edit').focus();
+  }
+}
+
+async function doSave() {
+  if (!CURRENT || !EDITING) return;
+  const code = editText();
+  setStatus('idle', '保存中…');
+  const r = await api('/api/save', { file: CURRENT.file, fragment: CINDEX, code });
+  if (!r.ok) { setStatus('err', '保存失败'); showOut(r.message || r.error || '保存失败', '', false); return; }
+  EDITING = false;
+  await refresh();
+  const n = SNIPPETS.find(s => s.file === CURRENT.file);
+  if (n) { CURRENT = n; CINDEX = Math.min(CINDEX, n.fragments.length - 1); renderMain(); }
+  setStatus('ok', '已保存'); showOut(r.message, '', true);
+}
+
+function doCancelEdit() {
+  if (!confirmLeaveEdit()) return;
+  EDITING = false;
+  renderCode();
+}
+
+function showOut(stdout, stderr, isOk) {
+  const b = $('out-body'); b.innerHTML = '';
+  const pre = document.createElement('pre');
+  if (stdout) { const s = document.createElement('span'); s.textContent = stdout; pre.appendChild(s); }
+  if (stderr) {
+    const s = document.createElement('span'); s.className = 'stderr'; s.textContent = '\n[stderr]\n' + stderr; pre.appendChild(s);
+  }
+  if (!stdout && !stderr) pre.appendChild(Object.assign(document.createElement('span'), { className: 'empty', textContent: '(无输出)' }));
+  b.appendChild(pre);
+  b.scrollTop = b.scrollHeight;
+}
+
+function doPreview() {
+  if (!CURRENT) return;
+  const f = CURRENT.fragments[CINDEX];
+  const blob = new Blob([f.code], { type: 'text/html' });
+  $('pframe').src = URL.createObjectURL(blob);
+  $('preview').style.display = ''; $('code-wrap').style.display = 'none'; $('edit-split').style.display = 'none'; $('output').style.display = 'none'; $('split-h').style.display = 'none';
+  setStatus('ok', '预览中');
+}
+
+$('btn-run').onclick = doRun;
+$('btn-check').onclick = doCheck;
+$('btn-format').onclick = doFormat;
+$('btn-preview').onclick = doPreview;
+$('btn-edit').onclick = toggleEdit;
+$('btn-save').onclick = doSave;
+$('btn-cancel').onclick = doCancelEdit;
+// Cmd/Ctrl+S 保存（编辑模式下）
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+    e.preventDefault();
+    if (EDITING) doSave();
+  }
+});
+$('btn-input').onclick = () => { const a = $('input-area'); a.classList.toggle('hidden'); if (!a.classList.contains('hidden')) $('input-box').focus(); };
+$('btn-md').onclick = () => {
+  MD_RENDER_MODE = !MD_RENDER_MODE;
+  try { localStorage.setItem('mc-md-view', MD_RENDER_MODE ? '1' : '0'); } catch (_) {}
+  applyMdView();
+};
+$('tag-head').onclick = toggleTagHead;
+renderTagHead();
+
+/* ---- 拖拽调整大小：左侧宽度 / 输出高度（记忆到 localStorage） ---- */
+function clampV(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function makeResizer(split, axis, getter, setter, flip) {
+  let start = null;
+  split.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    start = { x: e.clientX, y: e.clientY, v: getter() };
+    try { split.setPointerCapture(e.pointerId); } catch (_) {}
+    document.body.classList.add('resizing', axis === 'v' ? 'resizing-v' : 'resizing-h');
+    split.classList.add('active');
+  });
+  split.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    // 竖向：向右拉 → 左侧变宽(+); 横向：向上拉 → 输出变高(-); flip 反向（右侧面板）
+    const dv = axis === 'v' ? e.clientX - start.x : -(e.clientY - start.y);
+    setter(start.v + (flip ? -dv : dv));
+  });
+  const end = () => {
+    if (!start) return;
+    start = null;
+    document.body.classList.remove('resizing', 'resizing-v', 'resizing-h');
+    split.classList.remove('active');
+  };
+  split.addEventListener('pointerup', end);
+  split.addEventListener('pointercancel', end);
+}
+(function initLayout() {
+  try {
+    const sw = parseInt(localStorage.getItem('mc-side-w')) || 320;
+    const oh = parseInt(localStorage.getItem('mc-out-h')) || 200;
+    $('side').style.width = clampV(sw, 180, 700) + 'px';
+    $('output').style.height = clampV(oh, 90, Math.round(window.innerHeight * 0.62)) + 'px';
+  } catch (_) {}
+  makeResizer($('split-v'), 'v',
+    () => $('side').getBoundingClientRect().width,
+    (v) => { $('side').style.width = clampV(v, 180, 700) + 'px'; try { localStorage.setItem('mc-side-w', String(Math.round(v))); } catch (_) {} });
+  makeResizer($('split-h'), 'h',
+    () => $('output').getBoundingClientRect().height,
+    (v) => { $('output').style.height = clampV(v, 90, Math.round(window.innerHeight * 0.62)) + 'px'; try { localStorage.setItem('mc-out-h', String(Math.round(v))); } catch (_) {} });
+  makeResizer($('split-v2'), 'v',
+    () => $('outline-panel').getBoundingClientRect().width,
+    (v) => { $('outline-panel').classList.remove('collapsed'); $('outline-panel').style.width = clampV(v, 160, 520) + 'px'; try { localStorage.setItem('mc-outline-w', String(Math.round(v))); } catch (_) {} },
+    true); // 右侧面板：向左拖 = 变宽（反向）
+  makeResizer($('edit-split-v'), 'v',
+    () => $('code-wrap').getBoundingClientRect().width,
+    (v) => { $('code-wrap').style.flex = 'none'; $('code-wrap').style.width = clampV(v, 220, Math.max(300, Math.round(window.innerWidth * 0.75))) + 'px'; try { localStorage.setItem('mc-edit-split-w', String(Math.round(v))); } catch (_) {} });
+  // 大纲面板默认显示，记忆开关与宽度（收起时保留操作按钮列）
+  let showOutline = true;
+  try { showOutline = localStorage.getItem('mc-outline') !== '0'; } catch (_) {}
+  try { MD_RENDER_MODE = localStorage.getItem('mc-md-view') !== '0'; } catch (_) {}
+  try {
+    const ow = parseInt(localStorage.getItem('mc-outline-w')) || 240;
+    $('outline-panel').style.width = clampV(ow, 160, 520) + 'px';
+  } catch (_) {}
+  if (!showOutline) { $('outline-panel').classList.add('collapsed'); }
+  $('btn-outline').classList.toggle('on', showOutline);
+  $('btn-outline').onclick = toggleOutline;
+  // 编辑模式下输入时实时刷新大纲 + 实时渲染预览 + 代码实时高亮
+  $('code-edit').addEventListener('input', () => { if (EDITING) { renderOutline(); updateEditPreview(); syncHighlight(); } });
+  // 代码编辑的高亮层与 textarea 滚动同步
+  $('code-edit').addEventListener('scroll', () => {
+    if (EDITING) { $('code').scrollTop = $('code-edit').scrollTop; $('code').scrollLeft = $('code-edit').scrollLeft; }
+  });
+  // 输入法合成期（拼音/五笔候选）：临时显示明文，避免候选字看不见；合成结束恢复高亮
+  $('code-edit').addEventListener('compositionstart', () => $('code-edit').classList.add('composing'));
+  $('code-edit').addEventListener('compositionend', () => { $('code-edit').classList.remove('composing'); syncHighlight(); });
+})();
+$('refresh').onclick = () => refresh(false);
+$('search').oninput = renderList;
+
+// 实时同步：每 2.5s 探测 vault 版本指纹，变了就静默刷新（保留选中与输出）
+async function syncLoop() {
+  try {
+    const d = await api('/api/rev');
+    if (d.rev && d.rev !== lastRev) await refresh(true);
+    setSync(true);
+  } catch (_) { setSync(false); }
+}
+setInterval(syncLoop, 2500);
+
+// 环境检测面板
+async function loadEnv(refreshNow) {
+  const d = await api('/api/env' + (refreshNow ? '?refresh=1' : ''));
+  $('env-ready').textContent = d.summary.ready;
+  $('env-missing').textContent = d.summary.missing;
+  $('env-meta').innerHTML = `Vault: <code style="font-size:11px">${escapeHtml(d.vault)}</code><br>平台: ${escapeHtml(d.platform)}`;
+  const list = $('env-list'); list.innerHTML = '';
+  const tools = Object.values(d.env).sort((a, b) => (a.available === b.available ? 0 : a.available ? 1 : -1));
+  for (const t of tools) {
+    const row = document.createElement('div');
+    row.className = 'tool-row';
+    const hint = t.available ? '' : `<div class="hint">⚠ ${escapeHtml(t.label)} 缺失 · ${escapeHtml(t.for)}<br>安装: ${escapeHtml(t.hint || installHints[t.key] || '')}</div>`;
+    row.innerHTML = `<div class="dot ${t.available ? 'ok' : 'bad'}"></div>
+      <div class="info"><div class="nm">${escapeHtml(t.label)}</div><div class="sub">${escapeHtml(t.for)}</div>${hint}</div>
+      <div class="ver">${t.available ? escapeHtml(t.version || 'ok') : '缺失'}</div>`;
+    list.appendChild(row);
+  }
+}
+// 安装提示映射（与服务端一致）
+const installHints = {
+  node: 'brew install node', python3: 'brew install python', bash: '系统自带',
+  gcc: 'xcode-select --install', gpp: 'xcode-select --install', java: 'brew install --cask temurin',
+  ruby: 'brew install ruby', swift: 'xcode-select --install', go: 'brew install go',
+  clangformat: 'xcode-select --install 或 brew install clang-format', gofmt: 'brew install go',
+  black: 'pip3 install --user black', npx: 'brew install node',
+};
+$('btn-env').onclick = () => { $('env-panel').classList.add('open'); loadEnv(false); };
+$('btn-env-close').onclick = () => $('env-panel').classList.remove('open');
+$('btn-env-refresh').onclick = () => loadEnv(true);
+
+refresh(false);
+</script>
+</body>
+</html>

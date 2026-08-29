@@ -1,0 +1,14 @@
+{
+  "name": "masscode-runner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "massCode 伴生工具：给片段库提供 运行 / 语法检查 / 格式化 能力（不改动 massCode 本体）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

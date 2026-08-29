@@ -1,0 +1,237 @@
+{
+  "counters": {
+    "contentId": 9,
+    "folderId": 11,
+    "snippetId": 16,
+    "tagId": 7
+  },
+  "folderIdByPath": {
+    "Test": 1,
+    "嵌入式开发Linux": 3,
+    "嵌入式开发MCU": 2,
+    "数据结构算法": 9,
+    "Test/多文件示例": 4,
+    "Test/测试代码示例": 11,
+    "嵌入式开发Linux/应用层开发": 7,
+    "嵌入式开发Linux/驱动层开发": 8,
+    "嵌入式开发MCU/GD32系列": 6,
+    "嵌入式开发MCU/STM32系列": 5,
+    "数据结构算法/C++系列算法": 10
+  },
+  "folderUi": {
+    "1": {
+      "isOpen": 1
+    },
+    "2": {
+      "isOpen": 1
+    },
+    "3": {
+      "isOpen": 1
+    },
+    "4": {
+      "isOpen": 0
+    },
+    "5": {
+      "isOpen": 0
+    },
+    "6": {
+      "isOpen": 0
+    },
+    "7": {
+      "isOpen": 0
+    },
+    "8": {
+      "isOpen": 0
+    },
+    "9": {
+      "isOpen": 1
+    },
+    "10": {
+      "isOpen": 0
+    },
+    "11": {
+      "isOpen": 0
+    }
+  },
+  "snippets": [
+    {
+      "filePath": "Test/测试代码示例/test.md",
+      "id": 1,
+      "meta": {
+        "contents": [
+          {
+            "id": 1,
+            "label": "片段 1",
+            "language": "c_cpp"
+          },
+          {
+            "id": 2,
+            "label": "片段 2",
+            "language": "plain_text"
+          }
+        ],
+        "createdAt": 1787907791849,
+        "description": "基于C++的STL所写的二分法排序算法",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1787935608149.8667,
+        "name": "test",
+        "size": 544,
+        "tags": [
+          1,
+          2,
+          3
+        ],
+        "updatedAt": 1787926901090
+      }
+    },
+    {
+      "filePath": "嵌入式开发MCU/STM32系列/IIC通信驱动.md",
+      "id": 12,
+      "meta": {
+        "contents": [
+          {
+            "id": 6,
+            "label": "片段 1",
+            "language": "plain_text"
+          }
+        ],
+        "createdAt": 1787909929390,
+        "description": null,
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1787911438719.0083,
+        "name": "IIC通信驱动",
+        "size": 281,
+        "tags": [
+          2,
+          4,
+          7,
+          6
+        ],
+        "updatedAt": 1787911438716
+      }
+    },
+    {
+      "filePath": "嵌入式开发MCU/STM32系列/串口通信驱动.md",
+      "id": 13,
+      "meta": {
+        "contents": [
+          {
+            "id": 5,
+            "label": "uart.h",
+            "language": "c_cpp"
+          },
+          {
+            "id": 6,
+            "label": "uart.c",
+            "language": "c_cpp"
+          },
+          {
+            "id": 7,
+            "label": "uart_linux.c",
+            "language": "c_cpp"
+          },
+          {
+            "id": 8,
+            "label": "uart_mcu.c",
+            "language": "c_cpp"
+          },
+          {
+            "id": 9,
+            "label": "README.md",
+            "language": "markdown"
+          }
+        ],
+        "createdAt": 1787909881559,
+        "description": "通用串口(UART)驱动，高复用简洁版：只保留 open/read/write/close 四个接口，其余功能注释预留。分层设计，嵌入式 Linux 与 STM32 MCU 同一套接口，换平台只换后端文件。STM32 端内置 GPIO+时钟初始化、中断+环形缓冲接收。含 README。",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1787995818932.529,
+        "name": "串口通信驱动",
+        "size": 17997,
+        "tags": [
+          4,
+          2,
+          5,
+          6
+        ],
+        "updatedAt": 1787911440516
+      }
+    },
+    {
+      "filePath": "Test/多文件示例/多文件示例_CPP.md",
+      "id": 14,
+      "meta": {
+        "contents": [
+          {
+            "id": 6,
+            "label": "main.cpp",
+            "language": "c_cpp"
+          },
+          {
+            "id": 7,
+            "label": "calc.hpp",
+            "language": "c_cpp"
+          }
+        ],
+        "createdAt": 1787912000000,
+        "description": "多文件编译示例：main.cpp + calc.hpp 一起编译运行（含 stdin 输入演示）",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1787912718378.537,
+        "name": "多文件示例_CPP",
+        "size": 803,
+        "tags": [
+          1
+        ],
+        "updatedAt": 1787912000000
+      }
+    }
+  ],
+  "tags": [
+    {
+      "createdAt": 1787907812358,
+      "id": 1,
+      "name": "C++",
+      "updatedAt": 1787907812358
+    },
+    {
+      "createdAt": 1787907814627,
+      "id": 2,
+      "name": "C",
+      "updatedAt": 1787907814627
+    },
+    {
+      "createdAt": 1787907830032,
+      "id": 3,
+      "name": "二分法排序",
+      "updatedAt": 1787907830032
+    },
+    {
+      "createdAt": 1787909904994,
+      "id": 4,
+      "name": "嵌入式开发",
+      "updatedAt": 1787909904994
+    },
+    {
+      "createdAt": 1787909912113,
+      "id": 5,
+      "name": "串口通信",
+      "updatedAt": 1787909912113
+    },
+    {
+      "createdAt": 1787909914593,
+      "id": 6,
+      "name": "驱动开发",
+      "updatedAt": 1787909914593
+    },
+    {
+      "createdAt": 1787909950015,
+      "id": 7,
+      "name": "IIC",
+      "updatedAt": 1787909950015
+    }
+  ],
+  "version": 3
+}

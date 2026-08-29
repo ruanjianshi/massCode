@@ -1,0 +1,11 @@
+version: 2
+counters:
+  folderId: 0
+  requestId: 0
+  environmentId: 0
+  historyId: 0
+folders: []
+requests: []
+environments: []
+activeEnvironmentId: null
+history: []
