@@ -536,7 +536,7 @@ function outlineFor(code, lang) {
               }
               // ④ 函数定义：大括号同行或下一行；排除 if/for/while/return 等控制词与声明
               else if (!line.replace(/\s+$/, '').endsWith(';')) {
-                m = line.match(/^\s*(?:[\w:<>,*&\[\]\s]+\s+)?([A-Za-z_~][\w:<>~]*)\s*\([^;{}]*\)\s*(?:const|override|noexcept|volatile)?\s*(?:\{|$)/);
+                m = line.match(/^\s*(?:[\w:<>,&\[\]\s]+\s+)?(?:[*&]\s*)?([A-Za-z_~][\w:<>~]*)\s*\([^;{}]*\)\s*(?:const|override|noexcept|volatile)?\s*(?:\{|$)/);
                 if (m) { name = m[1]; type = 'fn'; }
               }
               // ⑤ 函数原型/声明（头文件 API）：`返回类型 名字(参数);`
@@ -546,7 +546,7 @@ function outlineFor(code, lang) {
                 const isControl = /^\s*(?:return|if|for|while|switch|case|default|sizeof|new|delete|yield|async|await|break|continue|goto|throw|catch|typeof|using)\b/.test(line);
                 const hasAssignBeforeParen = pi > 0 && line.slice(0, pi).includes('=');
                 if (!isControl && !hasAssignBeforeParen) {
-                  m = line.match(/^\s*(?:[\w:<>,*&\[\]]+\s+)+([A-Za-z_~][\w:<>~]*)\s*\([^;{}]*\)\s*;/);
+                  m = line.match(/^\s*(?:[\w:<>,&\[\]]+\s+)+(?:[*&]\s*)?([A-Za-z_~][\w:<>~]*)\s*\([^;{}]*\)\s*;/);
                   if (m && !OL_CONTROL.has(m[1])) { name = m[1]; type = 'fn'; }
                 }
               }
