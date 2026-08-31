@@ -1,14 +1,15 @@
 {
   "counters": {
-    "contentId": 9,
-    "folderId": 11,
-    "snippetId": 16,
-    "tagId": 7
+    "contentId": 33,
+    "folderId": 12,
+    "snippetId": 32,
+    "tagId": 22
   },
   "folderIdByPath": {
     "Test": 1,
     "嵌入式开发Linux": 3,
     "嵌入式开发MCU": 2,
+    "嵌入式开发规范": 12,
     "数据结构算法": 9,
     "Test/多文件示例": 4,
     "Test/测试代码示例": 11,
@@ -44,12 +45,15 @@
       "isOpen": 0
     },
     "9": {
-      "isOpen": 1
+      "isOpen": 0
     },
     "10": {
       "isOpen": 0
     },
     "11": {
+      "isOpen": 0
+    },
+    "12": {
       "isOpen": 0
     }
   },
@@ -128,6 +132,11 @@
             "language": "c_cpp"
           },
           {
+            "id": 24,
+            "label": "uart_dev.c",
+            "language": "c_cpp"
+          },
+          {
             "id": 7,
             "label": "uart_linux.c",
             "language": "c_cpp"
@@ -147,9 +156,9 @@
         "description": "通用串口(UART)驱动，高复用简洁版：只保留 open/read/write/close 四个接口，其余功能注释预留。分层设计，嵌入式 Linux 与 STM32 MCU 同一套接口，换平台只换后端文件。STM32 端内置 GPIO+时钟初始化、中断+环形缓冲接收。含 README。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1787995818932.529,
+        "mtimeMs": 1788088051792.351,
         "name": "串口通信驱动",
-        "size": 17997,
+        "size": 48197,
         "tags": [
           4,
           2,
@@ -179,13 +188,270 @@
         "description": "多文件编译示例：main.cpp + calc.hpp 一起编译运行（含 stdin 输入演示）",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1787912718378.537,
+        "mtimeMs": 1787912718378.5369,
         "name": "多文件示例_CPP",
         "size": 803,
         "tags": [
           1
         ],
         "updatedAt": 1787912000000
+      }
+    },
+    {
+      "filePath": "嵌入式开发MCU/STM32系列/通用接口管理.md",
+      "id": 17,
+      "meta": {
+        "contents": [
+          {
+            "id": 20,
+            "label": "common.h",
+            "language": "c_cpp"
+          },
+          {
+            "id": 21,
+            "label": "device.h",
+            "language": "c_cpp"
+          },
+          {
+            "id": 22,
+            "label": "device.c",
+            "language": "c_cpp"
+          },
+          {
+            "id": 23,
+            "label": "README.md",
+            "language": "markdown"
+          }
+        ],
+        "createdAt": 1788087217287,
+        "description": "开发的通用层：通用类型定义（common.h）+ 设备注册表（device.h/device.c）。串口驱动等驱动依赖本片段。",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788087906644.527,
+        "name": "通用接口管理",
+        "size": 10912,
+        "tags": [],
+        "updatedAt": 1788087235257
+      }
+    },
+    {
+      "filePath": "数据结构算法/C++系列算法/排序算法.md",
+      "id": 18,
+      "meta": {
+        "contents": [
+          {
+            "id": 25,
+            "label": "片段 1",
+            "language": "c_cpp"
+          },
+          {
+            "id": 26,
+            "label": "片段 2",
+            "language": "plain_text"
+          }
+        ],
+        "createdAt": 1788088953081,
+        "description": "常用的排序算法，手搓算法代码段。",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788089043328.0283,
+        "name": "排序算法",
+        "size": 407,
+        "tags": [
+          1,
+          8,
+          9
+        ],
+        "updatedAt": 1788089043327
+      }
+    },
+    {
+      "filePath": "嵌入式开发规范/00-阅读导航与适用范围.md",
+      "id": 26,
+      "meta": {
+        "contents": [
+          {
+            "id": 27,
+            "label": "阅读导航.md",
+            "language": "markdown"
+          }
+        ],
+        "createdAt": 1788171531000,
+        "description": "嵌入式工程化开发规范的入口、适用范围、强制等级与阅读顺序。",
+        "isDeleted": 0,
+        "isFavorites": 1,
+        "mtimeMs": 1788172862409.552,
+        "name": "00-阅读导航与适用范围",
+        "size": 2400,
+        "tags": [
+          4,
+          10
+        ],
+        "updatedAt": 1788172784000
+      }
+    },
+    {
+      "filePath": "嵌入式开发规范/01-架构分层与依赖规则.md",
+      "id": 27,
+      "meta": {
+        "contents": [
+          {
+            "id": 28,
+            "label": "架构分层.md",
+            "language": "markdown"
+          }
+        ],
+        "createdAt": 1788171531000,
+        "description": "规范应用、中间件、驱动、Platform、Board与HAL的责任边界。",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788172862410.2354,
+        "name": "01-架构分层与依赖规则",
+        "size": 2706,
+        "tags": [
+          4,
+          10,
+          11
+        ],
+        "updatedAt": 1788172784000
+      }
+    },
+    {
+      "filePath": "嵌入式开发规范/02-C设备模型与驱动接口.md",
+      "id": 28,
+      "meta": {
+        "contents": [
+          {
+            "id": 29,
+            "label": "C设备模型.md",
+            "language": "markdown"
+          }
+        ],
+        "createdAt": 1788171531000,
+        "description": "使用对象、ops、config/data、container_of和设备注册表设计C驱动。",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788172862410.9282,
+        "name": "02-C设备模型与驱动接口",
+        "size": 3144,
+        "tags": [
+          4,
+          10,
+          2,
+          6,
+          12
+        ],
+        "updatedAt": 1788172784000
+      }
+    },
+    {
+      "filePath": "嵌入式开发规范/03-初始化生命周期与错误处理.md",
+      "id": 29,
+      "meta": {
+        "contents": [
+          {
+            "id": 30,
+            "label": "生命周期与错误.md",
+            "language": "markdown"
+          }
+        ],
+        "createdAt": 1788171531000,
+        "description": "规范设备初始化顺序、资源对称、错误传播、降级和恢复。",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788172862411.4907,
+        "name": "03-初始化生命周期与错误处理",
+        "size": 2901,
+        "tags": [
+          4,
+          10,
+          13,
+          14
+        ],
+        "updatedAt": 1788172784000
+      }
+    },
+    {
+      "filePath": "嵌入式开发规范/04-中断并发与实时性.md",
+      "id": 30,
+      "meta": {
+        "contents": [
+          {
+            "id": 31,
+            "label": "中断并发与实时性.md",
+            "language": "markdown"
+          }
+        ],
+        "createdAt": 1788171531000,
+        "description": "约束ISR、工作线程、锁、回调上下文、超时和优先级。",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788172862411.9978,
+        "name": "04-中断并发与实时性",
+        "size": 2824,
+        "tags": [
+          4,
+          10,
+          15,
+          16,
+          17,
+          18
+        ],
+        "updatedAt": 1788172784000
+      }
+    },
+    {
+      "filePath": "嵌入式开发规范/05-内存栈DMA与Cache安全.md",
+      "id": 31,
+      "meta": {
+        "contents": [
+          {
+            "id": 32,
+            "label": "内存DMA安全.md",
+            "language": "markdown"
+          }
+        ],
+        "createdAt": 1788171531000,
+        "description": "规范内存所有权、栈、缓冲区、DMA、D-Cache和环形缓冲区。",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788172862412.5222,
+        "name": "05-内存栈DMA与Cache安全",
+        "size": 3053,
+        "tags": [
+          4,
+          10,
+          19,
+          20
+        ],
+        "updatedAt": 1788172784000
+      }
+    },
+    {
+      "filePath": "嵌入式开发规范/06-代码评审与发布检查清单.md",
+      "id": 32,
+      "meta": {
+        "contents": [
+          {
+            "id": 33,
+            "label": "评审与发布检查清单.md",
+            "language": "markdown"
+          }
+        ],
+        "createdAt": 1788171531000,
+        "description": "可直接执行的编译、架构、内存、并发、硬件、故障注入和发布检查清单。",
+        "isDeleted": 0,
+        "isFavorites": 1,
+        "mtimeMs": 1788172862413.0286,
+        "name": "06-代码评审与发布检查清单",
+        "size": 3917,
+        "tags": [
+          4,
+          10,
+          21,
+          22
+        ],
+        "updatedAt": 1788172784000
       }
     }
   ],
@@ -231,6 +497,96 @@
       "id": 7,
       "name": "IIC",
       "updatedAt": 1787909950015
+    },
+    {
+      "createdAt": 1788088971157,
+      "id": 8,
+      "name": "排序",
+      "updatedAt": 1788088971157
+    },
+    {
+      "createdAt": 1788088980172,
+      "id": 9,
+      "name": "Leetcode",
+      "updatedAt": 1788088980172
+    },
+    {
+      "createdAt": 1788173038190,
+      "id": 10,
+      "name": "工程规范",
+      "updatedAt": 1788173038190
+    },
+    {
+      "createdAt": 1788173049703,
+      "id": 11,
+      "name": "软件架构",
+      "updatedAt": 1788173049703
+    },
+    {
+      "createdAt": 1788173049716,
+      "id": 12,
+      "name": "设备模型",
+      "updatedAt": 1788173049716
+    },
+    {
+      "createdAt": 1788173049726,
+      "id": 13,
+      "name": "生命周期",
+      "updatedAt": 1788173049726
+    },
+    {
+      "createdAt": 1788173049736,
+      "id": 14,
+      "name": "错误处理",
+      "updatedAt": 1788173049736
+    },
+    {
+      "createdAt": 1788173049745,
+      "id": 15,
+      "name": "RTOS",
+      "updatedAt": 1788173049745
+    },
+    {
+      "createdAt": 1788173049755,
+      "id": 16,
+      "name": "中断",
+      "updatedAt": 1788173049755
+    },
+    {
+      "createdAt": 1788173049764,
+      "id": 17,
+      "name": "并发",
+      "updatedAt": 1788173049764
+    },
+    {
+      "createdAt": 1788173049772,
+      "id": 18,
+      "name": "实时性",
+      "updatedAt": 1788173049772
+    },
+    {
+      "createdAt": 1788173049780,
+      "id": 19,
+      "name": "DMA",
+      "updatedAt": 1788173049780
+    },
+    {
+      "createdAt": 1788173049789,
+      "id": 20,
+      "name": "内存安全",
+      "updatedAt": 1788173049789
+    },
+    {
+      "createdAt": 1788173049797,
+      "id": 21,
+      "name": "代码评审",
+      "updatedAt": 1788173049797
+    },
+    {
+      "createdAt": 1788173049808,
+      "id": 22,
+      "name": "测试验证",
+      "updatedAt": 1788173049808
     }
   ],
   "version": 3
