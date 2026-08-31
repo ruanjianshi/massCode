@@ -38,7 +38,7 @@
   #split-v2::after { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: transparent; }
   #split-v2:hover::after, #split-v2.active::after { background: var(--accent); }
   /* 右侧代码大纲面板 */
-  #outline-panel { width: 240px; min-width: 160px; flex: none; display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--border); }
+  #outline-panel { width: 320px; min-width: 180px; flex: none; display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--border); }
   #outline-panel.hidden { display: none; }
   /* 操作按钮：固定在大纲顶部，与大纲排在一起 */
   #outline-actions { display: flex; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
@@ -52,6 +52,10 @@
   #outline-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; font-size: 12px; font-weight: 600; color: var(--dim); border-bottom: 1px solid var(--border); }
   #outline-head .sp { flex: 1; }
   #outline-count { font-size: 11px; color: var(--dim); font-weight: 400; }
+  #outline-tools { display:flex; align-items:center; gap:6px; padding:7px 8px; border-bottom:1px solid var(--border); }
+  #outline-q { min-width:0; flex:1; padding:5px 8px; background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:5px; font:11px var(--mono); outline:none; }
+  #outline-q:focus { border-color:var(--accent); }
+  #outline-scope { flex:none; padding:5px 7px; font-size:11px; }
   #outline-body { flex: 1; overflow: auto; padding: 6px 4px; }
   .ol-empty { display: block; padding: 10px 12px; color: var(--dim); font-size: 12px; font-style: italic; }
   .ol-item { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 5px; font-size: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; color: var(--text); }
@@ -61,6 +65,16 @@
   .ol-item.fn { color: #d2a8ff; }
   .ol-item .ol-ln { margin-left: auto; color: var(--dim); font-size: 10px; flex: none; }
   .ol-item.active { background: rgba(79,140,255,.18); color: #fff; }
+  .ol-group { position:sticky; top:-6px; z-index:2; display:flex; align-items:center; gap:6px; padding:6px 8px; color:var(--dim); background:rgba(30,33,40,.96); border-bottom:1px solid var(--border); font-size:11px; cursor:pointer; user-select:none; }
+  .ol-group:hover { color:var(--text); }
+  .ol-group .arrow { width:10px; text-align:center; }
+  .ol-group .count { margin-left:auto; font:10px var(--mono); }
+  .ol-item.rich { display:grid; grid-template-columns:16px minmax(0,1fr) auto auto; align-items:start; gap:6px; padding-top:5px; padding-bottom:5px; }
+  .ol-item.rich .ol-main { min-width:0; }
+  .ol-item.rich .ol-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:600 11px var(--mono); }
+  .ol-item.rich .ol-sig { display:block; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dim); font:9px var(--mono); }
+  .ol-item.rich .sym-badge { align-self:center; }
+  .ol-item.rich .ol-ln { align-self:center; }
   /* 跳转行高亮闪烁 */
   #ln-flash { position: absolute; left: 0; right: 0; pointer-events: none; background: rgba(79,140,255,.22); z-index: 5; }
   body.resizing { user-select: none; }
@@ -201,6 +215,82 @@
   .tool-row .info .sub { color: var(--dim); font-size: 12px; }
   .tool-row .ver { color: var(--accent); font: 11px var(--mono); white-space: nowrap; }
   .hint { color: var(--err); font-size: 12px; font-family: var(--mono); word-break: break-all; }
+  /* ---- Source Insight 阅读模式：符号面板 / 全局检索 ---- */
+  #sym-tabs { display: flex; gap: 6px; padding: 6px 10px 0; }
+  #sym-tabs button { flex: 1; padding: 5px 4px; font-size: 12px; }
+  #sym-tabs button.on { border-color: var(--accent); color: var(--accent); }
+  .sym-sec { display:flex; align-items:center; gap:6px; padding: 8px 10px 4px; font-size: 11px; font-weight: 600; color: var(--dim); border-top: 1px solid var(--border); margin-top: 5px; }
+  .sym-sec .sp { flex:1; }
+  .sym-row, .sym-ref, .symr { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+  .sym-row:hover, .sym-ref:hover, .symr:hover { background: var(--panel2); }
+  .symr.active { background: rgba(79,140,255,.2); outline: 1px solid rgba(79,140,255,.55); }
+  .sym-row .nm, .symr .nm { font-family: var(--mono); }
+  .sym-row .ol-ln, .symr .ln { margin-left: auto; color: var(--dim); font-size: 10px; flex: none; font-family: var(--mono); }
+  .kind-fn { color: #d2a8ff; }
+  .kind-type { color: #79c0ff; }
+  .kind-macro { color: #dbb904; }
+  .kind-var { color: #7ee787; }
+  .sym-back { padding: 4px 8px; font-size: 12px; color: var(--accent); cursor: pointer; }
+  .sym-back:hover { text-decoration: underline; }
+  .sym-ctx-head { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 13px; }
+  .sym-ctx-head .nm { font-family: var(--mono); font-weight: 600; }
+  .sym-ctx-head .sym-where { margin-left: auto; color: var(--dim); font-size: 11px; font-family: var(--mono); }
+  .sym-badge { flex:none; border:1px solid var(--border); border-radius:9px; padding:0 6px; color:var(--dim); font-size:10px; }
+  .sym-badge.def { color:var(--ok); border-color:rgba(63,185,80,.45); }
+  .sym-badge.decl { color:#dbb904; border-color:rgba(219,185,4,.45); }
+  .sym-def { margin: 5px 6px; padding: 9px 10px; background: #181b21; border: 1px solid var(--border); border-radius: 6px; font: 11px/1.55 var(--mono); max-height: 260px; overflow: auto; white-space: pre; cursor: pointer; }
+  .sym-def:hover { border-color:var(--accent); }
+  .sym-ref { display:grid; grid-template-columns:auto 1fr; align-items:baseline; }
+  .sym-ref .ln { color:var(--accent); font-size:10px; font-family:var(--mono); white-space:nowrap; }
+  .sym-ref .tx { color: var(--dim); min-width:0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family:var(--mono); font-size:11px; }
+  .sym-ref.call .tx { color: var(--accent); }
+  #sym-modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 100; }
+  #sym-modal.open { display: flex; }
+  #sym-modal-box { width: 780px; max-width: 94vw; max-height: 78vh; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  #sym-modal-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  #sym-modal-head .t { font-weight: 600; font-size: 13px; white-space: nowrap; }
+  #sym-modal-head .st { color: var(--dim); font-size: 11px; }
+  #sym-q { flex: 1; background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font: 13px var(--mono); outline: none; }
+  #sym-q:focus { border-color: var(--accent); }
+  #sym-filter { display:flex; gap:6px; padding:8px 14px; border-bottom:1px solid var(--border); }
+  #sym-filter button { padding:3px 10px; font-size:11px; border-radius:12px; }
+  #sym-filter button.on { color:var(--accent); border-color:var(--accent); background:rgba(79,140,255,.12); }
+  #sym-modal-res { overflow: auto; padding: 6px 4px; }
+  .symr .meta { margin-left:auto; min-width:0; color:var(--dim); font:10px var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sym-help { padding:18px; color:var(--dim); font-size:12px; line-height:1.8; }
+  /* ---- 关系树：调用 / 被调用 / 文件包含 ---- */
+  .rel-tools { display:flex; flex-wrap:wrap; gap:5px; padding:7px 8px; border-bottom:1px solid var(--border); }
+  .rel-tools button { padding:4px 8px; border-radius:10px; font-size:10px; }
+  .rel-tools button.on { color:var(--accent); border-color:var(--accent); background:rgba(79,140,255,.12); }
+  .rel-tip { padding:6px 9px; color:var(--dim); font-size:10px; line-height:1.5; border-bottom:1px solid var(--border); }
+  .rel-section { padding:8px 9px 4px; color:var(--dim); font-size:10px; font-weight:600; }
+  .rel-row { display:grid; grid-template-columns:14px 15px minmax(0,1fr) auto; align-items:center; gap:5px; min-height:27px; padding:3px 7px; border-radius:5px; cursor:pointer; font-size:11px; }
+  .rel-row:hover { background:var(--panel2); }
+  .rel-row.root { background:rgba(79,140,255,.12); outline:1px solid rgba(79,140,255,.3); }
+  .rel-row .arrow { color:var(--dim); text-align:center; cursor:pointer; user-select:none; }
+  .rel-row .nm { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--mono); }
+  .rel-row .meta { color:var(--dim); font:9px var(--mono); white-space:nowrap; }
+  .rel-row .edge { margin-left:4px; padding:0 4px; border:1px solid var(--border); border-radius:7px; color:var(--dim); font-size:8px; }
+  .rel-row .edge.dynamic { color:#dbb904; border-color:rgba(219,185,4,.45); }
+  .rel-row .edge.cycle { color:var(--err); border-color:rgba(248,81,73,.45); }
+  .rel-graph { position:relative; display:grid; grid-template-columns:minmax(90px,1fr) minmax(94px,1.05fr) minmax(90px,1fr); gap:20px; align-items:stretch; min-height:210px; padding:10px 8px 18px; overflow:hidden; }
+  .rel-graph-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; overflow:visible; }
+  .rel-graph-col { position:relative; z-index:1; display:flex; flex-direction:column; justify-content:center; gap:7px; min-width:0; }
+  .rel-graph-label { margin-bottom:2px; color:var(--dim); font-size:9px; font-weight:600; text-align:center; }
+  .rel-card { appearance:none; width:100%; min-width:0; padding:7px 6px; border:1px solid var(--border); border-radius:7px; background:var(--panel2); color:var(--text); text-align:left; cursor:pointer; }
+  .rel-card:hover { border-color:var(--accent); transform:translateY(-1px); }
+  .rel-card.upstream { border-left:3px solid var(--accent); }
+  .rel-card.root { border:2px solid #db9b35; background:rgba(219,155,53,.11); text-align:center; }
+  .rel-card.downstream { border-left:3px solid var(--ok); }
+  .rel-card.external { opacity:.72; border-left-color:var(--dim); cursor:default; }
+  .rel-card .title { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:600 10px var(--mono); }
+  .rel-card .sub { display:block; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dim); font:8px var(--mono); }
+  .rel-card .tag { display:inline-block; margin-top:3px; padding:0 4px; border:1px solid rgba(219,185,4,.45); border-radius:6px; color:#dbb904; font-size:7px; }
+  .rel-graph-empty { padding:8px 3px; color:var(--dim); font-size:9px; text-align:center; }
+  .rel-graph-more { color:var(--dim); font-size:9px; text-align:center; }
+  .rel-legend { display:flex; justify-content:center; gap:12px; padding:5px 8px 8px; color:var(--dim); font-size:9px; }
+  .rel-legend i { display:inline-block; width:12px; height:2px; margin-right:4px; vertical-align:middle; background:var(--accent); }
+  .rel-legend i.down { background:var(--ok); }
 </style>
 </head>
 <body>
@@ -230,6 +320,7 @@
       <span id="snippet-desc" class="sub" style="color:var(--dim);font-size:12px"></span>
       <span id="multi-badge" style="display:none;color:#dbb904;font-size:12px;background:rgba(219,154,4,.12);padding:2px 8px;border-radius:10px"></span>
       <span class="sp"></span>
+      <button id="btn-symbols" title="跨库符号检索（Source Insight 式 Lookup，Ctrl+Shift+F）">🔎 符号</button>
       <button id="btn-outline" title="显示/隐藏代码大纲">🧭 大纲</button>
       <button id="btn-edit" disabled>✏ 编辑</button>
       <button id="btn-save" class="btn-run" disabled style="display:none">💾 保存</button>
@@ -269,11 +360,38 @@
       <button id="btn-md" title="Markdown 渲染 / 源码切换" style="display:none">📄 源码</button>
     </div>
     <div id="outline-list">
+      <div id="sym-tabs">
+        <button id="tab-outline" class="on">🧭 大纲</button>
+        <button id="tab-symbol">🔍 符号</button>
+        <button id="tab-relation">🌳 关系</button>
+      </div>
       <div id="outline-head"><span>🧭 大纲</span><span class="sp"></span><span id="outline-count"></span></div>
+      <div id="outline-tools">
+        <input id="outline-q" placeholder="筛选当前大纲…" spellcheck="false">
+        <button id="outline-scope" title="切换当前文件 / 全部文件">当前</button>
+      </div>
       <div id="outline-body"><span class="ol-empty">选择片段后显示代码大纲</span></div>
     </div>
   </div>
 </main>
+<div id="sym-modal">
+  <div id="sym-modal-box">
+    <div id="sym-modal-head">
+      <span class="t">🔎 全局符号检索</span>
+      <input id="sym-q" placeholder="函数 / 类型 / 宏 / 变量名…（跨库，前缀+连续子串模糊匹配）" spellcheck="false">
+      <span id="sym-modal-status" class="st"></span>
+      <button id="sym-modal-close">✕</button>
+    </div>
+    <div id="sym-filter">
+      <button class="on" data-kind="all">全部</button>
+      <button data-kind="fn">ƒ 函数</button>
+      <button data-kind="type">▣ 类型</button>
+      <button data-kind="macro"># 宏</button>
+      <button data-kind="var">= 变量</button>
+    </div>
+    <div id="sym-modal-res"><span class="ol-empty">输入符号名，Enter 打开第一个结果</span></div>
+  </div>
+</div>
 <div id="env-panel">
   <div id="env-head">
     <h2>🔍 环境检测</h2>
@@ -325,6 +443,7 @@ async function refresh(silent) {
   SNIPPETS = d.snippets;
   TAGS = d.tags || [];
   FOLDERS = d.folders || [];
+  invalidateSymIndexes();
   renderTagBar();
   renderTagHead();
   renderList();
@@ -578,45 +697,112 @@ function outlineFor(code, lang) {
   return entries;
 }
 
+let OUTLINE_SCOPE = (() => { try { return localStorage.getItem('mc-outline-scope') || 'current'; } catch (_) { return 'current'; } })();
+const OL_COLLAPSED = new Set();
+let OL_SCROLL_RAF = 0;
+const CODE_FOCUS_RATIO = 0.30;
+let OL_JUMP_LOCK = null;
+
+function outlineSymbols() {
+  if (!CURRENT) return [];
+  if (!EDITING) return snippetIndex(CURRENT);
+  const tmp = Object.assign({}, CURRENT, {
+    file: CURRENT.file + '#editing',
+    fragments: CURRENT.fragments.map((f, i) => i === CINDEX ? Object.assign({}, f, { code: editText() }) : f),
+  });
+  return buildSnippetIndex(tmp);
+}
+function symbolSignature(sym) {
+  const f = fragmentOf(sym); if (!f) return '';
+  const lines = f.code.replace(/\r\n/g, '\n').split('\n');
+  const previewEnd = sym.kind === 'var' ? sym.line + 8 : sym.line + 3;
+  let text = lines.slice(sym.line - 1, Math.min(sym.endLine || sym.line, previewEnd)).join(' ');
+  text = text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/g, '').replace(/\s+/g, ' ').trim();
+  if (sym.kind === 'fn') text = text.replace(/\s*\{.*$/, ' {…}');
+  return text.length > 100 ? text.slice(0, 97) + '…' : text;
+}
+function outlineGroup(body, key, title, items, renderItem) {
+  if (!items.length) return;
+  const closed = OL_COLLAPSED.has(key);
+  const h = document.createElement('div'); h.className = 'ol-group';
+  h.innerHTML = '<span class="arrow">' + (closed ? '▸' : '▾') + '</span><span>' + escapeHtml(title) + '</span><span class="count">' + items.length + '</span>';
+  h.onclick = () => { closed ? OL_COLLAPSED.delete(key) : OL_COLLAPSED.add(key); renderOutline(); };
+  body.appendChild(h);
+  if (!closed) items.forEach(renderItem);
+}
+function outlineRow(sym) {
+  const d = document.createElement('div');
+  d.className = 'ol-item rich ' + (sym.kind === 'type' ? 'class' : sym.kind === 'fn' ? 'fn' : '');
+  d.dataset.line = sym.line; d.dataset.frag = sym.frag; d.dataset.oid = symbolId(sym); d.title = symbolSignature(sym) || sym.name;
+  const role = sym.kind === 'fn' ? '<span class="sym-badge ' + (sym.isDefinition ? 'def' : 'decl') + '">' + (sym.isDefinition ? '定义' : '声明') + '</span>' : '';
+  d.innerHTML = '<span class="ol-ico ' + symKindClass(sym.kind) + '">' + symKindIcon(sym.kind) + '</span>' +
+    '<span class="ol-main"><span class="ol-name">' + escapeHtml(sym.name) + '</span><span class="ol-sig">' + escapeHtml(symbolSignature(sym)) + '</span></span>' +
+    role + '<span class="ol-ln">:' + sym.line + '</span>';
+  d.onclick = () => { goToLocation(sym); setSymMode('outline'); };
+  $('outline-body').appendChild(d); return d;
+}
+function renderMarkdownOutline(src) {
+  const body = $('outline-body'), q = $('outline-q').value.trim().toLowerCase();
+  const all = [];
+  src.split('\n').forEach((ln, idx) => {
+    const m = ln.match(/^(#{1,6})\s+(.*)$/);
+    if (m) all.push({ level: m[1].length, text: stripMd(m[2]), line: idx + 1, sourceIndex: all.length });
+  });
+  const heads = all.filter(h => !q || h.text.toLowerCase().includes(q));
+  $('outline-count').textContent = (q ? heads.length + '/' : '') + all.length + ' 标题';
+  if (!heads.length) { body.innerHTML = '<span class="ol-empty">' + (q ? '没有匹配的标题' : '未识别到标题（用 # 写标题）') + '</span>'; return; }
+  body.innerHTML = '';
+  heads.forEach(h => {
+    const d = document.createElement('div'); d.className = 'ol-item class'; d.dataset.line = h.line;
+    d.style.paddingLeft = (8 + (h.level - 1) * 14) + 'px';
+    d.innerHTML = '<span class="ol-ico">H' + h.level + '</span><span>' + escapeHtml(h.text) + '</span><span class="ol-ln">:' + h.line + '</span>';
+    d.onclick = () => jumpToMdHeading(h.sourceIndex); body.appendChild(d);
+  });
+}
 function renderOutline() {
-  const s = CURRENT;
-  const f = s && s.fragments[CINDEX];
-  const body = $('outline-body');
+  const f = CURRENT && CURRENT.fragments[CINDEX], body = $('outline-body');
+  $('outline-tools').style.display = '';
+  $('outline-scope').style.display = CURRENT && CURRENT.fragments.length > 1 && f && f.language !== 'markdown' ? '' : 'none';
+  $('outline-scope').textContent = OUTLINE_SCOPE === 'all' ? '全部文件' : '当前';
   if (!f) { body.innerHTML = '<span class="ol-empty">选择片段后显示代码大纲</span>'; $('outline-count').textContent = ''; return; }
   const src = EDITING ? editText() : f.code;
-  if (f.language === 'markdown') {        // Markdown：标题大纲（TOC）
-    const heads = [];
-    src.split('\n').forEach((ln, idx) => {
-      const m = ln.match(/^(#{1,6})\s+(.*)$/);
-      if (m) heads.push({ level: m[1].length, text: m[2], line: idx + 1 });
+  if (f.language === 'markdown') { renderMarkdownOutline(src); return; }
+  const q = $('outline-q').value.trim().toLowerCase();
+  const all = outlineSymbols().filter(s => OUTLINE_SCOPE === 'all' || s.frag === CINDEX);
+  const items = all.filter(s => !q || s.name.toLowerCase().includes(q) || symbolSignature(s).toLowerCase().includes(q));
+  $('outline-count').textContent = (q ? items.length + '/' : '') + all.length + ' 项'; body.innerHTML = '';
+  if (!items.length) { body.innerHTML = '<span class="ol-empty">' + (q ? '没有匹配的符号' : '未识别到函数、类型、宏或变量') + '</span>'; return; }
+  if (OUTLINE_SCOPE === 'all' && !EDITING) {
+    CURRENT.fragments.forEach((frag, fi) => {
+      if (frag.language === 'markdown' || frag.language === 'plain_text') return;
+      outlineGroup(body, 'file:' + fi, (frag.label || '片段 ' + (fi + 1)) + ' · ' + frag.language,
+        items.filter(s => s.frag === fi), outlineRow);
     });
-    $('outline-count').textContent = heads.length ? heads.length + ' 项' : '';
-    if (!heads.length) { body.innerHTML = '<span class="ol-empty">未识别到标题（用 # 写标题）</span>'; return; }
-    body.innerHTML = '';
-    heads.forEach((h, k) => {
-      const d = document.createElement('div');
-      d.className = 'ol-item class';
-      d.dataset.line = h.line;
-      d.style.paddingLeft = (8 + (h.level - 1) * 14) + 'px';
-      d.innerHTML = `<span class="ol-ico">📄</span><span>${escapeHtml(stripMd(h.text))}</span><span class="ol-ln">:${h.line}</span>`;
-      d.onclick = () => jumpToMdHeading(k);
-      body.appendChild(d);
-    });
-    return;
+  } else {
+    outlineGroup(body, 'kind:type', '类型', items.filter(s => s.kind === 'type'), outlineRow);
+    outlineGroup(body, 'kind:fn', '函数', items.filter(s => s.kind === 'fn'), outlineRow);
+    outlineGroup(body, 'kind:macro', '宏', items.filter(s => s.kind === 'macro'), outlineRow);
+    outlineGroup(body, 'kind:var', '文件级变量', items.filter(s => s.kind === 'var'), outlineRow);
   }
-  const items = outlineFor(src, f.language);
-  $('outline-count').textContent = items.length ? items.length + ' 项' : '';
-  if (!items.length) { body.innerHTML = '<span class="ol-empty">未识别到函数 / 类</span>'; return; }
-  body.innerHTML = '';
-  for (const it of items) {
-    const d = document.createElement('div');
-    d.className = 'ol-item ' + it.type;
-    d.dataset.line = it.line;
-    d.style.paddingLeft = (8 + it.depth * 14) + 'px';
-    d.innerHTML = `<span class="ol-ico">${it.type === 'class' ? '▣' : 'ƒ'}</span><span>${escapeHtml(it.name)}</span><span class="ol-ln">:${it.line}</span>`;
-    d.onclick = () => jumpToLine(it.line);
-    body.appendChild(d);
-  }
+  updateOutlineActive();
+}
+
+function updateOutlineActive() {
+  if (SYM_MODE !== 'outline' || !CURRENT || EDITING) return;
+  const f = CURRENT.fragments[CINDEX]; if (!f || f.language === 'markdown') return;
+  const cw = $('code-wrap'), lineH = parseFloat(getComputedStyle($('code')).lineHeight) || 20;
+  const padTop = parseFloat(getComputedStyle($('code')).paddingTop) || 0;
+  const locked = OL_JUMP_LOCK && OL_JUMP_LOCK.frag === CINDEX && performance.now() < OL_JUMP_LOCK.until;
+  const line = locked ? OL_JUMP_LOCK.line : Math.max(1,
+    Math.floor((cw.scrollTop + cw.clientHeight * CODE_FOCUS_RATIO - padTop) / lineH) + 1);
+  const candidates = snippetIndex(CURRENT).filter(s => s.frag === CINDEX && s.line <= line)
+    .sort((a, b) => b.line - a.line);
+  const active = candidates.find(s => s.kind === 'fn' && s.isDefinition && (s.endLine || s.line) >= line) ||
+    candidates.find(s => s.kind === 'type' && (s.endLine || s.line) >= line) || candidates[0];
+  $('outline-body').querySelectorAll('.ol-item.active').forEach(x => x.classList.remove('active'));
+  if (!active) return;
+  const row = [...$('outline-body').querySelectorAll('[data-oid]')].find(x => x.dataset.oid === symbolId(active));
+  if (row) row.classList.add('active');
 }
 
 // 跳转到某一行：滚动代码区 + 高亮闪烁该行 + 大纲项高亮
@@ -624,7 +810,9 @@ function jumpToLine(line) {
   const cw = $('code-wrap');
   const lineH = parseFloat(getComputedStyle($('code')).lineHeight) || 20;
   const padTop = parseFloat(getComputedStyle($('code')).paddingTop) || 0;
-  cw.scrollTop = Math.max(0, padTop + (line - 1) * lineH - cw.clientHeight * 0.3);
+  /* 程序跳转与滚动跟随共用同一锚点；短暂锁住目标，防止文件尾滚动截断后误选前一项。 */
+  OL_JUMP_LOCK = { frag: CINDEX, line, until: performance.now() + 450 };
+  cw.scrollTop = Math.max(0, padTop + (line - 1) * lineH - cw.clientHeight * CODE_FOCUS_RATIO);
   let fl = $('ln-flash');
   if (!fl) { fl = document.createElement('div'); fl.id = 'ln-flash'; cw.appendChild(fl); }
   // 闪烁条用【内容坐标】定位：绝对定位子元素在滚动容器内会自动随 scrollTop 移动，不能手动再减 scrollTop
@@ -636,7 +824,8 @@ function jumpToLine(line) {
   fl.style.opacity = 1;
   clearTimeout(fl._t); fl._t = setTimeout(() => { fl.style.opacity = 0; }, 900);
   document.querySelectorAll('.ol-item.active').forEach(el => el.classList.remove('active'));
-  const it = document.querySelector('.ol-item[data-line="' + line + '"]');
+  const it = document.querySelector('.ol-item[data-frag="' + CINDEX + '"][data-line="' + line + '"]') ||
+    document.querySelector('.ol-item[data-line="' + line + '"]');
   if (it) it.classList.add('active');
 }
 
@@ -645,6 +834,747 @@ function toggleOutline() {
   try { localStorage.setItem('mc-outline', show ? '0' : '1'); } catch (_) {}
   $('btn-outline').classList.toggle('on', !show);
 }
+
+/* ==================== Source Insight 阅读模式：符号索引 / 上下文 / 引用 / 调用关系 ==================== */
+let SYM_MODE = 'outline';
+let SYM_SEL = null;
+const SNIPPET_INDEX = new Map();
+const REF_CACHE = new Map();
+let GLOBAL_INDEX = null;
+let SYM_SEARCH_KIND = 'all';
+let SYM_RESULTS = [];
+let SYM_ACTIVE = 0;
+let PARSER_ISSUES = [];
+let REL_VIEW = (() => { try { return localStorage.getItem('mc-rel-view') || 'calls'; } catch (_) { return 'calls'; } })();
+let REL_DIR = (() => { try { return localStorage.getItem('mc-rel-dir') || 'both'; } catch (_) { return 'both'; } })();
+let REL_LAYOUT = (() => { try { return localStorage.getItem('mc-rel-layout') || 'graph'; } catch (_) { return 'graph'; } })();
+let REL_ROOT = null;
+const REL_EXPANDED = new Set();
+
+const symKindIcon = (k) => (k === 'fn' ? 'ƒ' : k === 'type' ? '▣' : k === 'macro' ? '#' : '=');
+const symKindClass = (k) => 'kind-' + k;
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const symbolId = (s) => [s.snippet.file, s.frag, s.line, s.kind, s.name].join('|');
+const fragmentOf = (s) => s && s.snippet && s.snippet.fragments[s.frag];
+const symbolPlace = (s) => {
+  const f = fragmentOf(s);
+  return (s.snippet.name || '?') + ' / ' + ((f && f.label) || '?') + ':' + s.line;
+};
+
+/* 把注释和字符串替换为空格但保留换行，避免把示例注释误判为引用/调用。 */
+function maskNonCode(code) {
+  let out = '', state = 'code', quote = '';
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i], n = code[i + 1];
+    if (state === 'line') {
+      if (c === '\n') { out += '\n'; state = 'code'; } else out += ' ';
+    } else if (state === 'block') {
+      if (c === '*' && n === '/') { out += '  '; i++; state = 'code'; }
+      else out += c === '\n' ? '\n' : ' ';
+    } else if (state === 'string') {
+      if (c === '\\') { out += ' '; if (i + 1 < code.length) { out += code[i + 1] === '\n' ? '\n' : ' '; i++; } }
+      else if (c === quote) { out += ' '; state = 'code'; }
+      else out += c === '\n' ? '\n' : ' ';
+    } else if (c === '/' && n === '/') { out += '  '; i++; state = 'line'; }
+    else if (c === '/' && n === '*') { out += '  '; i++; state = 'block'; }
+    else if (c === '"' || c === "'" || c === '`') { out += ' '; quote = c; state = 'string'; }
+    else out += c;
+  }
+  return out;
+}
+
+function indentedExtent(lines, line1) {
+  const start = line1 - 1;
+  const base = (lines[start].match(/^\s*/) || [''])[0].length;
+  let end = start + 1;
+  for (; end < lines.length; end++) {
+    if (!lines[end].trim()) continue;
+    const indent = (lines[end].match(/^\s*/) || [''])[0].length;
+    if (indent <= base) break;
+  }
+  return { isDefinition: true, endLine: Math.max(line1, end) };
+}
+
+/* 精确区分 `foo(...);` 声明和 `foo(...) { ... }` 定义，并找出真实函数体边界。 */
+function functionExtent(lines, maskedLines, line1, lang) {
+  if (lang === 'python' || lang === 'ruby') return indentedExtent(lines, line1);
+  let paren = 0, bodyDepth = 0, bodyStarted = false;
+  const maxHead = Math.min(lines.length, line1 + 30);
+  for (let i = line1 - 1; i < lines.length; i++) {
+    if (!bodyStarted && i >= maxHead) return { isDefinition: false, endLine: line1 };
+    const line = maskedLines[i] || '';
+    for (const c of line) {
+      if (!bodyStarted) {
+        if (c === '(') paren++;
+        else if (c === ')') paren = Math.max(0, paren - 1);
+        else if (paren === 0 && c === ';') return { isDefinition: false, endLine: i + 1 };
+        else if (paren === 0 && c === '{') { bodyStarted = true; bodyDepth = 1; }
+      } else {
+        if (c === '{') bodyDepth++;
+        else if (c === '}' && --bodyDepth === 0) return { isDefinition: true, endLine: i + 1 };
+      }
+    }
+  }
+  return { isDefinition: bodyStarted, endLine: lines.length };
+}
+
+function typeExtent(lines, maskedLines, line1) {
+  let depth = 0, started = false;
+  for (let i = line1 - 1; i < Math.min(lines.length, line1 + 120); i++) {
+    for (const c of (maskedLines[i] || '')) {
+      if (c === '{') { depth++; started = true; }
+      else if (c === '}' && started && --depth === 0) return i + 1;
+    }
+    if (!started && (maskedLines[i] || '').includes(';')) return i + 1;
+  }
+  return line1;
+}
+
+function pushIndexSymbol(syms, snip, frag, line, name, kind, isDefinition = true, endLine = line) {
+  if (!name || OL_CONTROL.has(name)) return;
+  syms.push({ name, kind, frag, line, endLine, isDefinition, snippet: snip });
+}
+
+/* 补充 outlineFor 不负责的 C/C++ 类型别名：普通 typedef、函数指针 typedef、using 别名。 */
+function indexTypeAliases(syms, snip, fi, maskedLines) {
+  maskedLines.forEach((ln, i) => {
+    let m = ln.match(/^\s*typedef\b[^;{}]*\(\s*\*\s*([A-Za-z_]\w*)\s*\)\s*\([^;{}]*\)\s*;\s*$/);
+    if (m) { pushIndexSymbol(syms, snip, fi, i + 1, m[1], 'type'); return; }
+    if (/^\s*typedef\b/.test(ln) && !/[{}]/.test(ln) && /;\s*$/.test(ln)) {
+      m = ln.match(/([A-Za-z_]\w*)\s*;\s*$/);
+      if (m) pushIndexSymbol(syms, snip, fi, i + 1, m[1], 'type');
+      return;
+    }
+    m = ln.match(/^\s*using\s+([A-Za-z_]\w*)\s*=/);
+    if (m) pushIndexSymbol(syms, snip, fi, i + 1, m[1], 'type');
+  });
+}
+
+/* 提取文件作用域变量；braceDepth 可避免把结构体成员和函数局部变量混进大纲。 */
+function indexFileVariables(syms, snip, fi, maskedLines) {
+  let braceDepth = 0, aggregateStart = null;
+  const initializerEnd = (from) => {
+    if ((maskedLines[from] || '').includes(';')) return from + 1;
+    let depth = 0;
+    for (let j = from + 1; j < maskedLines.length; j++) {
+      const row = maskedLines[j];
+      depth += countCh(row, '{') - countCh(row, '}');
+      if (depth === 0 && row.includes(';')) return j + 1;
+    }
+    return from + 1;
+  };
+  maskedLines.forEach((ln, i) => {
+    const depthBefore = braceDepth;
+    const delta = countCh(ln, '{') - countCh(ln, '}');
+    const depthAfter = Math.max(0, depthBefore + delta);
+
+    if (depthBefore === 0 && !/^\s*typedef\b/.test(ln) &&
+        /^\s*(?:(?:static|extern|const|volatile|register)\s+)*(?:struct|union|enum)\b[^;=]*$/.test(ln)) {
+      aggregateStart = { line: i + 1, isExtern: /^\s*extern\b/.test(ln) };
+    }
+    if (aggregateStart && depthBefore > 0 && depthAfter === 0) {
+      const close = ln.match(/^\s*}\s*([A-Za-z_]\w*)\s*(?:\[[^\]]*\]\s*)*(?:=|;)/);
+      if (close) pushIndexSymbol(syms, snip, fi, aggregateStart.line, close[1], 'var',
+        !aggregateStart.isExtern, initializerEnd(i));
+      aggregateStart = null;
+    }
+
+    if (depthBefore === 0 && /[;=]/.test(ln) &&
+        !/^\s*(?:#|typedef\b|using\b|namespace\b|class\b)/.test(ln)) {
+      const stop = ln.search(/[;=]/);
+      let lhs = stop >= 0 ? ln.slice(0, stop).trim() : '';
+      lhs = lhs.replace(/(?:\s*\[[^\]]*\])+\s*$/, '').trim();
+      const forwardType = /^(?:struct|union|enum)\s+[A-Za-z_]\w*$/.test(lhs);
+      const name = !forwardType && !lhs.includes('(') && lhs.match(/([A-Za-z_]\w*)\s*$/);
+      if (name && /\s|\*/.test(lhs.slice(0, name.index))) {
+        pushIndexSymbol(syms, snip, fi, i + 1, name[1], 'var', !/^\s*extern\b/.test(ln));
+      }
+    }
+    braceDepth = depthAfter;
+  });
+}
+
+function buildSnippetIndex(snip) {
+  const syms = [];
+  (snip.fragments || []).forEach((f, fi) => {
+    if (!f || typeof f.code !== 'string' || f.language === 'markdown' || f.language === 'plain_text') return;
+    const lines = f.code.replace(/\r\n/g, '\n').split('\n');
+    const maskedLines = maskNonCode(f.code.replace(/\r\n/g, '\n')).split('\n');
+    outlineFor(f.code, f.language).forEach(o => {
+      const kind = o.type === 'class' ? 'type' : 'fn';
+      const ext = kind === 'fn'
+        ? functionExtent(lines, maskedLines, o.line, f.language)
+        : { isDefinition: true, endLine: typeExtent(lines, maskedLines, o.line) };
+      syms.push({ name: o.name, kind, frag: fi, line: o.line, endLine: ext.endLine,
+        isDefinition: ext.isDefinition, snippet: snip });
+    });
+    lines.forEach((ln, i) => {
+      const macro = ln.match(/^\s*#define\s+([A-Za-z_]\w*)/);
+      if (macro) syms.push({ name: macro[1], kind: 'macro', frag: fi, line: i + 1,
+        endLine: i + 1, isDefinition: true, snippet: snip });
+    });
+    if (f.language === 'c_cpp' || f.language === 'c') {
+      indexTypeAliases(syms, snip, fi, maskedLines);
+      indexFileVariables(syms, snip, fi, maskedLines);
+    }
+  });
+  const seen = new Set();
+  return syms.filter(s => { const id = symbolId(s); if (seen.has(id)) return false; seen.add(id); return true; });
+}
+
+/* 页面加载及每次同步时运行一个小型回归样例，避免以后重新引入已修复的误判。 */
+function parserSelfCheck() {
+  const fixture = { file: '__parser_self_check__', name: 'parser self check', fragments: [{
+    label: 'fixture.c', language: 'c_cpp', code: [
+      'typedef uint32_t word_t;',
+      'typedef struct opaque opaque_t;',
+      'typedef int (*callback_t)(void);',
+      'using count_t = unsigned long;',
+      'struct box {',
+      '  const int member;',
+      '};',
+      'static const struct',
+      '{',
+      '  int member;',
+      '} table[] =',
+      '{',
+      '  { 1 }',
+      '};',
+      'int plain_global;',
+      'int declared(int x);',
+      'int defined(int x) { return x; }',
+    ].join('\n')
+  }] };
+  const idx = buildSnippetIndex(fixture);
+  const has = (name, kind, def) => idx.some(s => s.name === name && s.kind === kind && (def === undefined || s.isDefinition === def));
+  const issues = [];
+  [['word_t','type'], ['opaque_t','type'], ['callback_t','type'], ['count_t','type'],
+   ['table','var'], ['plain_global','var']].forEach(([name, kind]) => { if (!has(name, kind)) issues.push('漏识别 ' + name); });
+  if (has('member', 'var')) issues.push('结构体成员被误判为文件级变量');
+  const table = idx.find(s => s.name === 'table' && s.kind === 'var');
+  if (table && (table.line !== 8 || table.endLine !== 14)) issues.push('匿名结构体变量范围定位错误');
+  if (!has('declared', 'fn', false)) issues.push('函数声明分类错误');
+  if (!has('defined', 'fn', true)) issues.push('函数定义分类错误');
+  return issues;
+}
+
+function snippetIndex(snip) {
+  if (!snip) return [];
+  let idx = SNIPPET_INDEX.get(snip.file);
+  if (!idx) { idx = buildSnippetIndex(snip); SNIPPET_INDEX.set(snip.file, idx); }
+  return idx;
+}
+function globalIndex() {
+  if (!GLOBAL_INDEX) GLOBAL_INDEX = SNIPPETS.flatMap(snippetIndex);
+  return GLOBAL_INDEX;
+}
+function invalidateSymIndexes() {
+  SNIPPET_INDEX.clear(); REF_CACHE.clear(); GLOBAL_INDEX = null; SYM_SEL = null; REL_ROOT = null; REL_EXPANDED.clear();
+  PARSER_ISSUES = parserSelfCheck();
+  const count = $('outline-count');
+  if (count) count.title = PARSER_ISSUES.length ? '索引自检：' + PARSER_ISSUES.join('；') : '索引自检通过';
+}
+
+function exactSymbols(name, kind) {
+  return globalIndex().filter(s => s.name === name && (!kind || s.kind === kind));
+}
+function resolveDefinition(sym) {
+  if (!sym) return null;
+  const cands = exactSymbols(sym.name, sym.kind);
+  if (!cands.length) return sym;
+  return cands.slice().sort((a, b) => {
+    const score = (s) => (s.isDefinition ? 100 : 0) +
+      (s.snippet.file === sym.snippet.file ? 35 : 0) + (s.frag === sym.frag ? 10 : 0) +
+      (/\.(c|cc|cpp|cxx|m|mm)$/i.test((fragmentOf(s) || {}).label || '') ? 8 : 0);
+    return score(b) - score(a) || a.line - b.line;
+  })[0];
+}
+
+/* ---- 右侧面板 ---- */
+function setSymMode(mode) {
+  SYM_MODE = mode;
+  $('tab-outline').classList.toggle('on', mode === 'outline');
+  $('tab-symbol').classList.toggle('on', mode === 'symbol');
+  $('tab-relation').classList.toggle('on', mode === 'relation');
+  const label = $('outline-head').querySelector('span');
+  if (label) label.textContent = mode === 'symbol' ? '🔍 符号上下文' : mode === 'relation' ? '🌳 关系树' : '🧭 大纲';
+  $('outline-tools').style.display = mode === 'outline' ? '' : 'none';
+  if (mode !== 'outline' && !$('outline-panel').classList.contains('collapsed') && $('outline-panel').getBoundingClientRect().width < 320) {
+    $('outline-panel').style.width = mode === 'relation' ? '390px' : '360px';
+  }
+  if (mode === 'outline') renderOutline();
+  else if (mode === 'relation') renderRelationPane();
+  else renderSymbolPane();
+}
+function renderSymbolPane() {
+  const body = $('outline-body');
+  const f = CURRENT && CURRENT.fragments[CINDEX];
+  if (!CURRENT || !f) { body.innerHTML = '<span class="ol-empty">选择片段后显示符号</span>'; $('outline-count').textContent = ''; return; }
+  if (f.language === 'markdown' || f.language === 'plain_text') { body.innerHTML = '<span class="ol-empty">当前文件不是代码，没有可索引符号</span>'; $('outline-count').textContent = ''; return; }
+  if (SYM_SEL) renderSymbolContext(SYM_SEL); else renderSymbolList();
+}
+function renderSymbolList() {
+  const body = $('outline-body');
+  const idx = snippetIndex(CURRENT).filter(s => s.frag === CINDEX);
+  if (!idx.length) { body.innerHTML = '<span class="ol-empty">未识别到符号</span>'; $('outline-count').textContent = ''; return; }
+  $('outline-count').textContent = idx.length + ' 个符号'; body.innerHTML = '';
+  const addGroup = (title, list) => {
+    if (!list.length) return;
+    const h = document.createElement('div'); h.className = 'sym-sec'; h.textContent = title + ' (' + list.length + ')'; body.appendChild(h);
+    list.forEach(sym => body.appendChild(symRow(sym)));
+  };
+  addGroup('函数', idx.filter(s => s.kind === 'fn'));
+  addGroup('类型', idx.filter(s => s.kind === 'type'));
+  addGroup('宏 / 变量', idx.filter(s => s.kind === 'macro' || s.kind === 'var'));
+}
+function symRow(sym) {
+  const d = document.createElement('div'); d.className = 'sym-row';
+  const role = sym.kind === 'fn' ? '<span class="sym-badge ' + (sym.isDefinition ? 'def' : 'decl') + '">' + (sym.isDefinition ? '定义' : '声明') + '</span>' : '';
+  d.innerHTML = '<span class="ol-ico ' + symKindClass(sym.kind) + '">' + symKindIcon(sym.kind) + '</span><span class="nm">' + escapeHtml(sym.name) + '</span>' + role + '<span class="ol-ln">:' + sym.line + '</span>';
+  d.onclick = () => goToSymbol(sym); return d;
+}
+function appendSection(body, title, count) {
+  const h = document.createElement('div'); h.className = 'sym-sec';
+  h.innerHTML = '<span>' + escapeHtml(title) + '</span><span class="sp"></span><span>' + count + '</span>';
+  body.appendChild(h);
+}
+function renderSymbolContext(selected) {
+  const body = $('outline-body'); body.innerHTML = '';
+  const def = resolveDefinition(selected) || selected;
+  const f = fragmentOf(def), lines = f ? f.code.replace(/\r\n/g, '\n').split('\n') : [];
+  const back = document.createElement('div'); back.className = 'sym-back'; back.textContent = '← 当前文件符号';
+  back.onclick = () => { SYM_SEL = null; renderSymbolPane(); }; body.appendChild(back);
+  const head = document.createElement('div'); head.className = 'sym-ctx-head';
+  head.innerHTML = '<span class="ol-ico ' + symKindClass(def.kind) + '">' + symKindIcon(def.kind) + '</span><span class="nm">' + escapeHtml(def.name) + '</span>' +
+    '<span class="sym-badge ' + (def.isDefinition ? 'def' : 'decl') + '">' + (def.isDefinition ? '定义' : '仅声明') + '</span>';
+  body.appendChild(head);
+  const where = document.createElement('div'); where.className = 'sym-where'; where.style.padding = '0 8px 3px';
+  where.textContent = symbolPlace(def); body.appendChild(where);
+  if (symbolId(def) !== symbolId(selected)) {
+    const origin = document.createElement('div'); origin.className = 'ol-empty'; origin.style.padding = '2px 8px 4px';
+    origin.textContent = '由 ' + symbolPlace(selected) + ' 解析到此定义'; body.appendChild(origin);
+  }
+  const end = Math.min(def.endLine || def.line, def.line + 49, lines.length);
+  const pre = document.createElement('pre'); pre.className = 'sym-def';
+  pre.innerHTML = codeHtml(lines.slice(def.line - 1, end).join('\n') + ((def.endLine || end) > end ? '\n…' : ''), f ? f.language : '');
+  pre.title = '点击跳到定义'; pre.onclick = () => goToSymbol(def); body.appendChild(pre);
+  $('outline-count').textContent = def.isDefinition && def.endLine ? (def.endLine - def.line + 1) + ' 行' : '声明';
+
+  const refs = collectRefs(def.name, def.kind);
+  appendSection(body, '跨库引用', refs.length);
+  refs.slice(0, 80).forEach(r => {
+    const row = document.createElement('div'); row.className = 'sym-ref';
+    row.innerHTML = '<span class="ln">' + escapeHtml(r.role + ' · ' + symbolPlace(r)) + '</span><span class="tx">' + escapeHtml(r.text.slice(0, 100)) + '</span>';
+    row.onclick = () => goToLocation(r); body.appendChild(row);
+  });
+  if (refs.length > 80) {
+    const more = document.createElement('div'); more.className = 'ol-empty'; more.textContent = '另有 ' + (refs.length - 80) + ' 条，建议用全局符号检索缩小范围'; body.appendChild(more);
+  }
+  if (def.kind === 'fn') {
+    const callers = fnCallers(def), callees = fnCallees(def);
+    appendSection(body, '调用者 callers', callers.length);
+    if (!callers.length) body.insertAdjacentHTML('beforeend', '<span class="ol-empty">未发现静态调用者</span>');
+    callers.forEach(c => body.appendChild(callRow(c, '调用 ' + def.name)));
+    appendSection(body, '被调 callees', callees.length);
+    if (!callees.length) body.insertAdjacentHTML('beforeend', '<span class="ol-empty">未发现可解析的库内调用</span>');
+    callees.forEach(c => body.appendChild(callRow(c, symbolPlace(c))));
+  }
+}
+function callRow(sym, note) {
+  const row = document.createElement('div'); row.className = 'sym-ref call';
+  row.innerHTML = '<span class="ln">' + escapeHtml(sym.name) + '</span><span class="tx">' + escapeHtml(note) + '</span>';
+  row.onclick = () => goToSymbol(sym); return row;
+}
+
+function collectRefs(name, kind) {
+  const cacheKey = kind + ':' + name;
+  if (REF_CACHE.has(cacheKey)) return REF_CACHE.get(cacheKey);
+  const out = [], re = new RegExp('\\b' + escRe(name) + '\\b');
+  SNIPPETS.forEach(snip => (snip.fragments || []).forEach((f, fi) => {
+    if (!f || typeof f.code !== 'string' || f.language === 'markdown' || f.language === 'plain_text') return;
+    const raw = f.code.replace(/\r\n/g, '\n').split('\n');
+    const masked = maskNonCode(f.code.replace(/\r\n/g, '\n')).split('\n');
+    masked.forEach((ln, i) => {
+      if (!re.test(ln)) return;
+      const at = snippetIndex(snip).find(x => x.name === name && x.frag === fi && x.line === i + 1);
+      out.push({ snippet: snip, frag: fi, line: i + 1, text: (raw[i] || '').trim(),
+        role: at ? (at.isDefinition ? '定义' : '声明') : '引用' });
+    });
+  }));
+  REF_CACHE.set(cacheKey, out); return out;
+}
+function functionMaskedBody(sym) {
+  const def = resolveDefinition(sym);
+  if (!def || def.kind !== 'fn' || !def.isDefinition || !def.endLine) return '';
+  const f = fragmentOf(def); if (!f) return '';
+  return maskNonCode(f.code).split('\n').slice(def.line - 1, def.endLine).join('\n');
+}
+function preferredFunction(name, near) {
+  const cands = exactSymbols(name, 'fn'); if (!cands.length) return null;
+  return cands.slice().sort((a, b) => {
+    const score = (s) => (s.isDefinition ? 100 : 0) + (near && s.snippet.file === near.snippet.file ? 35 : 0) + (near && s.frag === near.frag ? 8 : 0);
+    return score(b) - score(a);
+  })[0];
+}
+function dynamicDispatchTargets(member, near) {
+  const found = new Map(), assign = new RegExp('\\.\\s*' + escRe(member) + '\\s*=\\s*([A-Za-z_]\\w*)', 'g');
+  SNIPPETS.forEach(snip => (snip.fragments || []).forEach(f => {
+    if (!f || typeof f.code !== 'string' || f.language === 'markdown' || f.language === 'plain_text') return;
+    const src = maskNonCode(f.code); let m;
+    while ((m = assign.exec(src))) {
+      const target = preferredFunction(m[1], near);
+      if (target) found.set(symbolId(target), target);
+    }
+  }));
+  return [...found.values()];
+}
+function fnCalleeEdges(sym) {
+  const body = functionMaskedBody(sym), found = new Map();
+  const re = /\b([A-Za-z_]\w*)\s*\(/g; let m;
+  while ((m = re.exec(body))) {
+    const name = m[1];
+    if (name === sym.name || OL_CONTROL.has(name)) continue;
+    const target = preferredFunction(name, sym);
+    if (target) found.set(symbolId(target), { sym: target, edge: 'direct' });
+    else if (/(?:->|\.)\s*$/.test(body.slice(Math.max(0, m.index - 4), m.index))) {
+      dynamicDispatchTargets(name, sym).forEach(t => found.set(symbolId(t), { sym: t, edge: 'dynamic' }));
+    }
+  }
+  return [...found.values()];
+}
+function fnCallees(sym) { return fnCalleeEdges(sym).map(x => x.sym); }
+function fnCallers(sym) {
+  const target = resolveDefinition(sym) || sym, id = symbolId(target);
+  return globalIndex().filter(s => s.kind === 'fn' && s.isDefinition && symbolId(s) !== id &&
+    fnCalleeEdges(s).some(x => symbolId(x.sym) === id));
+}
+
+/* ---- Source Insight 式关系树：函数调用关系 + 文件 include 依赖 ---- */
+function relationCurrentFunction() {
+  if (!CURRENT) return null;
+  const cw = $('code-wrap'), lineH = parseFloat(getComputedStyle($('code')).lineHeight) || 20;
+  const padTop = parseFloat(getComputedStyle($('code')).paddingTop) || 0;
+  const line = Math.max(1, Math.floor((cw.scrollTop + cw.clientHeight * CODE_FOCUS_RATIO - padTop) / lineH) + 1);
+  const defs = snippetIndex(CURRENT).filter(s => s.frag === CINDEX && s.kind === 'fn' && s.isDefinition);
+  return defs.find(s => s.line <= line && (s.endLine || s.line) >= line) || defs[0] || null;
+}
+function relationChildren(sym, dir) {
+  if (dir === 'up') return fnCallers(sym).map(s => ({ sym: s, edge: 'caller' }));
+  return fnCalleeEdges(sym);
+}
+function relationTreeNode(body, sym, depth, dir, ancestry, root, edge) {
+  const def = resolveDefinition(sym) || sym, id = symbolId(def), cycle = ancestry.has(id);
+  const children = cycle ? [] : relationChildren(def, dir);
+  const key = dir + ':' + id, open = root || REL_EXPANDED.has(key);
+  const row = document.createElement('div'); row.className = 'rel-row' + (root ? ' root' : '');
+  row.style.paddingLeft = (7 + depth * 15) + 'px';
+  row.title = '点击跳转；双击设为关系树根节点';
+  const tag = cycle ? '<span class="edge cycle">循环</span>' : edge === 'dynamic' ? '<span class="edge dynamic">动态</span>' : '';
+  row.innerHTML = '<span class="arrow">' + (children.length ? (open ? '▾' : '▸') : '·') + '</span>' +
+    '<span class="ol-ico kind-fn">ƒ</span><span class="nm">' + escapeHtml(def.name) + tag + '</span>' +
+    '<span class="meta">' + escapeHtml(((fragmentOf(def) || {}).label || '?') + ':' + def.line) + '</span>';
+  row.querySelector('.arrow').onclick = (e) => {
+    e.stopPropagation(); if (!children.length) return;
+    open ? REL_EXPANDED.delete(key) : REL_EXPANDED.add(key); renderRelationPane();
+  };
+  row.onclick = () => { goToLocation(def); if (SYM_MODE !== 'relation') setSymMode('relation'); };
+  row.ondblclick = (e) => { e.preventDefault(); REL_ROOT = def; REL_EXPANDED.clear(); renderRelationPane(); };
+  body.appendChild(row);
+  if (!open || cycle) return;
+  const next = new Set(ancestry); next.add(id);
+  children.forEach(ch => relationTreeNode(body, ch.sym, depth + 1, dir, next, false, ch.edge));
+}
+
+function allCodeFiles() {
+  const out = [];
+  SNIPPETS.forEach(snippet => (snippet.fragments || []).forEach((fragment, frag) => {
+    if (fragment && typeof fragment.code === 'string' && fragment.language !== 'markdown' && fragment.language !== 'plain_text')
+      out.push({ snippet, frag, fragment, name: fragment.label || fragment.filename || ('片段 ' + (frag + 1)) });
+  }));
+  return out;
+}
+const fileNodeId = (n) => n.external ? 'external:' + n.name : n.snippet.file + '|' + n.frag;
+const baseName = (s) => String(s || '').replace(/\\/g, '/').split('/').pop();
+function fileIncludes(file) {
+  const out = [], raw = file.fragment.code.replace(/\r\n/g, '\n').split('\n');
+  raw.forEach((ln, i) => {
+    const m = ln.match(/^\s*#\s*include\s*(["<])([^">]+)[">]/);
+    if (m) out.push({ name: m[2], system: m[1] === '<', line: i + 1, text: (raw[i] || '').trim() });
+  });
+  return out;
+}
+function resolveInclude(name) {
+  const base = baseName(name);
+  return allCodeFiles().filter(f => baseName(f.name) === base || baseName(f.fragment.filename) === base);
+}
+function fileRelationChildren(file, dir) {
+  if (file.external) return [];
+  if (dir === 'down') {
+    const out = [];
+    fileIncludes(file).forEach(inc => {
+      const targets = resolveInclude(inc.name);
+      if (targets.length) targets.forEach(t => out.push(Object.assign({}, t, { edge: inc.system ? 'system' : 'include' })));
+      else out.push({ external: true, name: inc.name, edge: inc.system ? 'system' : 'missing' });
+    });
+    return out;
+  }
+  const id = fileNodeId(file), out = [];
+  allCodeFiles().forEach(candidate => fileIncludes(candidate).forEach(inc => {
+    if (resolveInclude(inc.name).some(t => fileNodeId(t) === id)) out.push(Object.assign({}, candidate, { edge: 'included', includeLine: inc.line }));
+  }));
+  return out.filter((n, i) => out.findIndex(x => fileNodeId(x) === fileNodeId(n)) === i);
+}
+function fileTreeNode(body, file, depth, dir, ancestry, root) {
+  const id = fileNodeId(file), cycle = ancestry.has(id), children = cycle ? [] : fileRelationChildren(file, dir);
+  const key = 'file:' + dir + ':' + id, open = root || REL_EXPANDED.has(key);
+  const row = document.createElement('div'); row.className = 'rel-row' + (root ? ' root' : '');
+  row.style.paddingLeft = (7 + depth * 15) + 'px';
+  const badge = cycle ? '<span class="edge cycle">循环</span>' : file.external ? '<span class="edge">外部</span>' : '';
+  row.innerHTML = '<span class="arrow">' + (children.length ? (open ? '▾' : '▸') : '·') + '</span><span class="ol-ico">' +
+    (file.external ? '◇' : '▤') + '</span><span class="nm">' + escapeHtml(file.name) + badge + '</span><span class="meta">' +
+    escapeHtml(file.external ? file.edge || '' : file.snippet.name) + '</span>';
+  row.querySelector('.arrow').onclick = (e) => {
+    e.stopPropagation(); if (!children.length) return;
+    open ? REL_EXPANDED.delete(key) : REL_EXPANDED.add(key); renderRelationPane();
+  };
+  row.onclick = () => {
+    if (file.external) return;
+    goToLocation({ snippet: file.snippet, frag: file.frag, line: file.includeLine || 1 });
+    if (SYM_MODE !== 'relation') setSymMode('relation');
+  };
+  body.appendChild(row);
+  if (!open || cycle) return;
+  const next = new Set(ancestry); next.add(id);
+  children.forEach(ch => fileTreeNode(body, ch, depth + 1, dir, next, false));
+}
+function relationButton(box, label, active, onclick) {
+  const b = document.createElement('button'); b.textContent = label; b.classList.toggle('on', active); b.onclick = onclick; box.appendChild(b);
+}
+let REL_GRAPH_OBSERVER = null, REL_GRAPH_SEQ = 0;
+function relationGraphCard(data, side) {
+  const card = document.createElement('button'); card.type = 'button';
+  card.className = 'rel-card ' + side + (data.external ? ' external' : '');
+  card.innerHTML = '<span class="title">' + escapeHtml(data.title) + '</span><span class="sub">' + escapeHtml(data.meta || '') + '</span>' +
+    (data.badge ? '<span class="tag">' + escapeHtml(data.badge) + '</span>' : '');
+  card.title = data.external ? data.title + '（外部，库内无定义）' : '点击跳转并以此为关系中心';
+  if (data.external) card.disabled = true;
+  else card.onclick = data.activate;
+  return card;
+}
+function drawRelationGraph(graph) {
+  const svg = graph.querySelector('.rel-graph-svg'), root = graph.querySelector('.rel-card.root');
+  if (!svg || !root) return;
+  const box = graph.getBoundingClientRect(), rootBox = root.getBoundingClientRect();
+  svg.setAttribute('viewBox', '0 0 ' + box.width + ' ' + box.height);
+  svg.querySelectorAll('path.rel-link').forEach(p => p.remove());
+  const add = (card, fromLeft) => {
+    const r = card.getBoundingClientRect();
+    const x1 = (fromLeft ? r.right : rootBox.right) - box.left;
+    const y1 = (fromLeft ? r.top + r.height / 2 : rootBox.top + rootBox.height / 2) - box.top;
+    const x2 = (fromLeft ? rootBox.left : r.left) - box.left;
+    const y2 = (fromLeft ? rootBox.top + rootBox.height / 2 : r.top + r.height / 2) - box.top;
+    const mid = (x1 + x2) / 2, path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('class', 'rel-link'); path.setAttribute('d', 'M' + x1 + ',' + y1 + ' C' + mid + ',' + y1 + ' ' + mid + ',' + y2 + ' ' + x2 + ',' + y2);
+    path.setAttribute('fill', 'none'); path.setAttribute('stroke', fromLeft ? 'var(--accent)' : 'var(--ok)'); path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('marker-end', 'url(#' + (fromLeft ? graph.dataset.upMarker : graph.dataset.downMarker) + ')'); svg.appendChild(path);
+  };
+  graph.querySelectorAll('.rel-card.upstream').forEach(c => add(c, true));
+  graph.querySelectorAll('.rel-card.downstream').forEach(c => add(c, false));
+}
+function buildRelationGraph(body, left, center, right, labels) {
+  if (REL_GRAPH_OBSERVER) { REL_GRAPH_OBSERVER.disconnect(); REL_GRAPH_OBSERVER = null; }
+  const graph = document.createElement('div'); graph.className = 'rel-graph';
+  const seq = ++REL_GRAPH_SEQ, upMarker = 'rel-up-' + seq, downMarker = 'rel-down-' + seq;
+  graph.dataset.upMarker = upMarker; graph.dataset.downMarker = downMarker;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'rel-graph-svg');
+  svg.innerHTML = '<defs><marker id="' + upMarker + '" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--accent)"/></marker>' +
+    '<marker id="' + downMarker + '" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ok)"/></marker></defs>';
+  graph.appendChild(svg);
+  const makeCol = (label, items, side) => {
+    const col = document.createElement('div'); col.className = 'rel-graph-col';
+    const head = document.createElement('div'); head.className = 'rel-graph-label'; head.textContent = label; col.appendChild(head);
+    if (!items.length) { const empty = document.createElement('div'); empty.className = 'rel-graph-empty'; empty.textContent = '无库内关系'; col.appendChild(empty); }
+    items.slice(0, 12).forEach(x => col.appendChild(relationGraphCard(x, side)));
+    if (items.length > 12) { const more = document.createElement('div'); more.className = 'rel-graph-more'; more.textContent = '另有 ' + (items.length - 12) + ' 项'; col.appendChild(more); }
+    graph.appendChild(col);
+  };
+  makeCol(labels[0], left, 'upstream'); makeCol(labels[1], [center], 'root'); makeCol(labels[2], right, 'downstream');
+  body.appendChild(graph);
+  const legend = document.createElement('div'); legend.className = 'rel-legend';
+  legend.innerHTML = '<span><i></i>流入当前节点</span><span><i class="down"></i>从当前节点流出</span>'; body.appendChild(legend);
+  requestAnimationFrame(() => drawRelationGraph(graph));
+  if (window.ResizeObserver) { REL_GRAPH_OBSERVER = new ResizeObserver(() => drawRelationGraph(graph)); REL_GRAPH_OBSERVER.observe(graph); }
+}
+function activateRelationFunction(sym) {
+  const def = resolveDefinition(sym) || sym; REL_ROOT = def; REL_EXPANDED.clear(); goToLocation(def); renderRelationPane();
+}
+function renderFunctionGraph(body, root) {
+  const callers = REL_DIR === 'down' ? [] : fnCallers(root).map(sym => ({ title: sym.name, meta: ((fragmentOf(sym) || {}).label || '?') + ':' + sym.line, activate: () => activateRelationFunction(sym) }));
+  const callees = REL_DIR === 'up' ? [] : fnCalleeEdges(root).map(x => ({ title: x.sym.name, meta: ((fragmentOf(x.sym) || {}).label || '?') + ':' + x.sym.line,
+    badge: x.edge === 'dynamic' ? '动态候选' : '', activate: () => activateRelationFunction(x.sym) }));
+  const center = { title: root.name, meta: ((fragmentOf(root) || {}).label || '?') + ':' + root.line, activate: () => goToLocation(root) };
+  buildRelationGraph(body, callers, center, callees, ['调用者', '当前函数', '被调用']);
+  return callers.length + callees.length;
+}
+function activateRelationFile(file) {
+  if (file.external) return;
+  goToLocation({ snippet: file.snippet, frag: file.frag, line: file.includeLine || 1 }); renderRelationPane();
+}
+function renderFileGraph(body, root) {
+  const incoming = REL_DIR === 'down' ? [] : fileRelationChildren(root, 'up').map(f => ({ title: f.name, meta: f.snippet.name, activate: () => activateRelationFile(f) }));
+  const outgoing = REL_DIR === 'up' ? [] : fileRelationChildren(root, 'down').map(f => ({ title: f.name, meta: f.external ? (f.edge === 'system' ? '系统头文件' : '未找到定义') : f.snippet.name,
+    external: !!f.external, activate: () => activateRelationFile(f) }));
+  const center = { title: root.name, meta: root.snippet.name, activate: () => activateRelationFile(root) };
+  buildRelationGraph(body, incoming, center, outgoing, ['包含当前文件', '当前文件', '当前文件包含']);
+  return incoming.length + outgoing.length;
+}
+function renderRelationPane() {
+  const body = $('outline-body'); body.innerHTML = '';
+  if (!CURRENT || !CURRENT.fragments[CINDEX]) { body.innerHTML = '<span class="ol-empty">选择代码文件后显示关系树</span>'; $('outline-count').textContent = ''; return; }
+  const tools = document.createElement('div'); tools.className = 'rel-tools'; body.appendChild(tools);
+  relationButton(tools, 'ƒ 调用关系', REL_VIEW === 'calls', () => { REL_VIEW = 'calls'; REL_EXPANDED.clear(); try { localStorage.setItem('mc-rel-view', REL_VIEW); } catch (_) {} renderRelationPane(); });
+  relationButton(tools, '▤ 文件依赖', REL_VIEW === 'files', () => { REL_VIEW = 'files'; REL_EXPANDED.clear(); try { localStorage.setItem('mc-rel-view', REL_VIEW); } catch (_) {} renderRelationPane(); });
+  relationButton(tools, '◫ 图形', REL_LAYOUT === 'graph', () => { REL_LAYOUT = 'graph'; try { localStorage.setItem('mc-rel-layout', REL_LAYOUT); } catch (_) {} renderRelationPane(); });
+  relationButton(tools, '☷ 树形', REL_LAYOUT === 'tree', () => { REL_LAYOUT = 'tree'; try { localStorage.setItem('mc-rel-layout', REL_LAYOUT); } catch (_) {} renderRelationPane(); });
+  const divider = document.createElement('span'); divider.style.flexBasis = '100%'; tools.appendChild(divider);
+  relationButton(tools, REL_VIEW === 'files' ? '包含了谁' : '向下调用', REL_DIR === 'down', () => { REL_DIR = 'down'; REL_EXPANDED.clear(); try { localStorage.setItem('mc-rel-dir', REL_DIR); } catch (_) {} renderRelationPane(); });
+  relationButton(tools, REL_VIEW === 'files' ? '谁包含它' : '向上调用', REL_DIR === 'up', () => { REL_DIR = 'up'; REL_EXPANDED.clear(); try { localStorage.setItem('mc-rel-dir', REL_DIR); } catch (_) {} renderRelationPane(); });
+  relationButton(tools, '双向', REL_DIR === 'both', () => { REL_DIR = 'both'; REL_EXPANDED.clear(); try { localStorage.setItem('mc-rel-dir', REL_DIR); } catch (_) {} renderRelationPane(); });
+  const tip = document.createElement('div'); tip.className = 'rel-tip';
+  tip.textContent = REL_LAYOUT === 'graph' ? '箭头表示调用/依赖方向 · 点击节点切换关系中心' : '▸ 展开节点 · 点击跳转 · 双击函数设为根节点'; body.appendChild(tip);
+
+  if (REL_VIEW === 'calls') {
+    let root = REL_ROOT && REL_ROOT.kind === 'fn' ? resolveDefinition(REL_ROOT) : relationCurrentFunction();
+    if (!root) { body.insertAdjacentHTML('beforeend', '<span class="ol-empty">当前文件没有可用的函数定义；先点击代码中的函数名</span>'); $('outline-count').textContent = '无根函数'; return; }
+    REL_ROOT = root;
+    if (REL_LAYOUT === 'graph') { const count = renderFunctionGraph(body, root); $('outline-count').textContent = count + ' 个直接关系'; return; }
+    const dirs = REL_DIR === 'both' ? [['up','调用者 callers'], ['down','被调 callees']] : [[REL_DIR, REL_DIR === 'up' ? '调用者 callers' : '被调 callees']];
+    let count = 0;
+    dirs.forEach(([dir, title]) => {
+      const sec = document.createElement('div'); sec.className = 'rel-section'; sec.textContent = title; body.appendChild(sec);
+      count += relationChildren(root, dir).length; relationTreeNode(body, root, 0, dir, new Set(), true, 'root');
+    });
+    $('outline-count').textContent = count + ' 个直接关系';
+  } else {
+    const fragment = CURRENT.fragments[CINDEX];
+    if (fragment.language === 'markdown' || fragment.language === 'plain_text') { body.insertAdjacentHTML('beforeend', '<span class="ol-empty">当前文件没有代码依赖</span>'); $('outline-count').textContent = ''; return; }
+    const root = { snippet: CURRENT, frag: CINDEX, fragment, name: fragment.label || fragment.filename || ('片段 ' + (CINDEX + 1)) };
+    if (REL_LAYOUT === 'graph') { const count = renderFileGraph(body, root); $('outline-count').textContent = count + ' 个直接依赖'; return; }
+    const dirs = REL_DIR === 'both' ? [['up','谁包含当前文件'], ['down','当前文件包含了谁']] : [[REL_DIR, REL_DIR === 'up' ? '谁包含当前文件' : '当前文件包含了谁']];
+    let count = 0;
+    dirs.forEach(([dir, title]) => {
+      const sec = document.createElement('div'); sec.className = 'rel-section'; sec.textContent = title; body.appendChild(sec);
+      count += fileRelationChildren(root, dir).length; fileTreeNode(body, root, 0, dir, new Set(), true);
+    });
+    $('outline-count').textContent = count + ' 个直接依赖';
+  }
+}
+
+function goToLocation(loc) {
+  if (!loc || !loc.snippet) return false;
+  if (!CURRENT || CURRENT.file !== loc.snippet.file) { if (!select(loc.snippet)) return false; }
+  if (loc.frag !== CINDEX) { CINDEX = loc.frag; renderMain(); }
+  jumpToLine(loc.line); return true;
+}
+function goToSymbol(sym) {
+  if (!goToLocation(sym)) return;
+  SYM_SEL = sym; setSymMode('symbol');
+}
+
+/* ---- 点击代码中的符号 -> 上下文；双击 -> 定义 ---- */
+function codeTokenAt(e) {
+  if (!document.caretRangeFromPoint) return null;
+  const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+  if (!range || range.startContainer.nodeType !== 3) return null;
+  const txt = range.startContainer.textContent || '', idx = range.startOffset;
+  const isId = (c) => c && /[A-Za-z0-9_$]/.test(c);
+  let s = idx, en = idx;
+  while (s > 0 && isId(txt[s - 1])) s--;
+  while (en < txt.length && isId(txt[en])) en++;
+  const word = txt.slice(s, en);
+  return /^[A-Za-z_$][\w$]*$/.test(word) ? { word, line: codeLineAt(e) } : null;
+}
+function codeLineAt(e) {
+  const cw = $('code-wrap'), rect = cw.getBoundingClientRect();
+  const lineH = parseFloat(getComputedStyle($('code')).lineHeight) || 20;
+  const padTop = parseFloat(getComputedStyle($('code')).paddingTop) || 0;
+  return Math.max(1, Math.floor((e.clientY - rect.top + cw.scrollTop - padTop) / lineH) + 1);
+}
+function findBestSymbol(name, line) {
+  const cands = exactSymbols(name); if (!cands.length) return null;
+  return cands.slice().sort((a, b) => {
+    const score = (s) => (s.snippet.file === CURRENT.file ? 60 : 0) + (s.frag === CINDEX ? 25 : 0) +
+      (s.isDefinition ? 12 : 0) + (s.line <= line ? Math.max(0, 8 - Math.floor((line - s.line) / 30)) : 0);
+    return score(b) - score(a);
+  })[0];
+}
+function onCodeClick(e) {
+  if (EDITING) return;
+  const f = CURRENT && CURRENT.fragments[CINDEX];
+  if (!f || f.language === 'markdown' || f.language === 'plain_text') return;
+  const t = codeTokenAt(e), sym = t && findBestSymbol(t.word, t.line);
+  if (sym) {
+    SYM_SEL = sym;
+    if (SYM_MODE === 'relation' && sym.kind === 'fn') { REL_ROOT = resolveDefinition(sym) || sym; REL_EXPANDED.clear(); renderRelationPane(); }
+    else setSymMode('symbol');
+  }
+}
+function onCodeDblClick(e) {
+  if (EDITING) return;
+  const t = codeTokenAt(e), sym = t && findBestSymbol(t.word, t.line);
+  if (sym) goToSymbol(resolveDefinition(sym) || sym);
+}
+
+/* ---- 跨库全局符号检索 ---- */
+function fuzzyScore(q, name) {
+  const Q = q.toLowerCase(), N = name.toLowerCase();
+  if (!Q) return -1;
+  if (N === Q) return 100000;
+  if (N.startsWith(Q)) return 50000 - name.length;
+  if (N.includes(Q)) return 25000 - name.length;
+  let qi = 0;
+  for (let i = 0; i < N.length && qi < Q.length; i++) if (N[i] === Q[qi]) qi++;
+  return qi === Q.length ? 10000 - name.length : -1;
+}
+let symTimer = null;
+function setActiveSymResult(index) {
+  const rows = $('sym-modal-res').querySelectorAll('.symr');
+  if (!rows.length) { SYM_ACTIVE = 0; return; }
+  SYM_ACTIVE = (index + rows.length) % rows.length;
+  rows.forEach((r, i) => r.classList.toggle('active', i === SYM_ACTIVE));
+  rows[SYM_ACTIVE].scrollIntoView({ block: 'nearest' });
+}
+function renderSymResults(q) {
+  const box = $('sym-modal-res'); box.innerHTML = '';
+  if (!q.trim()) {
+    const counts = globalIndex().reduce((a, s) => { a[s.kind] = (a[s.kind] || 0) + 1; return a; }, {});
+    box.innerHTML = '<div class="sym-help">输入名称搜索整个片段库。<br>↑ / ↓ 选择，Enter 打开，Esc 关闭。<br><br>' +
+      '当前索引：' + (counts.fn || 0) + ' 函数 · ' + (counts.type || 0) + ' 类型 · ' + (counts.macro || 0) + ' 宏 · ' + (counts.var || 0) + ' 变量</div>';
+    $('sym-modal-status').textContent = globalIndex().length + ' 个符号'; SYM_RESULTS = []; return;
+  }
+  const t0 = performance.now();
+  SYM_RESULTS = globalIndex().filter(s => SYM_SEARCH_KIND === 'all' || s.kind === SYM_SEARCH_KIND)
+    .map(sym => ({ sym, score: fuzzyScore(q, sym.name) })).filter(x => x.score >= 0)
+    .sort((a, b) => b.score - a.score || Number(b.sym.isDefinition) - Number(a.sym.isDefinition) || a.sym.name.localeCompare(b.sym.name))
+    .slice(0, 120).map(x => x.sym);
+  SYM_RESULTS.forEach((sym, i) => {
+    const row = document.createElement('div'); row.className = 'symr' + (i === 0 ? ' active' : '');
+    row.innerHTML = '<span class="ol-ico ' + symKindClass(sym.kind) + '">' + symKindIcon(sym.kind) + '</span><span class="nm">' + escapeHtml(sym.name) + '</span>' +
+      (sym.kind === 'fn' ? '<span class="sym-badge ' + (sym.isDefinition ? 'def' : 'decl') + '">' + (sym.isDefinition ? '定义' : '声明') + '</span>' : '') +
+      '<span class="meta">' + escapeHtml(symbolPlace(sym)) + '</span>';
+    row.onclick = () => { closeSymModal(); goToSymbol(sym); }; box.appendChild(row);
+  });
+  SYM_ACTIVE = 0;
+  $('sym-modal-status').textContent = SYM_RESULTS.length ? SYM_RESULTS.length + ' 条 · ' + (performance.now() - t0).toFixed(0) + 'ms' : '无匹配';
+  if (!SYM_RESULTS.length) box.innerHTML = '<span class="ol-empty">没有匹配的符号</span>';
+}
+function openSnippetForSym(sym) { goToSymbol(sym); }
+function openSymModal() {
+  $('sym-modal').classList.add('open'); $('sym-q').value = ''; SYM_SEARCH_KIND = 'all';
+  $('sym-filter').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.kind === 'all'));
+  renderSymResults(''); setTimeout(() => $('sym-q').focus(), 30);
+}
+function closeSymModal() { $('sym-modal').classList.remove('open'); }
 
 /* ---- 轻量语法高亮（内置分词器，离线可用） ---- */
 const KEYWORDS = {
@@ -713,9 +1643,10 @@ function highlight(code, lang) {
 }
 
 function select(s) {
-  if (!confirmLeaveEdit()) return;
-  CURRENT = s; CINDEX = 0;
+  if (!confirmLeaveEdit()) return false;
+  CURRENT = s; CINDEX = 0; SYM_SEL = null;
   renderList(); renderMain();
+  return true;
 }
 
 function renderCode() {
@@ -767,7 +1698,9 @@ function renderCode() {
   $('btn-preview').style.display = isHtml ? '' : 'none';
   $('btn-preview').disabled = !isHtml;
   updateEditButtons();
-  renderOutline();
+  if (SYM_MODE === 'symbol') renderSymbolPane();
+  else if (SYM_MODE === 'relation') renderRelationPane();
+  else renderOutline();
   applyMdView();
 }
 
@@ -1150,7 +2083,7 @@ function makeResizer(split, axis, getter, setter, flip) {
     (v) => { $('output').style.height = clampV(v, 90, Math.round(window.innerHeight * 0.62)) + 'px'; try { localStorage.setItem('mc-out-h', String(Math.round(v))); } catch (_) {} });
   makeResizer($('split-v2'), 'v',
     () => $('outline-panel').getBoundingClientRect().width,
-    (v) => { $('outline-panel').classList.remove('collapsed'); $('outline-panel').style.width = clampV(v, 160, 520) + 'px'; try { localStorage.setItem('mc-outline-w', String(Math.round(v))); } catch (_) {} },
+    (v) => { $('outline-panel').classList.remove('collapsed'); $('outline-panel').style.width = clampV(v, 180, 640) + 'px'; try { localStorage.setItem('mc-outline-w', String(Math.round(v))); } catch (_) {} },
     true); // 右侧面板：向左拖 = 变宽（反向）
   makeResizer($('edit-split-v'), 'v',
     () => $('code-wrap').getBoundingClientRect().width,
@@ -1160,12 +2093,54 @@ function makeResizer(split, axis, getter, setter, flip) {
   try { showOutline = localStorage.getItem('mc-outline') !== '0'; } catch (_) {}
   try { MD_RENDER_MODE = localStorage.getItem('mc-md-view') !== '0'; } catch (_) {}
   try {
-    const ow = parseInt(localStorage.getItem('mc-outline-w')) || 240;
-    $('outline-panel').style.width = clampV(ow, 160, 520) + 'px';
+    const ow = parseInt(localStorage.getItem('mc-outline-w')) || 320;
+    $('outline-panel').style.width = clampV(ow, 180, 640) + 'px';
   } catch (_) {}
   if (!showOutline) { $('outline-panel').classList.add('collapsed'); }
   $('btn-outline').classList.toggle('on', showOutline);
   $('btn-outline').onclick = toggleOutline;
+  // Source Insight 阅读模式：符号面板 / 全局检索 / 代码点击
+  $('btn-symbols').onclick = openSymModal;
+  $('tab-outline').onclick = () => setSymMode('outline');
+  $('tab-symbol').onclick = () => { SYM_SEL = null; setSymMode('symbol'); };
+  $('tab-relation').onclick = () => { REL_ROOT = SYM_SEL && SYM_SEL.kind === 'fn' ? resolveDefinition(SYM_SEL) : relationCurrentFunction(); REL_EXPANDED.clear(); setSymMode('relation'); };
+  $('outline-q').addEventListener('input', () => { if (SYM_MODE === 'outline') renderOutline(); });
+  $('outline-q').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.target.value = ''; renderOutline(); e.target.blur(); } });
+  $('outline-scope').onclick = () => {
+    OUTLINE_SCOPE = OUTLINE_SCOPE === 'current' ? 'all' : 'current';
+    try { localStorage.setItem('mc-outline-scope', OUTLINE_SCOPE); } catch (_) {}
+    renderOutline();
+  };
+  $('sym-modal-close').onclick = closeSymModal;
+  $('sym-q').addEventListener('input', (e) => {
+    clearTimeout(symTimer);
+    symTimer = setTimeout(() => renderSymResults(e.target.value), 120);
+  });
+  $('sym-q').addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveSymResult(SYM_ACTIVE + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveSymResult(SYM_ACTIVE - 1); }
+    else if (e.key === 'Enter') { e.preventDefault(); const rows = $('sym-modal-res').querySelectorAll('.symr'); if (rows[SYM_ACTIVE]) rows[SYM_ACTIVE].click(); }
+    else if (e.key === 'Escape') closeSymModal();
+  });
+  $('sym-filter').querySelectorAll('button').forEach(btn => btn.onclick = () => {
+    SYM_SEARCH_KIND = btn.dataset.kind;
+    $('sym-filter').querySelectorAll('button').forEach(b => b.classList.toggle('on', b === btn));
+    renderSymResults($('sym-q').value);
+    $('sym-q').focus();
+  });
+  $('sym-modal').addEventListener('click', (e) => { if (e.target === $('sym-modal')) closeSymModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('sym-modal').classList.contains('open')) closeSymModal();
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) { e.preventDefault(); openSymModal(); }
+  });
+  $('code').addEventListener('click', onCodeClick);
+  $('code').addEventListener('dblclick', onCodeDblClick);
+  $('code-wrap').addEventListener('wheel', () => { OL_JUMP_LOCK = null; }, { passive: true });
+  $('code-wrap').addEventListener('pointerdown', () => { OL_JUMP_LOCK = null; });
+  $('code-wrap').addEventListener('scroll', () => {
+    if (OL_SCROLL_RAF) cancelAnimationFrame(OL_SCROLL_RAF);
+    OL_SCROLL_RAF = requestAnimationFrame(() => { OL_SCROLL_RAF = 0; updateOutlineActive(); });
+  });
   // 编辑模式下输入时实时刷新大纲 + 实时渲染预览 + 代码实时高亮
   $('code-edit').addEventListener('input', () => { if (EDITING) { renderOutline(); updateEditPreview(); syncHighlight(); } });
   // 代码编辑的高亮层与 textarea 滚动同步
