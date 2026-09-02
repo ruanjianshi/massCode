@@ -1,9 +1,9 @@
 {
   "counters": {
-    "contentId": 33,
-    "folderId": 12,
-    "snippetId": 32,
-    "tagId": 22
+    "contentId": 38,
+    "folderId": 13,
+    "snippetId": 33,
+    "tagId": 26
   },
   "folderIdByPath": {
     "Test": 1,
@@ -12,6 +12,7 @@
     "嵌入式开发规范": 12,
     "数据结构算法": 9,
     "Test/多文件示例": 4,
+    "Test/手搓代码": 13,
     "Test/测试代码示例": 11,
     "嵌入式开发Linux/应用层开发": 7,
     "嵌入式开发Linux/驱动层开发": 8,
@@ -54,6 +55,9 @@
       "isOpen": 0
     },
     "12": {
+      "isOpen": 0
+    },
+    "13": {
       "isOpen": 0
     }
   },
@@ -153,19 +157,26 @@
           }
         ],
         "createdAt": 1787909881559,
-        "description": "通用串口(UART)驱动，高复用简洁版：只保留 open/read/write/close 四个接口，其余功能注释预留。分层设计，嵌入式 Linux 与 STM32 MCU 同一套接口，换平台只换后端文件。STM32 端内置 GPIO+时钟初始化、中断+环形缓冲接收。含 README。",
+        "description": "简单可用的 UART 驱动：统一 open/read/write/close，支持 Linux termios、STM32 HAL 中断接收和可选具名设备管理。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788088051792.351,
+        "mtimeMs": 1788275466276.1013,
         "name": "串口通信驱动",
-        "size": 48197,
+        "size": 33884,
         "tags": [
           4,
           2,
           5,
-          6
+          6,
+          10,
+          12,
+          13,
+          14,
+          16,
+          17,
+          22
         ],
-        "updatedAt": 1787911440516
+        "updatedAt": 1788187561000
       }
     },
     {
@@ -224,14 +235,20 @@
           }
         ],
         "createdAt": 1788087217287,
-        "description": "开发的通用层：通用类型定义（common.h）+ 设备注册表（device.h/device.c）。串口驱动等驱动依赖本片段。",
+        "description": "简单的嵌入式公共错误码和静态设备注册表，提供注册、查找与注销基本能力。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788087906644.527,
+        "mtimeMs": 1788275660596.9758,
         "name": "通用接口管理",
-        "size": 10912,
-        "tags": [],
-        "updatedAt": 1788087235257
+        "size": 12690,
+        "tags": [
+          4,
+          2,
+          6,
+          10,
+          12
+        ],
+        "updatedAt": 1788187561000
       }
     },
     {
@@ -415,7 +432,7 @@
         "description": "规范内存所有权、栈、缓冲区、DMA、D-Cache和环形缓冲区。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788172862412.5222,
+        "mtimeMs": 1788172862412.522,
         "name": "05-内存栈DMA与Cache安全",
         "size": 3053,
         "tags": [
@@ -452,6 +469,53 @@
           22
         ],
         "updatedAt": 1788172784000
+      }
+    },
+    {
+      "filePath": "Test/手搓代码/接口化最小代码实现.md",
+      "id": 33,
+      "meta": {
+        "contents": [
+          {
+            "id": 34,
+            "label": "led.h",
+            "language": "c_cpp"
+          },
+          {
+            "id": 35,
+            "label": "led.c",
+            "language": "c_cpp"
+          },
+          {
+            "id": 38,
+            "label": "uart.c",
+            "language": "c_cpp"
+          },
+          {
+            "id": 37,
+            "label": "uart.h",
+            "language": "c_cpp"
+          },
+          {
+            "id": 36,
+            "label": "main.c",
+            "language": "c_cpp"
+          }
+        ],
+        "createdAt": 1788275360484,
+        "description": "最简洁、最小化实现面向对象接口化、工程化开发代码示例",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788349092283.74,
+        "name": "接口化最小代码实现",
+        "size": 4796,
+        "tags": [
+          26,
+          23,
+          2,
+          25
+        ],
+        "updatedAt": 1788348037007
       }
     }
   ],
@@ -587,6 +651,30 @@
       "id": 22,
       "name": "测试验证",
       "updatedAt": 1788173049808
+    },
+    {
+      "createdAt": 1788275391410,
+      "id": 23,
+      "name": "接口化",
+      "updatedAt": 1788275391410
+    },
+    {
+      "createdAt": 1788275401221,
+      "id": 24,
+      "name": "封装",
+      "updatedAt": 1788275401221
+    },
+    {
+      "createdAt": 1788275416035,
+      "id": 25,
+      "name": "LED示例",
+      "updatedAt": 1788275416035
+    },
+    {
+      "createdAt": 1788276519138,
+      "id": 26,
+      "name": "静态池",
+      "updatedAt": 1788276519138
     }
   ],
   "version": 3

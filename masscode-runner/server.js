@@ -766,6 +766,139 @@ function writeBackFragment(file, fragment, newCode) {
   return true;
 }
 
+/* 重排片段顺序：同时重排 frontmatter 的 contents 列表与 body 的 ## Fragment 段。
+   order = 新顺序（原索引的排列，如 [2,0,1] 表示原第 2/0/1 段依次放到最前）。
+   按原始文本切片重排，不改任何片段内容与格式。 */
+function reorderFragments(file, order) {
+  const text = fs.readFileSync(file, 'utf8');
+  const fmRe = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+  const m = fmRe.exec(text);
+  if (!m) return { ok: false, error: '文件缺少 frontmatter' };
+  const yamlRaw = m[1];
+  const body = text.slice(m[0].length);
+  const nl = yamlRaw.includes('\r\n') ? '\r\n' : '\n';
+  const yamlLines = yamlRaw.split(/\r?\n/);
+
+  // 1) 定位 contents 列表项的原始行块（2空格 "- " 项 + 4空格字段）
+  const ci = yamlLines.findIndex((l) => /^contents:\s*$/.test(l));
+  if (ci < 0) return { ok: false, error: 'frontmatter 缺少 contents' };
+  const items = [];
+  let cur = null;
+  for (let i = ci + 1; i < yamlLines.length; i++) {
+    const l = yamlLines[i];
+    if (/^ {2}- /.test(l)) {
+      if (cur) cur.end = i - 1;
+      cur = { start: i, end: i };
+      items.push(cur);
+    } else if (/^ {4}/.test(l) && cur) {
+      cur.end = i;
+    } else if (cur && /^\s*$/.test(l)) {
+      continue;
+    } else if (cur && !/^\s/.test(l)) {
+      break;
+    } else if (cur) {
+      cur.end = i;
+    }
+  }
+  if (items.length === 0) return { ok: false, error: 'contents 为空，无法重排' };
+
+  // 2) 定位 body 的 Fragment 段
+  const heads = [];
+  const hre = /^##\s*Fragment:\s*(.*)$/gm;
+  let mm;
+  while ((mm = hre.exec(body))) heads.push({ label: mm[1].trim(), start: mm.index });
+  if (heads.length !== items.length) return { ok: false, error: 'contents 与 ## Fragment 段数量不一致，已取消重排' };
+
+  // 3) 校验 order 是 0..n-1 的排列
+  const n = items.length;
+  if (!Array.isArray(order) || order.length !== n) return { ok: false, error: 'order 长度不符' };
+  const seen = new Set();
+  for (const o of order) {
+    if (!Number.isInteger(o) || o < 0 || o >= n || seen.has(o)) return { ok: false, error: 'order 非法' };
+    seen.add(o);
+  }
+  if (n === 1) return { ok: true };
+
+  // 4) 重排 body 段（原始切片，完整保留）
+  const segs = heads.map((h, i) => {
+    const segStart = h.start + body.slice(h.start).indexOf('\n') + 1;
+    const segEnd = i + 1 < heads.length ? heads[i + 1].start : body.length;
+    return body.slice(segStart, segEnd);
+  });
+  const bodyHead = body.slice(0, heads[0].start);
+  const newBody = bodyHead + order.map((oi) => '## Fragment: ' + heads[oi].label + '\n' + segs[oi]).join('');
+
+  // 5) 重排 contents 原始行块
+  const itemBlocks = items.map((it) => yamlLines.slice(it.start, it.end + 1));
+  const before = yamlLines.slice(0, items[0].start);
+  const after = yamlLines.slice(items[items.length - 1].end + 1);
+  const newYaml = [].concat(before, order.map((oi) => itemBlocks[oi]).flat(), after).join(nl);
+
+  // 6) 组装写回
+  const out = '---' + nl + newYaml + nl + '---' + nl + newBody;
+  fs.writeFileSync(file, out, 'utf8');
+  return { ok: true };
+}
+
+/* --------------------------------- Git 面板 ---------------------------------- */
+
+let GIT_ROOT = null;   // 缓存仓库根（vault 所在 git 仓库，通常在其上级目录）
+function gitRoot() {
+  if (GIT_ROOT) return GIT_ROOT;
+  try {
+    const out = execFileSync('git', ['-C', vaultPath(), 'rev-parse', '--show-toplevel'], { encoding: 'utf8', timeout: 10000 }).trim();
+    return (GIT_ROOT = out) || null;
+  } catch (_) { return null; }
+}
+function gitRun(args, timeout) {
+  const root = gitRoot();
+  if (!root) return Promise.resolve({ ok: false, error: '未找到 Git 仓库（vault 上级无 .git）' });
+  return new Promise((resolve) => {
+    execFile('git', args, { cwd: root, timeout: timeout || 60000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
+      resolve({ ok: !err, stdout: String(stdout || ''), stderr: String(stderr || ''), error: err ? String(stderr || err.message).trim().slice(0, 600) : '' });
+    });
+  });
+}
+function gitStatus() {
+  const root = gitRoot();
+  if (!root) return { ok: false, error: '未找到 Git 仓库（vault 上级无 .git）' };
+  try {
+    // -z + core.quotepath=false：路径按 UTF-8 原样输出、NUL 分隔，避免中文被转义
+    const out = execFileSync('git', ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '-b', '-z'], { cwd: root, encoding: 'utf8', timeout: 15000 });
+    const recs = out.split('\0').filter(Boolean);
+    const changes = [];
+    let branch = '', ahead = 0, behind = 0;
+    for (const r of recs) {
+      if (r.startsWith('## ')) {
+        const m = /^##\s+([^\s]+)(?:\s+\[(.*)\])?/.exec(r);
+        branch = m ? m[1].split('...')[0] : '';
+        const br = (m && m[2]) || '';
+        const am = /ahead (\d+)/.exec(br); if (am) ahead = +am[1];
+        const bm = /behind (\d+)/.exec(br); if (bm) behind = +bm[1];
+        continue;
+      }
+      if (r.length < 3) continue;
+      const xy = r.slice(0, 2);
+      const path = r.slice(3);
+      let kind = 'modified';
+      if (xy === '??') kind = 'untracked';
+      else if (xy[0] === 'A') kind = 'added';
+      else if (xy[1] === 'D' || xy[0] === 'D') kind = 'deleted';
+      else if (xy[0] === 'R') kind = 'renamed';
+      changes.push({ status: xy.trim() || '?', idx: xy[0], wt: xy[1], path, kind });
+    }
+    let lastCommit = null;
+    try {
+      const lg = execFileSync('git', ['log', '-1', '--format=%h%x09%s'], { cwd: root, encoding: 'utf8', timeout: 10000 }).trim();
+      const sp = lg.indexOf('\t');
+      lastCommit = sp >= 0 ? { hash: lg.slice(0, sp), subject: lg.slice(sp + 1) } : { hash: lg };
+    } catch (_) {}
+    return { ok: true, root, branch, ahead, behind, changes, lastCommit };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+}
+
 /* --------------------------------- HTTP 服务 ---------------------------------- */
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -902,6 +1035,39 @@ const server = http.createServer(async (req, res) => {
       if (typeof b.code !== 'string') return send(res, 400, { ok: false, error: '缺少 code' });
       const written = writeBackFragment(b.file, frag, b.code.replace(/\n+$/, ''));
       return send(res, 200, { ok: written, written, message: written ? '已保存到 vault（massCode 会实时同步）' : '保存失败：未能定位片段代码块' });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/reorder') {
+      const b = await readBody(req);
+      const snips = walkSnippets();
+      const snip = snips.find((s) => s.file === b.file);
+      if (!snip) return send(res, 404, { ok: false, error: '片段不存在（vault 可能已变动）' });
+      const r = reorderFragments(b.file, b.order);
+      return send(res, 200, { ok: r.ok, error: r.error, message: r.ok ? '片段顺序已调整（massCode 会实时同步）' : undefined });
+    }
+    if (req.method === 'GET' && u.pathname === '/api/git') {
+      return send(res, 200, gitStatus());
+    }
+    if (req.method === 'POST' && u.pathname === '/api/git/commit') {
+      const b = await readBody(req);
+      const msg = String(b.message || '').trim();
+      if (!msg) return send(res, 200, { ok: false, error: '提交信息不能为空' });
+      const add = await gitRun(['add', '-A']);
+      if (!add.ok) return send(res, 200, { ok: false, error: 'git add 失败: ' + add.error });
+      const cm = await gitRun(['commit', '-m', msg]);
+      if (!cm.ok) return send(res, 200, { ok: false, error: 'git commit 失败: ' + cm.error, output: (cm.stdout + cm.stderr).trim() });
+      return send(res, 200, { ok: true, message: '已提交', output: (cm.stdout + cm.stderr).trim(), status: gitStatus() });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/git/push') {
+      const r = await gitRun(['push'], 120000);
+      return send(res, 200, r.ok
+        ? { ok: true, message: '推送成功', output: (r.stdout + r.stderr).trim(), status: gitStatus() }
+        : { ok: false, error: r.error, output: (r.stdout + r.stderr).trim() });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/git/pull') {
+      const r = await gitRun(['pull'], 120000);
+      return send(res, 200, r.ok
+        ? { ok: true, message: '拉取成功', output: (r.stdout + r.stderr).trim(), status: gitStatus() }
+        : { ok: false, error: r.error, output: (r.stdout + r.stderr).trim() });
     }
     send(res, 404, { ok: false, error: 'Not Found: ' + u.pathname });
   } catch (e) {

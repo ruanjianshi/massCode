@@ -27,6 +27,13 @@
   .btn-err { color: #ffb3b1; }
   main { flex: 1; display: flex; min-height: 0; }
   #side { width: 320px; min-width: 180px; flex: none; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+  /* 左侧三区（项目树 / Git / 标签）：项目树弹性占余，Git/标签可拖高；hsplit 为区域间水平分隔条 */
+  #pane-tree { flex: 1 1 0; min-height: 90px; display: flex; flex-direction: column; overflow: hidden; }
+  #pane-git { flex: 0 0 auto; display: flex; flex-direction: column; overflow: hidden; }
+  #pane-tags { flex: 0 0 auto; display: flex; flex-direction: column; overflow: hidden; }
+  .hsplit { flex: none; height: 7px; cursor: row-resize; position: relative; background: transparent; }
+  .hsplit::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; transform: translateY(-50%); background: transparent; }
+  .hsplit:hover::after, .hsplit.active::after { background: var(--accent); }
   /* 拖拽分隔条：左侧宽度 / 输出高度 */
   #split-v { flex: none; width: 7px; cursor: col-resize; position: relative; background: transparent; }
   #split-v::after { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: transparent; }
@@ -107,6 +114,43 @@
   .fnode .count { margin-left: auto; color: var(--dim); font-size: 11px; background: var(--panel2); padding: 0 7px; border-radius: 9px; }
   .tree-children { overflow: hidden; }
   .tree-children.hidden { display: none; }
+  /* 项目树标题行（全部收拢/展开，VSCode 风格） */
+  #tree-head { display: flex; align-items: center; gap: 4px; padding: 8px 8px 2px; font-size: 11px; color: var(--dim); letter-spacing: .06em; text-transform: uppercase; }
+  #tree-head .tt { flex: 1; }
+  #tree-head button { background: none; border: none; color: var(--dim); font-size: 12px; padding: 2px 5px; border-radius: 4px; cursor: pointer; }
+  #tree-head button:hover { color: var(--text); background: var(--panel2); }
+  /* Git 面板 */
+  #git-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 4px; cursor: pointer; border-top: 1px solid var(--border); font-size: 12px; color: var(--text); }
+  #git-head:hover { background: rgba(255,255,255,.03); }
+  #git-head .arrow { width: 14px; text-align: center; flex: none; font-size: 10px; color: var(--dim); transition: transform .12s; }
+  #git-head.collapsed .arrow { transform: rotate(-90deg); }
+  #git-head .count { margin-left: auto; color: var(--dim); font-size: 11px; background: var(--panel2); padding: 0 7px; border-radius: 9px; }
+  #git-head .git-ah.ahead { color: var(--ok); }
+  #git-head .git-ah.behind { color: #dbb904; }
+  #git-head button { background: none; border: none; color: var(--dim); font-size: 12px; padding: 2px 5px; border-radius: 4px; cursor: pointer; }
+  #git-head button:hover { color: var(--text); background: var(--panel2); }
+  #git-body { border-top: 1px solid rgba(255,255,255,.04); padding: 4px 6px 6px; flex: 1 1 auto; min-height: 0; overflow: auto; }
+  #git-body.hidden { display: none; }
+  #git-list { font-size: 12px; }
+  #git-list .gfolder { color: var(--dim); padding: 3px 4px; font-weight: 600; }
+  #git-list .gfile { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 4px; }
+  #git-list .gfile:hover { background: var(--panel2); }
+  #git-list .gbadge { flex: none; width: 20px; text-align: center; font-size: 10px; border-radius: 3px; padding: 1px 0; font-weight: 700; }
+  #git-list .gbadge.st-m { color: #dbb904; background: rgba(219,185,4,.14); }
+  #git-list .gbadge.st-a { color: var(--ok); background: rgba(63,185,80,.14); }
+  #git-list .gbadge.st-d { color: var(--err); background: rgba(248,81,73,.14); }
+  #git-list .gbadge.st-u { color: var(--ok); background: rgba(63,185,80,.14); }
+  #git-list .gbadge.st-r { color: var(--accent); background: rgba(79,140,255,.14); }
+  #git-list .gnm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #git-list .gpath { margin-left: auto; flex: none; color: var(--dim); font-size: 10px; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #git-list .git-empty { color: var(--dim); padding: 6px 4px; font-size: 12px; }
+  .git-actions { display: flex; gap: 5px; padding: 6px 2px 2px; }
+  .git-actions input { flex: 1; min-width: 0; background: var(--panel2); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 5px 8px; font-size: 12px; }
+  .git-actions button { flex: none; background: var(--panel2); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 5px 9px; font-size: 12px; cursor: pointer; }
+  .git-actions button:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #git-result { font-size: 11px; padding: 4px 2px 0; color: var(--dim); word-break: break-all; max-height: 64px; overflow: auto; }
+  #git-result.ok { color: var(--ok); }
+  #git-result.err { color: var(--err); }
   .item { padding: 7px 10px; border-radius: 6px; cursor: pointer; }
   .item:hover { background: var(--panel2); }
   .item.active { background: #2b3342; outline: 1px solid var(--accent); }
@@ -125,8 +169,8 @@
   #edit-split-v { flex: none; width: 7px; cursor: col-resize; position: relative; background: transparent; display: none; }
   #edit-split-v::after { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: transparent; }
   #edit-split-v:hover::after, #edit-split-v.active::after { background: var(--accent); }
-  #ln { flex: none; padding: 14px 8px 14px 12px; text-align: right; color: #4b5263; font: 12px/1.7 var(--mono); user-select: none; background: #1b1e25; border-right: 1px solid var(--border); white-space: pre; }
-  #code { flex: 1; margin: 0; padding: 14px; font: 12px/1.7 var(--mono); white-space: pre; tab-size: 2; }
+  #ln { flex: none; padding: 14px 8px 14px 12px; text-align: right; color: #4b5263; font: 12px/1.7 var(--mono); user-select: none; background: #1b1e25; border-right: 1px solid var(--border); white-space: pre; letter-spacing: normal; }
+  #code { flex: 1; margin: 0; padding: 14px; font: 12px/1.7 var(--mono); white-space: pre; tab-size: 2; letter-spacing: normal; }
   #code.hljs { background: transparent; }
   /* ---- Markdown 渲染视图（只读 #md-view 与编辑预览 #edit-preview 共用 .md-doc 样式） ---- */
   #md-view { display: none; flex: 1; overflow: auto; margin: 10px 14px 0; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; }
@@ -152,7 +196,8 @@
   .md-doc a { color: #58a6ff; }
   .md-doc img { max-width: 100%; border-radius: 6px; }
   .md-doc code, .md-doc pre { white-space: pre; }
-  #code-edit { flex: 1; margin: 0; padding: 14px; font: 12px/1.7 var(--mono); white-space: pre; tab-size: 2; background: transparent; color: var(--text); border: none; outline: 1px solid var(--accent); outline-offset: -1px; border-radius: 8px; resize: none; }
+  #code-edit { flex: 1; margin: 0; padding: 14px; font: 12px/1.7 var(--mono); white-space: pre; tab-size: 2; background: transparent; color: var(--text); border: none; outline: 1px solid var(--accent); outline-offset: -1px; border-radius: 8px; resize: none; letter-spacing: normal; scrollbar-width: none; }
+  #code-edit::-webkit-scrollbar { display: none; }   /* 隐藏 textarea 滚动条：杜绝滚动条占宽导致的两层水平错位 */
   /* 代码编辑的实时高亮：文字透明、光标可见，叠在 #code 高亮层上；聚焦时仍给编辑框描边 */
   #code-edit.live-hl { color: transparent; caret-color: var(--text); -webkit-text-fill-color: transparent; position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
   #code-edit.live-hl.composing { color: var(--text); -webkit-text-fill-color: var(--text); }   /* 输入法合成期：临时显示明文 */
@@ -338,6 +383,10 @@
   .tab:hover { background:rgba(255,255,255,.035); border-color:transparent; color:#cbd5e1; }
   .tab.active { background:#19202a; color:#eef3f9; }
   .tab.active::after { content:''; position:absolute; left:10px; right:10px; bottom:0; height:2px; border-radius:2px 2px 0 0; background:var(--accent); }
+  /* 片段标签拖拽排序 */
+  .tab.draggable-tab { cursor: grab; }
+  .tab.draggable-tab:active { cursor: grabbing; }
+  .tab.dragging { opacity: .45; border: 1px dashed var(--accent) !important; }
   #edit-split { background:#0d1117; }
   #code-wrap { margin:10px 12px 0; border-color:#28313d; border-radius:10px; background:#11161e; box-shadow:inset 0 1px 0 rgba(255,255,255,.018),var(--shadow); }
   #ln { color:#536074; background:#0e131a; border-right-color:#222b36; }
@@ -394,15 +443,45 @@
 </header>
 <main>
   <div id="side">
-    <input id="search" placeholder="搜索片段名称 / 描述 / 语言…">
-    <div id="list"></div>
-    <div id="tag-head" title="显示/隐藏标签栏">
-      <span id="tag-head-arrow" class="arrow">▾</span>
-      <span>🏷 标签</span>
-      <span id="tag-active" class="tag-active"></span>
-      <span id="tag-count" class="count"></span>
+    <div id="pane-tree">
+      <input id="search" placeholder="搜索片段名称 / 描述 / 语言…">
+      <div id="tree-head">
+        <span class="tt">📁 项目</span>
+        <button id="btn-collapse-all" title="全部收拢">▾▾</button>
+        <button id="btn-expand-all" title="全部展开">▸▸</button>
+      </div>
+      <div id="list"></div>
     </div>
-    <div id="tagbar"></div>
+    <div class="hsplit" id="h-git" title="拖拽调整 Git 面板高度"></div>
+    <div id="pane-git">
+      <div id="git-head" title="显示/隐藏 Git 面板">
+        <span id="git-arrow" class="arrow">▾</span>
+        <span>⎇ Git</span>
+        <span id="git-branch" class="count"></span>
+        <span id="git-ah" class="git-ah"></span>
+        <button id="git-refresh" title="刷新 Git 状态">↻</button>
+      </div>
+      <div id="git-body">
+      <div id="git-list"></div>
+      <div class="git-actions">
+        <input id="git-msg" placeholder="提交信息，如 feat: xxx">
+        <button id="git-commit" title="暂存全部并提交">提交</button>
+        <button id="git-push" title="git push">推送</button>
+        <button id="git-pull" title="git pull">拉取</button>
+      </div>
+      <div id="git-result"></div>
+    </div>
+    </div>
+    <div class="hsplit" id="h-tags" title="拖拽调整标签面板高度"></div>
+    <div id="pane-tags">
+      <div id="tag-head" title="显示/隐藏标签栏">
+        <span id="tag-head-arrow" class="arrow">▾</span>
+        <span>🏷 标签</span>
+        <span id="tag-active" class="tag-active"></span>
+        <span id="tag-count" class="count"></span>
+      </div>
+      <div id="tagbar"></div>
+    </div>
   </div>
   <div id="split-v" title="拖拽调整左侧宽度"></div>
   <div id="main">
@@ -501,6 +580,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 let SNIPPETS = [], TAGS = [], FOLDERS = [], CURRENT = null, CINDEX = 0, lastRev = null;
+let DRAG_IDX = null; // 标签拖拽排序：当前拖拽的片段索引
 let EDITING = false; // 编辑模式：可修改代码并保存回 vault
 const activeTags = new Set(); // 选中的标签 id
 // 标签栏折叠状态（记忆到本地，避免标签多了挤满左侧）
@@ -557,8 +637,15 @@ async function refresh(silent) {
   }
 }
 
-// 折叠状态（默认全部展开）；路径如 "A/B"
-const collapsed = new Set();
+// 折叠状态（默认全部展开）；路径如 "A/B"，记忆到本地避免刷新后复原
+const collapsed = new Set((() => { try { return JSON.parse(localStorage.getItem('mc-collapsed') || '[]'); } catch (_) { return []; } })());
+function saveCollapsed() { try { localStorage.setItem('mc-collapsed', JSON.stringify([...collapsed])); } catch (_) {} }
+function collapseAll() {
+  const root = buildTree(SNIPPETS, FOLDERS);
+  const collect = (n) => { if (n.path) collapsed.add(n.path); n.children.forEach(collect); };
+  collect(root); saveCollapsed(); renderList();
+}
+function expandAll() { collapsed.clear(); saveCollapsed(); renderList(); }
 
 function buildTree(snippets, folders) {
   // 根：{ name:'', path:'', children:[], snippets:[], level:0 }
@@ -614,7 +701,7 @@ function renderTree(root, container) {
       f.className = 'fnode';
       f.style.paddingLeft = (6 + (node.level - 1) * 14) + 'px';
       f.innerHTML = `<span class="arrow">${isOpen ? '▾' : '▸'}</span><span class="ico">📁</span><span>${escapeHtml(node.name)}</span><span class="count">${node.total}</span>`;
-      f.onclick = () => { isOpen ? collapsed.add(node.path) : collapsed.delete(node.path); renderList(); };
+      f.onclick = () => { isOpen ? collapsed.add(node.path) : collapsed.delete(node.path); saveCollapsed(); renderList(); };
       boxContainer.appendChild(f);
     }
     const box = document.createElement('div');
@@ -654,6 +741,121 @@ function renderList() {
   if (!list.children.length) list.innerHTML = '<div class="empty-state">暂无片段</div>';
 }
 
+/* --------------------------------- Git 面板 ---------------------------------- */
+const GIT_STATUS_LABEL = { M: '改', A: '增', D: '删', '??': '新', R: '移', C: '拷' };
+const GIT_STATUS_CLS = { M: 'st-m', A: 'st-a', D: 'st-d', '??': 'st-u', R: 'st-r', C: 'st-c' };
+let GIT_OPEN = (() => { try { return localStorage.getItem('mc-git-open') !== '0'; } catch (_) { return true; } })();
+let GIT_LAST_TICK = 0;
+
+function gitMsg(text, isErr) {
+  const el = $('git-result'); if (!el) return;
+  el.textContent = text || '';
+  el.className = isErr ? 'err' : (text ? 'ok' : '');
+}
+
+async function refreshGit(silent) {
+  try {
+    const d = await api('/api/git');
+    renderGit(d);
+  } catch (_) { if (!silent) gitMsg('Git 读取失败', true); }
+}
+
+function renderGit(d) {
+  const branchEl = $('git-branch'), ahEl = $('git-ah'), listEl = $('git-list');
+  if (!d || !d.ok) {
+    branchEl.textContent = 'git 不可用';
+    ahEl.textContent = '';
+    listEl.innerHTML = '<div class="git-empty">' + escapeHtml((d && d.error) || '未找到 Git 仓库') + '</div>';
+    return;
+  }
+  branchEl.textContent = d.branch || '';
+  branchEl.title = '仓库: ' + d.root;
+  const ah = [];
+  if (d.ahead) ah.push('↑' + d.ahead);
+  if (d.behind) ah.push('↓' + d.behind);
+  ahEl.textContent = ah.join(' ');
+  ahEl.classList.toggle('ahead', !!d.ahead);
+  ahEl.classList.toggle('behind', !!d.behind);
+  // 改动文件树（按目录分组）
+  const changes = d.changes || [];
+  listEl.innerHTML = '';
+  if (!changes.length) { listEl.innerHTML = '<div class="git-empty">✓ 工作区干净</div>'; return; }
+  const root = { children: new Map(), files: [] };
+  for (const c of changes) {
+    const parts = c.path.split('/').filter(Boolean);   // 去掉尾空段（未跟踪目录带尾斜杠）
+    let node = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (!node.children.has(parts[i])) node.children.set(parts[i], { name: parts[i], children: new Map(), files: [] });
+      node = node.children.get(parts[i]);
+    }
+    node.files.push(c);
+  }
+  const walk = (node, depth) => {
+    for (const child of node.children.values()) {
+      const row = document.createElement('div');
+      row.className = 'gfolder';
+      row.style.paddingLeft = (8 + depth * 14) + 'px';
+      row.textContent = '📁 ' + child.name;
+      listEl.appendChild(row);
+      walk(child, depth + 1);
+    }
+    for (const f of node.files) {
+      const st = f.status.trim() || (f.kind === 'untracked' ? '??' : 'M');
+      const isDir = /\/$/.test(f.path);
+      const parts = f.path.split('/').filter(Boolean);
+      const d2 = document.createElement('div');
+      d2.className = 'gfile';
+      d2.style.paddingLeft = (8 + depth * 14) + 'px';
+      d2.innerHTML = `<span class="gbadge ${GIT_STATUS_CLS[st] || 'st-m'}">${GIT_STATUS_LABEL[st] || st}</span>` +
+        `<span class="gnm">${isDir ? '📁 ' : ''}${escapeHtml(parts[parts.length - 1] || '?')}</span>` +
+        (parts.length > 1 ? `<span class="gpath">${escapeHtml(parts.slice(0, -1).join('/'))}</span>` : '');
+      d2.title = f.path;
+      listEl.appendChild(d2);
+    }
+  };
+  walk(root, 0);
+}
+
+function toggleGit() {
+  GIT_OPEN = !GIT_OPEN;
+  try { localStorage.setItem('mc-git-open', GIT_OPEN ? '1' : '0'); } catch (_) {}
+  $('git-body').classList.toggle('hidden', !GIT_OPEN);
+  $('git-head').classList.toggle('collapsed', !GIT_OPEN);
+  // 收起时面板缩到标题行高度，展开时恢复记忆高度
+  const pane = $('pane-git');
+  if (GIT_OPEN) {
+    const h = parseInt(localStorage.getItem('mc-git-h')) || 220;
+    pane.style.height = clampV(h, 60, Math.round(window.innerHeight * 0.7)) + 'px';
+    refreshGit();
+  } else {
+    pane.style.height = 'auto';
+  }
+}
+
+async function gitCommit() {
+  const msg = $('git-msg').value.trim();
+  if (!msg) { gitMsg('请先填写提交信息', true); $('git-msg').focus(); return; }
+  gitMsg('提交中…');
+  const r = await api('/api/git/commit', { message: msg });
+  if (r.ok) { $('git-msg').value = ''; gitMsg(r.message || '已提交'); }
+  else gitMsg(r.error || r.message || '提交失败', true);
+  await refreshGit();
+}
+async function gitPush() {
+  gitMsg('推送中…');
+  const r = await api('/api/git/push', {});   // 必须传 body，否则 api() 发 GET
+  if (r.ok) gitMsg('推送成功');
+  else gitMsg(r.error || '推送失败', true);
+  await refreshGit();
+}
+async function gitPull() {
+  gitMsg('拉取中…');
+  const r = await api('/api/git/pull', {});   // 必须传 body，否则 api() 发 GET
+  if (r.ok) { gitMsg('拉取成功'); refresh(false); }
+  else gitMsg(r.error || '拉取失败', true);
+  await refreshGit();
+}
+
 // 标签栏：全部 + 各标签（含数量），点击多选（AND）
 function renderTagBar() {
   const bar = $('tagbar');
@@ -689,6 +891,13 @@ function renderTagHead() {
 function toggleTagHead() {
   tagsHidden = !tagsHidden;
   try { localStorage.setItem('mc-tags-hidden', tagsHidden ? '1' : '0'); } catch (_) {}
+  // 收起时标签面板缩到标题行，展开时恢复记忆高度
+  const pane = $('pane-tags');
+  if (tagsHidden) { pane.style.height = 'auto'; }
+  else {
+    const h = parseInt(localStorage.getItem('mc-tags-h'));
+    if (h) { pane.style.height = clampV(h, 60, Math.round(window.innerHeight * 0.7)) + 'px'; $('tagbar').style.maxHeight = 'none'; $('tagbar').style.flex = '1'; }
+  }
   renderTagBar(); renderTagHead();
 }
 
@@ -1756,8 +1965,26 @@ function renderCode() {
     const t = document.createElement('button');
     t.className = 'tab' + (i === CINDEX ? ' active' : '');
     t.textContent = `${f.label || ('片段 ' + (i + 1))} · ${f.language}`;
-    t.title = '文件: ' + f.filename;
+    t.title = '文件: ' + f.filename + (s.fragments.length > 1 ? '\n拖动标签可调整片段顺序' : '');
     t.onclick = () => { if (!confirmLeaveEdit()) return; CINDEX = i; renderMain(); };
+    if (s.fragments.length > 1) {
+      t.draggable = true;
+      t.classList.add('draggable-tab');
+      t.addEventListener('dragstart', (e) => {
+        DRAG_IDX = i;
+        t.classList.add('dragging');
+        try { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+      });
+      t.addEventListener('dragover', (e) => { if (DRAG_IDX === null || DRAG_IDX === i) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+      t.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const from = DRAG_IDX, to = i;
+        DRAG_IDX = null;
+        if (from === null || from === to) return;
+        reorderFragments(from, to);
+      });
+      t.addEventListener('dragend', () => { DRAG_IDX = null; t.classList.remove('dragging'); });
+    }
     tabs.appendChild(t);
   });
   const multi = s.fragments.length > 1;
@@ -2076,6 +2303,54 @@ function toggleEdit() {
   }
 }
 
+// Cmd/Ctrl+/ 注释切换（VSCode 风格）：对选中行（无选中则当前行）加/去注释
+// 代码用 // ，markdown 用 #
+function toggleComment() {
+  if (!EDITING) return;
+  const f = CURRENT && CURRENT.fragments[CINDEX];
+  const isMd = f && f.language === 'markdown';
+  const prefix = isMd ? '#' : '//';
+  const reComment = isMd ? /^\s*#/ : /^\s*\/\//;
+  const ta = $('code-edit');
+  const val = ta.value;
+  if (!val) return;
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  // 覆盖选中区域的行范围 [ls, le)：ls=首行行首，le=末行行尾（不含换行）
+  let ls = val.lastIndexOf('\n', start - 1) + 1;
+  let le = val.indexOf('\n', end);
+  if (le === -1) le = val.length;
+  const block = val.slice(ls, le);
+  const lines = block.split('\n');
+  const allCommented = lines.length > 0 && lines.every(l => reComment.test(l));
+  const nb = lines.map(l => allCommented
+      ? l.replace(new RegExp('^(\\s*)' + prefix.replace('/', '\\/') + '\\s?'), '$1')   /* 取消注释（保留缩进） */
+      : l.replace(/^(\s*)/, '$1' + prefix + ' ')).join('\n');                          /* 加注释（保留缩进） */
+  ta.value = val.slice(0, ls) + nb + val.slice(le);
+  ta.setSelectionRange(ls, ls + nb.length);   /* 保持选中这些行 */
+  renderOutline(); updateEditPreview(); syncHighlight();
+}
+
+// 拖动标签调整片段顺序：把片段 from 移到 to 位置（落盘到 vault）
+async function reorderFragments(from, to) {
+  if (!CURRENT || CURRENT.fragments.length < 2) return;
+  if (EDITING && !window.confirm('当前有未保存的编辑，调整顺序后将丢失，确定继续？')) return;
+  const n = CURRENT.fragments.length;
+  const activeId = CURRENT.fragments[CINDEX] ? String(CURRENT.fragments[CINDEX].id) : null;
+  const order = Array.from({ length: n }, (_, k) => k);
+  order.splice(to, 0, order.splice(from, 1)[0]);
+  setStatus('idle', '正在调整片段顺序…');
+  const r = await api('/api/reorder', { file: CURRENT.file, order });
+  if (!r.ok) { setStatus('err', r.error || '重排失败'); return; }
+  await refresh();
+  const nn = SNIPPETS.find(s => s.file === CURRENT.file);
+  if (nn) {
+    CURRENT = nn;
+    if (activeId != null) { const ni = nn.fragments.findIndex(f => String(f.id) === activeId); if (ni >= 0) CINDEX = ni; }
+  }
+  renderMain();
+  setStatus('ok', '片段顺序已调整');
+}
+
 async function doSave() {
   if (!CURRENT || !EDITING) return;
   const code = editText();
@@ -2165,6 +2440,30 @@ function makeResizer(split, axis, getter, setter, flip) {
   split.addEventListener('pointerup', end);
   split.addEventListener('pointercancel', end);
 }
+/* 水平分隔条：上下拖拽调整目标区域高度（用于左侧 项目树/Git/标签 之间） */
+function makeHResizer(handle, getter, setter) {
+  let start = null;
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    start = { y: e.clientY, v: getter() };
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    document.body.classList.add('resizing', 'resizing-h');
+    handle.classList.add('active');
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    // 边界模型（与输出窗口 split-h 一致）：把分隔条往下拉 → 下方面板变矮、上方面板变高
+    setter(start.v - (e.clientY - start.y));
+  });
+  const end = () => {
+    if (!start) return;
+    start = null;
+    document.body.classList.remove('resizing', 'resizing-h');
+    handle.classList.remove('active');
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+}
 (function initLayout() {
   try {
     const sw = parseInt(localStorage.getItem('mc-side-w')) || 320;
@@ -2185,6 +2484,19 @@ function makeResizer(split, axis, getter, setter, flip) {
   makeResizer($('edit-split-v'), 'v',
     () => $('code-wrap').getBoundingClientRect().width,
     (v) => { $('code-wrap').style.flex = 'none'; $('code-wrap').style.width = clampV(v, 220, Math.max(300, Math.round(window.innerWidth * 0.75))) + 'px'; try { localStorage.setItem('mc-edit-split-w', String(Math.round(v))); } catch (_) {} });
+  // 左侧区域高度：Git 面板默认 220px，标签默认内容高度；均可拖拽调整并记忆
+  // 收起状态下加载时面板缩到标题行（auto），避免留空
+  const maxPaneH = Math.round(window.innerHeight * 0.7);
+  if (GIT_OPEN) { const gitH = parseInt(localStorage.getItem('mc-git-h')) || 220; $('pane-git').style.height = clampV(gitH, 60, maxPaneH) + 'px'; }
+  else { $('pane-git').style.height = 'auto'; }
+  const tagsH = parseInt(localStorage.getItem('mc-tags-h'));
+  if (tagsH && !tagsHidden) { $('pane-tags').style.height = clampV(tagsH, 60, maxPaneH) + 'px'; $('tagbar').style.maxHeight = 'none'; $('tagbar').style.flex = '1'; }
+  makeHResizer($('h-git'),
+    () => $('pane-git').getBoundingClientRect().height,
+    (v) => { $('pane-git').style.height = clampV(v, 60, maxPaneH) + 'px'; try { localStorage.setItem('mc-git-h', String(Math.round(v))); } catch (_) {} });
+  makeHResizer($('h-tags'),
+    () => $('pane-tags').getBoundingClientRect().height,
+    (v) => { $('pane-tags').style.height = clampV(v, 60, maxPaneH) + 'px'; $('tagbar').style.maxHeight = 'none'; $('tagbar').style.flex = '1'; try { localStorage.setItem('mc-tags-h', String(Math.round(v))); } catch (_) {} });
   // 大纲面板默认显示，记忆开关与宽度（收起时保留操作按钮列）
   let showOutline = true;
   try { showOutline = localStorage.getItem('mc-outline') !== '0'; } catch (_) {}
@@ -2251,9 +2563,25 @@ function makeResizer(split, axis, getter, setter, flip) {
   // 输入法合成期（拼音/五笔候选）：临时显示明文，避免候选字看不见；合成结束恢复高亮
   $('code-edit').addEventListener('compositionstart', () => $('code-edit').classList.add('composing'));
   $('code-edit').addEventListener('compositionend', () => { $('code-edit').classList.remove('composing'); syncHighlight(); });
+  // Cmd/Ctrl+/ 注释切换（VSCode 风格）
+  $('code-edit').addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === '/') { e.preventDefault(); toggleComment(); }
+  });
 })();
 $('refresh').onclick = () => refresh(false);
 $('search').oninput = renderList;
+$('btn-collapse-all').onclick = collapseAll;
+$('btn-expand-all').onclick = expandAll;
+// Git 面板
+$('git-head').onclick = toggleGit;
+$('git-refresh').onclick = (e) => { e.stopPropagation(); refreshGit(); };
+$('git-commit').onclick = gitCommit;
+$('git-push').onclick = gitPush;
+$('git-pull').onclick = gitPull;
+$('git-msg').addEventListener('keydown', (e) => { if (e.key === 'Enter') gitCommit(); });
+$('git-body').classList.toggle('hidden', !GIT_OPEN);
+$('git-head').classList.toggle('collapsed', !GIT_OPEN);
+if (GIT_OPEN) refreshGit();
 
 // 实时同步：每 2.5s 探测 vault 版本指纹，变了就静默刷新（保留选中与输出）
 async function syncLoop() {
@@ -2262,6 +2590,8 @@ async function syncLoop() {
     if (d.rev && d.rev !== lastRev) await refresh(true);
     setSync(true);
   } catch (_) { setSync(false); }
+  // Git 面板开着时，每 ~6s 静默刷新一次状态（本机 git status 很轻）
+  if (GIT_OPEN && Date.now() - GIT_LAST_TICK > 6000) { GIT_LAST_TICK = Date.now(); refreshGit(true); }
 }
 setInterval(syncLoop, 2500);
 
