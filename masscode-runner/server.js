@@ -65,6 +65,94 @@ function vaultPath() {
   return defaultVaultPath();
 }
 
+/* -------------------------------- 实时系统状态 -------------------------------- */
+
+function cpuTimes() {
+  let idle = 0, total = 0;
+  for (const cpu of os.cpus()) {
+    idle += cpu.times.idle;
+    total += Object.values(cpu.times).reduce((sum, value) => sum + value, 0);
+  }
+  return { idle, total };
+}
+let CPU_LAST = cpuTimes(), CPU_USAGE = 0;
+const CPU_SAMPLE_TIMER = setInterval(() => {
+  const next = cpuTimes(), total = next.total - CPU_LAST.total, idle = next.idle - CPU_LAST.idle;
+  if (total > 0) CPU_USAGE = Math.max(0, Math.min(100, (1 - idle / total) * 100));
+  CPU_LAST = next;
+}, 1000);
+CPU_SAMPLE_TIMER.unref();
+
+let DISK_CACHE = { at: 0, value: null };
+let MEMORY_CACHE = { at: 0, value: null };
+function execFileText(command, args, timeout) {
+  return new Promise((resolve, reject) => execFile(command, args, { encoding: 'utf8', timeout: timeout || 5000, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => err ? reject(new Error(String(stderr || err.message))) : resolve(String(stdout || ''))));
+}
+async function memoryStatus() {
+  if (MEMORY_CACHE.value && Date.now() - MEMORY_CACHE.at < 1800) return MEMORY_CACHE.value;
+  const total = os.totalmem(); let free = os.freemem();
+  try {
+    if (process.platform === 'linux') {
+      const info = fs.readFileSync('/proc/meminfo', 'utf8');
+      const available = /^MemAvailable:\s+(\d+)\s+kB/im.exec(info);
+      if (available) free = Number(available[1]) * 1024;
+    } else if (process.platform === 'darwin') {
+      const stat = await execFileText('vm_stat', [], 3000);
+      const pageMatch = /page size of\s+(\d+) bytes/i.exec(stat);
+      const pageSize = pageMatch ? Number(pageMatch[1]) : 4096;
+      const pages = (label) => { const m = new RegExp('^' + label + ':\\s+(\\d+)', 'mi').exec(stat); return m ? Number(m[1]) : 0; };
+      // inactive/speculative 是可快速回收的文件缓存；比 os.freemem 更符合活动监视器的“可用内存”。
+      free = (pages('Pages free') + pages('Pages inactive') + pages('Pages speculative')) * pageSize;
+    }
+  } catch (_) { /* 回退到 os.freemem */ }
+  free = Math.max(0, Math.min(total, free));
+  const used = Math.max(0, total - free);
+  const value = { total, used, free, usage: total ? used / total * 100 : 0 };
+  MEMORY_CACHE = { at: Date.now(), value };
+  return value;
+}
+async function diskStatus() {
+  if (DISK_CACHE.value && Date.now() - DISK_CACHE.at < 5000) return DISK_CACHE.value;
+  let value;
+  try {
+    if (process.platform === 'win32') {
+      const drive = path.parse(vaultPath()).root.replace(/[\\/]+$/, '') || 'C:';
+      const script = "$d=Get-CimInstance Win32_LogicalDisk -Filter \"DeviceID='" + drive.replace(/'/g, "''") + "'\"; $d | Select-Object DeviceID,Size,FreeSpace | ConvertTo-Json -Compress";
+      const parsed = JSON.parse(await execFileText('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], 6000));
+      const total = Number(parsed.Size || 0), free = Number(parsed.FreeSpace || 0);
+      value = { total, free, used: Math.max(0, total - free), usage: total ? (total - free) / total * 100 : 0, mount: parsed.DeviceID || drive };
+    } else {
+      const lines = (await execFileText('df', ['-Pk', vaultPath()], 5000)).trim().split(/\r?\n/);
+      const fields = (lines[lines.length - 1] || '').trim().split(/\s+/);
+      if (fields.length < 6) throw new Error('无法解析 df 输出');
+      const total = Number(fields[1]) * 1024, free = Number(fields[3]) * 1024, used = Math.max(0, total - free);
+      value = { total, used, free, usage: total ? used / total * 100 : 0, mount: fields.slice(5).join(' ') };
+    }
+  } catch (e) {
+    value = { total: 0, used: 0, free: 0, usage: 0, mount: '', error: e.message };
+  }
+  DISK_CACHE = { at: Date.now(), value };
+  return value;
+}
+
+async function systemStatus() {
+  const cpus = os.cpus(), memory = await memoryStatus();
+  return {
+    ok: true,
+    timestamp: Date.now(),
+    cpu: {
+      usage: CPU_USAGE,
+      cores: cpus.length,
+      model: cpus[0] ? cpus[0].model.trim() : 'Unknown CPU',
+      speedMHz: cpus.length ? Math.round(cpus.reduce((sum, cpu) => sum + Number(cpu.speed || 0), 0) / cpus.length) : 0,
+      load: process.platform === 'win32' ? [] : os.loadavg(),
+    },
+    memory,
+    disk: await diskStatus(),
+    system: { hostname: os.hostname(), platform: platformInfo().label, arch: os.arch(), uptime: os.uptime() },
+  };
+}
+
 /* --------------------------------- 环境检测 ---------------------------------- */
 
 // Windows 上通常没有 python3，只有 python / py；跨平台解析可用的 Python 命令
@@ -76,6 +164,34 @@ function pythonCmd() {
     try { execFileSync(c, ['--version'], { stdio: 'ignore', timeout: 5000 }); return _pyCmd = c; } catch (_) {}
   }
   return _pyCmd = cands[0];
+}
+
+// LaTeX 优先使用 XeLaTeX（Unicode/中文文档体验更好），不可用时回退到 pdfLaTeX。
+let _latexCmd = null;
+function latexCmd() {
+  if (_latexCmd) return _latexCmd;
+  for (const c of ['xelatex', 'pdflatex']) {
+    try { execFileSync(c, ['--version'], { stdio: 'ignore', timeout: 5000 }); return _latexCmd = c; } catch (_) {}
+  }
+  return _latexCmd = 'xelatex';
+}
+function latexStarter() {
+  let hasCtex = false;
+  try { hasCtex = !!execFileSync('kpsewhich', ['ctexart.cls'], { encoding: 'utf8', timeout: 5000 }).trim(); } catch (_) {}
+  return hasCtex
+    ? '\\documentclass[UTF8,11pt]{ctexart}\n\\usepackage[margin=2.5cm]{geometry}\n\\usepackage{amsmath}\n\n\\title{LaTeX 文档}\n\\author{}\n\\date{\\today}\n\n\\begin{document}\n\\maketitle\n\n\\section{开始}\n在这里编写内容。\n\n\\end{document}'
+    : '\\documentclass[11pt]{article}\n\\usepackage[margin=2.5cm]{geometry}\n\\usepackage{amsmath}\n\n\\title{LaTeX Document}\n\\author{}\n\\date{\\today}\n\n\\begin{document}\n\\maketitle\n\n\\section{Introduction}\nStart writing here.\n\n\\end{document}';
+}
+function latexProjectStarter() {
+  return '\\documentclass[UTF8,11pt]{ctexart}\n' +
+    '\\usepackage[margin=2.5cm]{geometry}\n\\usepackage{amsmath}\n\\usepackage{graphicx}\n\\usepackage{fontspec}\n' +
+    '\\graphicspath{{figures/}}\n\n' +
+    '% 字体文件放入 fonts/ 后可启用，例如：\n% \\setmainfont[Path=fonts/]{YourFont.ttf}\n\n' +
+    '\\newif\\ifhasreferences\n\\IfFileExists{data/references.bib}{%\n  \\hasreferencestrue\n  \\usepackage[backend=biber]{biblatex}\n  \\addbibresource{data/references.bib}\n}{}\n\n' +
+    '\\title{LaTeX 工程}\n\\author{}\n\\date{\\today}\n\n' +
+    '\\begin{document}\n\\maketitle\n\n\\section{开始}\n在左侧编辑源码，右侧会实时生成 PDF。\n\n' +
+    '\\section{图片}\n% 图片放入 figures/ 后取消下面一行注释：\n% \\includegraphics[width=0.7\\linewidth]{example.png}\n\n' +
+    '\\ifhasreferences\n\\nocite{*}\n\\printbibliography\n\\fi\n\n\\end{document}';
 }
 
 const TOOLS = [
@@ -92,6 +208,9 @@ const TOOLS = [
   { key: 'gofmt',      probe: ['gofmt', '-h'],                  label: 'gofmt',                for: 'Go 格式化', group: '格式化工具' },
   { key: 'black',      probe: () => [pythonCmd(), '-m', 'black', '--version'], label: 'black', for: 'Python 格式化', group: '格式化工具' },
   { key: 'npx',        probe: ['npx', '--version'],             label: 'npx（Prettier）',       for: '前端/文档格式化', group: '格式化工具' },
+  { key: 'latex',      probe: () => [latexCmd(), '--version'],  label: 'LaTeX 引擎',            for: 'LaTeX 实时 PDF 编译', group: '文档工具' },
+  { key: 'biber',      probe: ['biber', '--version'],           label: 'Biber',                for: 'LaTeX 参考文献', group: '文档工具' },
+  { key: 'ctex',       probe: ['kpsewhich', 'ctexart.cls'],     label: 'CTeX 中文宏包',          for: 'LaTeX 中文文档', group: '文档工具' },
 ];
 
 const TOOLS_BY_LANGUAGE = {
@@ -101,6 +220,7 @@ const TOOLS_BY_LANGUAGE = {
   java: ['java'], ruby: ['ruby'], swift: ['swift'], go: ['go', 'gofmt'],
   json: ['npx'], json5: ['npx'], html: ['npx'], css: ['npx'], scss: ['npx'],
   less: ['npx'], yaml: ['npx'], markdown: ['npx'],
+  latex: ['latex', 'biber', 'ctex'],
 };
 
 function projectToolKeys() {
@@ -162,8 +282,8 @@ function deploymentInfo(env, requiredKeys) {
   let command = '';
   if (supported && missing.length) {
     command = process.platform === 'win32'
-      ? 'powershell -NoProfile -ExecutionPolicy Bypass -File "' + script.replace(/"/g, '""') + '" ' + missing.join(' ')
-      : 'bash ' + shellQuote(script) + ' ' + missing.map(shellQuote).join(' ');
+      ? '& powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + script.replace(/"/g, '""') + '" ' + missing.join(' ') + '; Write-Output ("__MASSCODE_DEPLOY_DONE__:" + $LASTEXITCODE)'
+      : 'bash ' + shellQuote(script) + ' ' + missing.map(shellQuote).join(' ') + '; masscode_deploy_status=$?; printf "\\n__MASSCODE_DEPLOY_DONE__:%s\\n" "$masscode_deploy_status"';
   }
   return { supported, command, missing, script, needsTerminal: true };
 }
@@ -203,14 +323,15 @@ async function getEnv(force) {
 
 // 给某工具缺失时的安装提示（按平台给不同命令）
 function linuxInstallHint(key) {
+  if (key === 'ctex') key = 'latex';
   const pm = platformInfo().packageManager || 'apt-get';
   const packages = {
-    'apt-get': { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'build-essential', gpp:'build-essential', java:'default-jdk', ruby:'ruby', go:'golang-go', clangformat:'clang-format', gofmt:'golang-go', npx:'npm' },
-    dnf: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-21-openjdk-devel', ruby:'ruby', go:'golang', clangformat:'clang-tools-extra', gofmt:'golang', npx:'npm' },
-    yum: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-17-openjdk-devel', ruby:'ruby', go:'golang', clangformat:'clang', gofmt:'golang', npx:'npm' },
-    pacman: { node:'nodejs npm', python3:'python python-pip', bash:'bash', gcc:'base-devel', gpp:'base-devel', java:'jdk-openjdk', ruby:'ruby', go:'go', clangformat:'clang', gofmt:'go', npx:'npm' },
-    zypper: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-17-openjdk-devel', ruby:'ruby', go:'go', clangformat:'clang-tools', gofmt:'go', npx:'npm' },
-    apk: { node:'nodejs npm', python3:'python3 py3-pip', bash:'bash', gcc:'build-base', gpp:'build-base', java:'openjdk17', ruby:'ruby', go:'go', clangformat:'clang-extra-tools', gofmt:'go', npx:'npm' },
+    'apt-get': { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'build-essential', gpp:'build-essential', java:'default-jdk', ruby:'ruby', go:'golang-go', clangformat:'clang-format', gofmt:'golang-go', npx:'npm', latex:'texlive-xetex texlive-latex-extra texlive-fonts-recommended texlive-lang-chinese', biber:'biber' },
+    dnf: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-21-openjdk-devel', ruby:'ruby', go:'golang', clangformat:'clang-tools-extra', gofmt:'golang', npx:'npm', latex:'texlive-xetex texlive-collection-latexextra texlive-ctex', biber:'biber' },
+    yum: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-17-openjdk-devel', ruby:'ruby', go:'golang', clangformat:'clang', gofmt:'golang', npx:'npm', latex:'texlive-xetex texlive-collection-latexextra texlive-ctex', biber:'biber' },
+    pacman: { node:'nodejs npm', python3:'python python-pip', bash:'bash', gcc:'base-devel', gpp:'base-devel', java:'jdk-openjdk', ruby:'ruby', go:'go', clangformat:'clang', gofmt:'go', npx:'npm', latex:'texlive-bin texlive-latexextra texlive-fontsrecommended texlive-langchinese', biber:'biber' },
+    zypper: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-17-openjdk-devel', ruby:'ruby', go:'go', clangformat:'clang-tools', gofmt:'go', npx:'npm', latex:'texlive-xetex texlive-latexextra texlive-ctex', biber:'biber' },
+    apk: { node:'nodejs npm', python3:'python3 py3-pip', bash:'bash', gcc:'build-base', gpp:'build-base', java:'openjdk17', ruby:'ruby', go:'go', clangformat:'clang-extra-tools', gofmt:'go', npx:'npm', latex:'texlive-xetex texmf-dist-latexextra texmf-dist-langchinese', biber:'biber' },
   };
   if (key === 'swift') return '从 swift.org 安装对应 Linux 工具链';
   if (key === 'black') return 'python3 -m pip install --user black';
@@ -239,7 +360,9 @@ function installHint(key) {
     gofmt: mac ? 'brew install go（自带 gofmt）' : win ? '安装 Go（自带 gofmt）' : linuxInstallHint(key),
     black: mac ? 'pip3 install --user black' : win ? (pythonCmd() === 'py' ? 'py -m pip install black' : 'python -m pip install black') : linuxInstallHint(key),
     npx: mac ? 'brew install node（自带 npx）' : win ? '安装 Node.js（自带 npx）' : linuxInstallHint(key),
+    latex: mac ? 'brew install --cask mactex-no-gui' : win ? 'winget install MiKTeX.MiKTeX' : linuxInstallHint(key),
   };
+  if (key === 'biber' || key === 'ctex') return H.latex;
   return H[key] || '请安装对应工具';
 }
 
@@ -315,9 +438,10 @@ const EXT_FOR_LANG = {
   javascript: 'js', typescript: 'ts', python: 'py', bash: 'sh', shell: 'sh',
   c_cpp: 'cpp', c: 'c', java: 'java', ruby: 'rb', swift: 'swift', go: 'go',
   json: 'json', html: 'html', css: 'css', markdown: 'md', plain_text: 'txt',
+  latex: 'tex',
   draw: 'draw', drawing: 'draw',
 };
-const KNOWN_EXT = /\.(c|cc|cpp|cxx|h|hh|hpp|hxx|py|js|mjs|cjs|ts|sh|go|java|rb|swift|json|html|css|yml|yaml|md|txt|draw)$/i;
+const KNOWN_EXT = /\.(c|cc|cpp|cxx|h|hh|hpp|hxx|py|js|mjs|cjs|ts|sh|go|java|rb|swift|json|html|css|yml|yaml|md|tex|txt|draw)$/i;
 function computeFilename(label, language, index, total) {
   const lbl = (label || '').trim();
   if (lbl && KNOWN_EXT.test(lbl)) return lbl;
@@ -499,6 +623,44 @@ function walkFolders() {
   return out;
 }
 
+const LATEX_RESOURCE_DIRS = new Set(['data', 'figures', 'fonts']);
+const LATEX_TEXT_EXTS = new Set(['.bib', '.tex', '.sty', '.cls', '.csv', '.json', '.yaml', '.yml', '.txt']);
+const LATEX_RESOURCE_EXTS = new Set([...LATEX_TEXT_EXTS, '.bst', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf', '.eps', '.otf', '.ttf', '.ttc', '.woff', '.woff2']);
+
+function latexResourceKind(rel) {
+  const parts = String(rel || '').split('/');
+  return parts.find((part) => LATEX_RESOURCE_DIRS.has(part)) || '';
+}
+function resolveLatexResource(rel, allowMissing) {
+  rel = String(rel || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!rel || rel.split('/').some((part) => !part || part === '.' || part === '..')) throw new Error('资源路径不合法');
+  const kind = latexResourceKind(rel), ext = path.extname(rel).toLowerCase();
+  if (!kind || !LATEX_RESOURCE_EXTS.has(ext)) throw new Error('只允许访问 LaTeX 的 data / figures / fonts 资源');
+  const root = path.resolve(path.join(vaultPath(), 'code'));
+  const full = path.resolve(root, rel);
+  if (!full.startsWith(root + path.sep)) throw new Error('资源路径越界');
+  if (!allowMissing && !fs.existsSync(full)) throw new Error('资源不存在');
+  return { rel, full, root, kind, ext };
+}
+function walkLatexResources() {
+  const root = path.join(vaultPath(), 'code'), out = [];
+  const walk = (dir, rel) => {
+    let entries = []; try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.isSymbolicLink()) continue;
+      const childRel = rel ? rel + '/' + entry.name : entry.name;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) { walk(full, childRel); continue; }
+      const kind = latexResourceKind(childRel), ext = path.extname(entry.name).toLowerCase();
+      if (!kind || !LATEX_RESOURCE_EXTS.has(ext)) continue;
+      let size = 0, updatedAt = 0; try { const st = fs.statSync(full); size = st.size; updatedAt = st.mtimeMs; } catch (_) {}
+      out.push({ path: childRel, folder: path.posix.dirname(childRel) === '.' ? '' : path.posix.dirname(childRel), name: entry.name, kind, ext, size, updatedAt, text: LATEX_TEXT_EXTS.has(ext) });
+    }
+  };
+  walk(root, '');
+  return out.sort((a, b) => a.path.localeCompare(b.path, 'zh'));
+}
+
 /* massCode 元数据库 .masscode/state.json：新建/移动片段与文件夹时需要登记，保证 massCode 识别 */
 function readState() {
   try {
@@ -552,8 +714,7 @@ function computeRev() {
       if (e.name.startsWith('.') && e.name !== '.masscode') continue;
       const full = path.join(dir, e.name);
       if (e.isDirectory()) walk(full);
-      else if (e.name.endsWith('.md')) addFile(full);
-      else if (e.name === '.meta.yaml') addFile(full);
+      else addFile(full);
     }
   };
   walk(codeRoot);
@@ -608,6 +769,139 @@ function writeTemp(name, content) {
   return { dir, file: f };
 }
 
+// 在独立临时目录编译 LaTeX，并禁用 shell escape。额外拦截显式绝对路径/上级目录引用。
+function copyLatexResources(sourceFile, targetDir) {
+  if (!sourceFile) return;
+  const codeRoot = path.resolve(path.join(vaultPath(), 'code'));
+  const resolved = path.resolve(String(sourceFile));
+  if (!resolved.startsWith(codeRoot + path.sep) || path.extname(resolved).toLowerCase() !== '.md') return;
+  const sourceDir = path.dirname(resolved);
+  const allowed = new Set(['.tex', '.sty', '.cls', '.bib', '.bst', '.csv', '.png', '.jpg', '.jpeg', '.pdf', '.eps', '.otf', '.ttf', '.ttc']);
+  let total = 0;
+  const copyDir = (from, to, depth) => {
+    if (depth > 4) return;
+    let entries = [];
+    try { entries = fs.readdirSync(from, { withFileTypes: true }); } catch (_) { return; }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.isSymbolicLink()) continue;
+      const src = path.join(from, entry.name), dst = path.join(to, entry.name);
+      if (entry.isDirectory()) { fs.mkdirSync(dst, { recursive: true }); copyDir(src, dst, depth + 1); continue; }
+      if (!entry.isFile() || !allowed.has(path.extname(entry.name).toLowerCase())) continue;
+      let size = 0; try { size = fs.statSync(src).size; } catch (_) { continue; }
+      if (size > 10 * 1024 * 1024 || total + size > 30 * 1024 * 1024) continue;
+      fs.copyFileSync(src, dst); total += size;
+    }
+  };
+  copyDir(sourceDir, targetDir, 0);
+}
+
+const LATEX_BIB_CACHE = new Map();
+function latexBibliographyKey(dir, sourceFile, code) {
+  const parts = [String(sourceFile || '')];
+  const commands = String(code || '').match(/\\(?:addbibresource|bibliography|bibliographystyle|nocite|[A-Za-z]*cite[A-Za-z]*)\*?(?:\[[^\]]*\])?\{[^}]*\}/g) || [];
+  parts.push(commands.join('|'));
+  const walk = (folder) => {
+    let entries = []; try { entries = fs.readdirSync(folder, { withFileTypes: true }); } catch (_) { return; }
+    for (const entry of entries) {
+      const full = path.join(folder, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.bib') {
+        // 资源每次都会复制进新的临时目录，mtime 会随复制而变化；按内容计算才能稳定命中缓存。
+        try { parts.push(path.relative(dir, full) + ':' + fs.readFileSync(full, 'utf8')); } catch (_) {}
+      }
+    }
+  };
+  walk(dir);
+  let hash = 5381, joined = parts.sort().join('|');
+  for (let i = 0; i < joined.length; i++) hash = ((hash * 33) ^ joined.charCodeAt(i)) >>> 0;
+  return hash.toString(36);
+}
+
+async function compileLatex(code, sourceFile) {
+  const { tools: env } = await getEnv();
+  if (!env.latex || !env.latex.available) {
+    return { ok: false, unsupported: true, reason: missingReason('latex', env.latex) };
+  }
+  const unsafeFileRef = /\\(?:input|include|includegraphics|bibliography|addbibresource|lstinputlisting|verbatiminput|inputminted|openin)\b[^\r\n{=]*(?:\{|=)\s*(?:\/|[A-Za-z]:[\\/]|\.\.[\\/])/i;
+  if (unsafeFileRef.test(code)) {
+    return { ok: false, error: '为安全起见，实时预览不允许读取绝对路径或上级目录中的文件', log: '当前实时预览仅编译片段内的自包含 LaTeX 文档。' };
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mscr-latex-'));
+  const source = path.join(dir, 'main.tex');
+  const pdf = path.join(dir, 'main.pdf');
+  const cmd = latexCmd();
+  copyLatexResources(sourceFile, dir);
+  const bibKey = latexBibliographyKey(dir, sourceFile, code), cachedBbl = LATEX_BIB_CACHE.get(bibKey);
+  if (cachedBbl) fs.writeFileSync(path.join(dir, 'main.bbl'), cachedBbl);
+  fs.writeFileSync(source, code, 'utf8');
+  const started = Date.now();
+  try {
+    const runFile = (program, args, timeout = 30000) => new Promise((resolve) => {
+      execFile(program, args, {
+        cwd: dir, timeout, maxBuffer: 6 * 1024 * 1024,
+        env: { ...process.env, openin_any: 'p', openout_any: 'p', TEXMFOUTPUT: dir },
+      }, (err, stdout, stderr) => resolve({ err, stdout: String(stdout || ''), stderr: String(stderr || '') }));
+    });
+    const texArgs = [
+        '-no-shell-escape', '-interaction=nonstopmode', '-halt-on-error',
+        '-cnf-line=openin_any=p', '-cnf-line=openout_any=p',
+        '-file-line-error', '-synctex=0', '-output-directory=.', 'main.tex',
+    ];
+    let result = await runFile(cmd, texArgs), pipeline = cmd;
+    const clean = (s) => String(s || '').split(dir).join('[临时目录]');
+    let log = clean(result.stdout + (result.stderr ? '\n' + result.stderr : '')).trim();
+    if (!result.err && fs.existsSync(path.join(dir, 'main.bcf')) && cachedBbl) {
+      pipeline += ' + biber缓存';
+    } else if (!result.err && fs.existsSync(path.join(dir, 'main.bcf')) && executablePath('biber')) {
+      const bib = await runFile('biber', ['--input-directory', dir, '--output-directory', dir, 'main'], 30000);
+      log += '\n' + clean(bib.stdout + (bib.stderr ? '\n' + bib.stderr : ''));
+      if (bib.err) result = bib;
+      else {
+        pipeline += ' + biber';
+        for (let pass = 0; pass < 2; pass++) {
+          const again = await runFile(cmd, texArgs);
+          log += '\n' + clean(again.stdout + (again.stderr ? '\n' + again.stderr : ''));
+          if (again.err) { result = again; break; }
+        }
+        if (!result.err && fs.existsSync(path.join(dir, 'main.bbl'))) {
+          LATEX_BIB_CACHE.set(bibKey, fs.readFileSync(path.join(dir, 'main.bbl')));
+          if (LATEX_BIB_CACHE.size > 20) LATEX_BIB_CACHE.delete(LATEX_BIB_CACHE.keys().next().value);
+        }
+      }
+    } else if (!result.err && fs.existsSync(path.join(dir, 'main.aux')) && /\\bibdata\{/.test(fs.readFileSync(path.join(dir, 'main.aux'), 'utf8')) && executablePath('bibtex')) {
+      const bib = await runFile('bibtex', ['main'], 30000);
+      log += '\n' + clean(bib.stdout + (bib.stderr ? '\n' + bib.stderr : ''));
+      if (bib.err) result = bib;
+      else {
+        pipeline += ' + bibtex';
+        for (let pass = 0; pass < 2; pass++) { const again = await runFile(cmd, texArgs); log += '\n' + clean(again.stdout + (again.stderr ? '\n' + again.stderr : '')); if (again.err) { result = again; break; } }
+      }
+    }
+    if (result.err || !fs.existsSync(pdf)) {
+      const timedOut = result.err && (result.err.killed || result.err.code === 'ETIMEDOUT');
+      return {
+        ok: false,
+        timedOut: !!timedOut,
+        engine: cmd,
+        elapsedMs: Date.now() - started,
+        error: timedOut ? 'LaTeX 编译超过 30 秒，已停止' : 'LaTeX 编译失败',
+        log: log.slice(-12000),
+      };
+    }
+    const pageMatch = log.match(/Output written on .*?\((\d+) pages?/i);
+    return {
+      ok: true,
+      engine: pipeline,
+      elapsedMs: Date.now() - started,
+      pages: pageMatch ? Number(pageMatch[1]) : null,
+      pdf: fs.readFileSync(pdf).toString('base64'),
+      log: log.slice(-4000),
+    };
+  } finally {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  }
+}
+
 // 把多个片段（含文件名）写入同一个临时目录，支持跨文件引用 / 一起编译
 function writeFragments(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mscr-'));
@@ -634,6 +928,7 @@ const LANGUAGE_MAP = {
   json:       { ext: '.json', label: 'JSON' },
   html:       { ext: '.html', label: 'HTML' },
   markdown:   { ext: '.md', label: 'Markdown' },
+  latex:      { ext: '.tex', label: 'LaTeX' },
 };
 
 // 环境守卫：缺工具时返回明确提示，而不是晦涩的 spawn 报错
@@ -1120,7 +1415,7 @@ function gitStatus() {
 
 /* --------------------------------- HTTP 服务 ---------------------------------- */
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json; charset=utf-8' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf', '.otf': 'font/otf', '.ttf': 'font/ttf', '.ttc': 'font/collection', '.woff': 'font/woff', '.woff2': 'font/woff2', '.bib': 'text/plain; charset=utf-8', '.csv': 'text/csv; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 
 function send(res, code, obj) {
   const body = typeof obj === 'string' ? obj : JSON.stringify(obj);
@@ -1131,7 +1426,7 @@ function send(res, code, obj) {
 function readBody(req) {
   return new Promise((resolve) => {
     let data = '';
-    req.on('data', (c) => { data += c; if (data.length > 5e6) req.destroy(); });
+    req.on('data', (c) => { data += c; if (data.length > 45e6) req.destroy(); });
     req.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve({}); } });
   });
 }
@@ -1169,8 +1464,11 @@ const server = http.createServer(async (req, res) => {
       } catch (_) { send(res, 404, { ok: false, error: 'not found' }); }
       return;
     }
+    if (req.method === 'GET' && u.pathname === '/api/system/status') {
+      return send(res, 200, await systemStatus());
+    }
     if (req.method === 'GET' && u.pathname === '/api/snippets') {
-      send(res, 200, { vault: vaultPath(), rev: computeRev(), tags: readTagRegistry().list, folders: walkFolders(), snippets: walkSnippets() });
+      send(res, 200, { vault: vaultPath(), rev: computeRev(), tags: readTagRegistry().list, folders: walkFolders(), resources: walkLatexResources(), snippets: walkSnippets() });
       return;
     }
     if (req.method === 'GET' && u.pathname === '/api/rev') {
@@ -1202,6 +1500,92 @@ const server = http.createServer(async (req, res) => {
         system,
       });
       return;
+    }
+    if (req.method === 'GET' && u.pathname === '/api/latex/resource/raw') {
+      let resource;
+      try { resource = resolveLatexResource(u.searchParams.get('path')); }
+      catch (e) { return send(res, 404, { ok: false, error: e.message }); }
+      const data = fs.readFileSync(resource.full);
+      const displayName = path.basename(resource.full).replace(/["\r\n]/g, '');
+      const asciiName = ('resource' + resource.ext).replace(/[^\x20-\x7e]/g, '');
+      const encodedName = encodeURIComponent(displayName).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+      res.writeHead(200, { 'Content-Type': MIME[resource.ext] || 'application/octet-stream', 'Content-Length': data.length, 'Cache-Control': 'no-store', 'Content-Disposition': 'inline; filename="' + asciiName + '"; filename*=UTF-8\'\'' + encodedName });
+      res.end(data); return;
+    }
+    if (req.method === 'GET' && u.pathname === '/api/latex/resource') {
+      let resource;
+      try { resource = resolveLatexResource(u.searchParams.get('path')); }
+      catch (e) { return send(res, 404, { ok: false, error: e.message }); }
+      const stat = fs.statSync(resource.full);
+      if (!LATEX_TEXT_EXTS.has(resource.ext)) return send(res, 200, { ok: true, path: resource.rel, kind: resource.kind, ext: resource.ext, size: stat.size, text: false });
+      if (stat.size > 2 * 1024 * 1024) return send(res, 413, { ok: false, error: '文本资源超过 2 MB，无法在线编辑' });
+      return send(res, 200, { ok: true, path: resource.rel, kind: resource.kind, ext: resource.ext, size: stat.size, text: true, content: fs.readFileSync(resource.full, 'utf8') });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/latex/resource/save') {
+      const b = await readBody(req); let resource;
+      try { resource = resolveLatexResource(b.path, true); }
+      catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+      if (!LATEX_TEXT_EXTS.has(resource.ext)) return send(res, 400, { ok: false, error: '该资源不是可编辑文本' });
+      const content = String(b.content == null ? '' : b.content);
+      if (Buffer.byteLength(content, 'utf8') > 2 * 1024 * 1024) return send(res, 413, { ok: false, error: '文本资源超过 2 MB' });
+      fs.mkdirSync(path.dirname(resource.full), { recursive: true });
+      fs.writeFileSync(resource.full, content, 'utf8');
+      return send(res, 200, { ok: true, path: resource.rel, size: Buffer.byteLength(content, 'utf8') });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/latex/resource/upload') {
+      const b = await readBody(req);
+      const folder = String(b.folder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      const name = path.basename(String(b.name || '')).replace(/[\x00-\x1f]/g, '');
+      if (!folder || !name || name === '.' || name === '..') return send(res, 400, { ok: false, error: '上传路径不合法' });
+      let resource;
+      try { resource = resolveLatexResource(folder + '/' + name, true); }
+      catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+      const encoded = String(b.data || '').replace(/^data:[^,]*,/, '');
+      let data; try { data = Buffer.from(encoded, 'base64'); } catch (_) { return send(res, 400, { ok: false, error: '文件数据无效' }); }
+      if (!data.length || data.length > 30 * 1024 * 1024) return send(res, 413, { ok: false, error: '资源文件必须在 30 MB 以内' });
+      fs.mkdirSync(path.dirname(resource.full), { recursive: true });
+      fs.writeFileSync(resource.full, data);
+      return send(res, 200, { ok: true, path: resource.rel, size: data.length, replaced: !!b.replace });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/latex/resource/rename') {
+      const b = await readBody(req); let source;
+      try { source = resolveLatexResource(b.path); }
+      catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+      let name = path.basename(String(b.name || '').trim()).replace(/[\x00-\x1f]/g, '');
+      if (!name || name === '.' || name === '..' || name !== String(b.name || '').trim()) return send(res, 400, { ok: false, error: '文件名不合法' });
+      // 只输入主文件名时保留原扩展名，避免图片重命名后意外失去格式。
+      if (!path.extname(name)) name += source.ext;
+      if (path.extname(name).toLowerCase() !== source.ext) return send(res, 400, { ok: false, error: '重命名不能改变文件格式，请保留 ' + source.ext + ' 扩展名' });
+      let target;
+      try { target = resolveLatexResource(path.posix.dirname(source.rel) + '/' + name, true); }
+      catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+      if (path.resolve(source.full) === path.resolve(target.full)) return send(res, 200, { ok: true, path: source.rel, name: path.basename(source.rel) });
+      if (fs.existsSync(target.full)) return send(res, 409, { ok: false, error: '同一目录已存在同名资源' });
+      try { fs.renameSync(source.full, target.full); }
+      catch (e) { return send(res, 500, { ok: false, error: '重命名失败: ' + e.message }); }
+      return send(res, 200, { ok: true, path: target.rel, name });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/latex/resource/move') {
+      const b = await readBody(req); let source;
+      try { source = resolveLatexResource(b.path); }
+      catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+      const toFolder = String(b.toFolder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      let target;
+      try { target = resolveLatexResource(toFolder + '/' + path.basename(source.rel), true); }
+      catch (e) { return send(res, 400, { ok: false, error: e.message }); }
+      if (target.kind !== source.kind) return send(res, 400, { ok: false, error: '资源只能移动到同类型目录（' + source.kind + '）' });
+      if (path.resolve(source.full) === path.resolve(target.full)) return send(res, 200, { ok: true, path: source.rel });
+      if (fs.existsSync(target.full)) return send(res, 409, { ok: false, error: '目标目录已存在同名资源' });
+      fs.mkdirSync(path.dirname(target.full), { recursive: true });
+      try { fs.renameSync(source.full, target.full); }
+      catch (e) { return send(res, 500, { ok: false, error: '移动失败: ' + e.message }); }
+      return send(res, 200, { ok: true, path: target.rel });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/latex/compile') {
+      const b = await readBody(req);
+      if (typeof b.code !== 'string') return send(res, 400, { ok: false, error: '缺少 LaTeX 源码' });
+      if (Buffer.byteLength(b.code, 'utf8') > 1024 * 1024) return send(res, 413, { ok: false, error: 'LaTeX 文档超过 1 MB，无法实时编译' });
+      return send(res, 200, await compileLatex(b.code, b.file));
     }
     if (req.method === 'POST' && u.pathname === '/api/run') {
       const b = await readBody(req);
@@ -1344,10 +1728,12 @@ const server = http.createServer(async (req, res) => {
       const cid = ++st.counters.contentId;
       const now = Date.now();
       const filePath = folder ? folder + '/' + name + '.md' : name + '.md';
+      const contentLabel = language === 'latex' ? name + '.tex' : name;
+      const initialCode = language === 'latex' ? (b.latexProject ? latexProjectStarter() : latexStarter()) : '';
       const md = '---\n' +
         'contents:\n' +
         '  - id: ' + cid + '\n' +
-        '    label: ' + name + '\n' +
+        '    label: ' + contentLabel + '\n' +
         '    language: ' + language + '\n' +
         'createdAt: ' + now + '\n' +
         'description: ' + (description ? JSON.stringify(description) : '""') + '\n' +
@@ -1359,14 +1745,14 @@ const server = http.createServer(async (req, res) => {
         (tagIds.length ? 'tags:\n' + tagIds.map((t) => '  - ' + t).join('\n') + '\n' : 'tags:\n') +
         'updatedAt: ' + now + '\n' +
         '---\n' +
-        '\n## Fragment: ' + name + '\n' +
+        '\n## Fragment: ' + contentLabel + '\n' +
         '```' + language + '\n' +
-        '\n```\n';
+        initialCode + '\n```\n';
       fs.writeFileSync(full, md, 'utf8');
       st.snippets.push({
         filePath, id: sid,
         meta: {
-          contents: [{ id: cid, label: name, language }],
+          contents: [{ id: cid, label: contentLabel, language }],
           createdAt: now, description: description || null, folderId: fid || 0, isDeleted: 0, isFavorites: 0,
           mtimeMs: now, name, size: Buffer.byteLength(md), tags: tagIds, updatedAt: now,
         },
@@ -1407,6 +1793,38 @@ const server = http.createServer(async (req, res) => {
         if (updated !== text) fs.writeFileSync(destFull, updated, 'utf8');
       } catch (_) {}
       return send(res, 200, { ok: true, file: destFull, folder: toFolder });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/fs/move-folder') {
+      const b = await readBody(req);
+      const folder = String(b.folder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      const toFolder = String(b.toFolder || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+      const invalid = (value, allowEmpty) => !value ? !allowEmpty : value.split('/').some((seg) => !seg || seg === '.' || seg === '..');
+      if (invalid(folder, false) || invalid(toFolder, true)) return send(res, 400, { ok: false, error: '文件夹路径不合法' });
+      if (toFolder === folder || toFolder.startsWith(folder + '/')) return send(res, 400, { ok: false, error: '不能把文件夹移动到自身内部' });
+      const codeRoot = path.resolve(path.join(vaultPath(), 'code'));
+      const source = path.resolve(codeRoot, folder);
+      const destParent = toFolder ? path.resolve(codeRoot, toFolder) : codeRoot;
+      const targetRel = (toFolder ? toFolder + '/' : '') + path.posix.basename(folder);
+      const target = path.resolve(codeRoot, targetRel);
+      if (!source.startsWith(codeRoot + path.sep) || (destParent !== codeRoot && !destParent.startsWith(codeRoot + path.sep)) || !target.startsWith(codeRoot + path.sep)) return send(res, 400, { ok: false, error: '路径越界' });
+      if (!fs.existsSync(source) || !fs.statSync(source).isDirectory()) return send(res, 404, { ok: false, error: '文件夹不存在' });
+      if (!fs.existsSync(destParent) || !fs.statSync(destParent).isDirectory()) return send(res, 404, { ok: false, error: '目标文件夹不存在' });
+      if (source === target) return send(res, 200, { ok: true, folder: targetRel });
+      if (fs.existsSync(target)) return send(res, 409, { ok: false, error: '目标位置已存在同名文件夹' });
+      try { fs.renameSync(source, target); }
+      catch (e) { return send(res, 500, { ok: false, error: '移动文件夹失败: ' + e.message }); }
+      const st = readState(), prefix = folder + '/';
+      for (const snip of (st.snippets || [])) {
+        if (snip.filePath && snip.filePath.startsWith(prefix)) snip.filePath = targetRel + '/' + snip.filePath.slice(prefix.length);
+      }
+      const mapped = {};
+      for (const [key, id] of Object.entries(st.folderIdByPath || {})) {
+        const next = key === folder ? targetRel : key.startsWith(prefix) ? targetRel + '/' + key.slice(prefix.length) : key;
+        mapped[next] = id;
+      }
+      st.folderIdByPath = mapped;
+      writeState(st);
+      return send(res, 200, { ok: true, folder: targetRel, from: folder });
     }
     // 编辑片段信息：名称/类型(语言)/标签/说明（fragmentId 指定要改语言的分片，默认第一个）
     if (req.method === 'POST' && u.pathname === '/api/fs/update') {

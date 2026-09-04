@@ -20,6 +20,9 @@ foreach ($tool in $Tools) {
     'black'      { $needBlack = $true }
     'bash'       { [void]$packages.Add('Git.Git') }
     'swift'      { Write-Host 'Swift Windows 工具链请从 swift.org 安装。' -ForegroundColor Yellow }
+    'latex'      { [void]$packages.Add('MiKTeX.MiKTeX') }
+    'biber'      { [void]$packages.Add('MiKTeX.MiKTeX') }
+    'ctex'       { [void]$packages.Add('MiKTeX.MiKTeX') }
   }
 }
 

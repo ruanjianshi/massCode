@@ -3,7 +3,7 @@
 # 用法：bash deploy-env.sh gcc gpp clangformat
 set -Eeuo pipefail
 
-KNOWN=" node python3 bash gcc gpp java ruby swift go clangformat gofmt black npx "
+KNOWN=" node python3 bash gcc gpp java ruby swift go clangformat gofmt black npx latex biber ctex "
 if [ "$#" -eq 0 ]; then
   set -- python3 bash gcc gpp clangformat npx
 fi
@@ -31,6 +31,12 @@ add_unique() {
   local value="$1" item
   for item in "${PACKAGES[@]:-}"; do [ "$item" = "$value" ] && return; done
   PACKAGES+=("$value")
+}
+
+add_cask_unique() {
+  local value="$1" item
+  for item in "${CASKS[@]:-}"; do [ "$item" = "$value" ] && return; done
+  CASKS+=("$value")
 }
 
 echo "========================================"
@@ -61,12 +67,13 @@ if [ "$(uname -s)" = "Darwin" ]; then
           echo "请在系统弹窗完成安装后，再点一次环境检测。"
         fi
         ;;
-      java) CASKS+=(temurin) ;;
+      java) add_cask_unique temurin ;;
       ruby) add_unique ruby ;;
       go|gofmt) add_unique go ;;
       clangformat) add_unique clang-format ;;
       black) NEED_BLACK=1 ;;
       swift) NEED_SWIFT=1 ;;
+      latex|biber|ctex) add_cask_unique mactex-no-gui ;;
     esac
   done
   if [ "${#PACKAGES[@]}" -gt 0 ]; then brew install "${PACKAGES[@]}"; fi
@@ -91,6 +98,9 @@ else
       apt-get:ruby) add_unique ruby ;;
       apt-get:go|apt-get:gofmt) add_unique golang-go ;;
       apt-get:clangformat) add_unique clang-format ;;
+      apt-get:latex) add_unique texlive-xetex; add_unique texlive-latex-extra; add_unique texlive-fonts-recommended; add_unique texlive-lang-chinese ;;
+      apt-get:ctex) add_unique texlive-xetex; add_unique texlive-latex-extra; add_unique texlive-fonts-recommended; add_unique texlive-lang-chinese ;;
+      apt-get:biber) add_unique biber ;;
       dnf:node|dnf:npx|yum:node|yum:npx) add_unique nodejs; add_unique npm ;;
       dnf:python3|yum:python3) add_unique python3; add_unique python3-pip ;;
       dnf:bash|yum:bash) add_unique bash ;;
@@ -102,6 +112,9 @@ else
       dnf:go|dnf:gofmt|yum:go|yum:gofmt) add_unique golang ;;
       dnf:clangformat) add_unique clang-tools-extra ;;
       yum:clangformat) add_unique clang ;;
+      dnf:latex|yum:latex) add_unique texlive-xetex; add_unique texlive-collection-latexextra; add_unique texlive-ctex ;;
+      dnf:ctex|yum:ctex) add_unique texlive-xetex; add_unique texlive-collection-latexextra; add_unique texlive-ctex ;;
+      dnf:biber|yum:biber) add_unique biber ;;
       pacman:node|pacman:npx) add_unique nodejs; add_unique npm ;;
       pacman:python3) add_unique python; add_unique python-pip ;;
       pacman:bash) add_unique bash ;;
@@ -110,6 +123,9 @@ else
       pacman:ruby) add_unique ruby ;;
       pacman:go|pacman:gofmt) add_unique go ;;
       pacman:clangformat) add_unique clang ;;
+      pacman:latex) add_unique texlive-bin; add_unique texlive-latexextra; add_unique texlive-fontsrecommended; add_unique texlive-langchinese ;;
+      pacman:ctex) add_unique texlive-bin; add_unique texlive-latexextra; add_unique texlive-fontsrecommended; add_unique texlive-langchinese ;;
+      pacman:biber) add_unique biber ;;
       zypper:node|zypper:npx) add_unique nodejs; add_unique npm ;;
       zypper:python3) add_unique python3; add_unique python3-pip ;;
       zypper:bash) add_unique bash ;;
@@ -119,6 +135,9 @@ else
       zypper:ruby) add_unique ruby ;;
       zypper:go|zypper:gofmt) add_unique go ;;
       zypper:clangformat) add_unique clang-tools ;;
+      zypper:latex) add_unique texlive-xetex; add_unique texlive-latexextra; add_unique texlive-ctex ;;
+      zypper:ctex) add_unique texlive-xetex; add_unique texlive-latexextra; add_unique texlive-ctex ;;
+      zypper:biber) add_unique biber ;;
       apk:node|apk:npx) add_unique nodejs; add_unique npm ;;
       apk:python3) add_unique python3; add_unique py3-pip ;;
       apk:bash) add_unique bash ;;
@@ -127,6 +146,9 @@ else
       apk:ruby) add_unique ruby ;;
       apk:go|apk:gofmt) add_unique go ;;
       apk:clangformat) add_unique clang-extra-tools ;;
+      apk:latex) add_unique texlive-xetex; add_unique texmf-dist-latexextra; add_unique texmf-dist-langchinese ;;
+      apk:ctex) add_unique texlive-xetex; add_unique texmf-dist-latexextra; add_unique texmf-dist-langchinese ;;
+      apk:biber) add_unique biber ;;
       *:black) NEED_BLACK=1 ;;
       *:swift) NEED_SWIFT=1 ;;
     esac

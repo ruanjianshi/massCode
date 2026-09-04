@@ -22,6 +22,23 @@
   header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border); }
   header h1 { font-size: 15px; margin: 0; }
   header .sub { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  #sysmon { display:flex; align-items:center; gap:5px; position:relative; flex:none; }
+  .sm-item { min-width:76px; height:32px; display:grid; grid-template-columns:auto auto; grid-template-rows:1fr 3px; align-items:center; gap:2px 7px; padding:4px 7px; border-color:#2a3441; background:rgba(11,16,23,.7); border-radius:7px; }
+  .sm-item:hover { background:#17202b; }
+  .sm-label { color:#7f8b9d; font:10px/1 var(--mono); letter-spacing:.04em; }
+  .sm-value { color:#d9e1ec; font:600 10px/1 var(--mono); text-align:right; white-space:nowrap; }
+  .sm-bar { grid-column:1 / -1; height:3px; overflow:hidden; border-radius:3px; background:#26303c; }
+  .sm-bar > i { display:block; width:0; height:100%; border-radius:inherit; background:#4f9a72; transition:width .45s ease,background .25s ease; }
+  .sm-item.warn .sm-value { color:#eabf72; } .sm-item.warn .sm-bar > i { background:#d49a42; }
+  .sm-item.crit .sm-value { color:#ff8c88; } .sm-item.crit .sm-bar > i { background:#e5534b; }
+  .sm-item.offline { opacity:.5; }
+  #sysmon-detail { display:none; position:absolute; z-index:260; right:0; top:40px; width:320px; padding:12px; border:1px solid #344152; border-radius:10px; background:#111821; box-shadow:0 18px 50px rgba(0,0,0,.52); }
+  #sysmon-detail.open { display:block; }
+  .smd-title { display:flex; align-items:center; margin-bottom:9px; font-size:12px; font-weight:650; }
+  .smd-title span { margin-left:auto; color:#657286; font:10px var(--mono); font-weight:400; }
+  .smd-grid { display:grid; grid-template-columns:58px 1fr; gap:7px 10px; font-size:11px; }
+  .smd-grid .key { color:#718096; }
+  .smd-grid .val { color:#cdd6e3; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--mono); }
   button { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
   button:hover { border-color: var(--accent); }
   button:disabled { opacity: .45; cursor: not-allowed; }
@@ -336,6 +353,15 @@
   .fnode .fdel { display: none; flex: none; padding: 0 4px; border-radius: 5px; cursor: pointer; font-size: 11px; color: var(--dim); }
   .fnode:hover .fdel { display: inline-block; }
   .fnode .fdel:hover { background: rgba(229,83,75,.18); color: #f87171; }
+  .fnode .fadd { display: none; flex: none; padding: 0 4px; border-radius: 5px; color: var(--accent); font-size: 14px; }
+  .fnode.resource-folder:hover .fadd { display: inline-block; }
+  .resource-row { display: flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 6px; color: var(--dim); font-size: 12px; cursor: pointer; }
+  .resource-row:hover, .resource-row.active { background: var(--panel2); color: var(--text); }
+  .resource-row.active { outline: 1px solid rgba(79,140,255,.5); }
+  .resource-row.dragging, .fnode.dragging { opacity: .45; }
+  .resource-row .ricon { width: 16px; text-align: center; flex: none; }
+  .resource-row .rname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .resource-row .rsize { margin-left: auto; color: var(--dim); font-size: 10px; }
   .tree-children { overflow: hidden; }
   .tree-children.hidden { display: none; }
   /* 项目树标题行（全部收拢/展开，VSCode 风格） */
@@ -343,8 +369,8 @@
   #tree-head .tt { flex: 1; }
   #tree-head button { background: none; border: none; color: var(--dim); font-size: 12px; padding: 2px 5px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
   #tree-head button:hover { color: var(--text); background: var(--panel2); }
-  #tree-head #btn-new-file, #tree-head #btn-new-folder { color: var(--accent); font-size: 11px; letter-spacing: 0; text-transform: none; }
-  #tree-head #btn-new-file:hover, #tree-head #btn-new-folder:hover { background: rgba(79,140,255,.15); color: #a9c6ff; }
+  #tree-head #btn-new-file, #tree-head #btn-new-latex, #tree-head #btn-new-folder { color: var(--accent); font-size: 11px; letter-spacing: 0; text-transform: none; }
+  #tree-head #btn-new-file:hover, #tree-head #btn-new-latex:hover, #tree-head #btn-new-folder:hover { background: rgba(79,140,255,.15); color: #a9c6ff; }
   #list .item { cursor: grab; }
   #list .item.dragging { opacity: .45; }
   #list .fnode.drop-target, #list .item.drop-target { outline: 1px dashed var(--accent); outline-offset: -2px; background: rgba(79,140,255,.12); }
@@ -434,6 +460,27 @@
   /* ---- Markdown 渲染视图（只读 #md-view 与编辑预览 #edit-preview 共用 .md-doc 样式） ---- */
   #md-view { display: none; flex: 1; overflow: auto; margin: 10px 14px 0; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; }
   #edit-preview { position: relative; display: none; flex: 1; min-width: 0; overflow: auto; min-height: 0; margin: 10px 14px 0 0; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; }
+  #edit-preview.latex-preview { overflow: hidden; flex-direction: column; background: #252932; }
+  .latex-preview-head { flex: none; min-height: 38px; padding: 7px 10px; display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 11px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .latex-preview-head strong { color: var(--text); font-size: 12px; }
+  .latex-preview-head .sp { flex: 1; }
+  .latex-preview-head button { padding: 3px 8px; font-size: 11px; }
+  .latex-pdf-frame { flex: 1; width: 100%; min-height: 0; border: 0; background: #525659; }
+  .latex-preview-empty { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; color: var(--dim); text-align: center; }
+  .latex-preview-error { flex: none; display: none; max-height: 38%; overflow: auto; margin: 0; padding: 10px 12px; color: #ffb4b4; background: #21171a; border-top: 1px solid rgba(255,90,90,.28); font: 11px/1.55 var(--mono); white-space: pre-wrap; }
+  .latex-preview-error.only { display: block; flex: 1; max-height: none; border-top: 0; }
+  #resource-viewer { display: none; flex: 1; min-height: 0; margin: 10px 14px 0; border: 1px solid var(--border); border-radius: 8px; background: var(--panel2); overflow: hidden; flex-direction: column; }
+  #resource-head { flex: none; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  #resource-head .name { font-weight: 600; }
+  #resource-head .meta { color: var(--dim); font-size: 11px; }
+  #resource-head .sp { flex: 1; }
+  #resource-body { flex: 1; min-height: 0; display: flex; align-items: stretch; justify-content: center; overflow: auto; padding: 14px; }
+  #resource-text { flex: 1; width: 100%; resize: none; border: 0; outline: 0; background: #10151c; color: var(--text); padding: 14px; font: 12px/1.65 var(--mono); tab-size: 2; }
+  #resource-image { max-width: 100%; max-height: 100%; object-fit: contain; margin: auto; }
+  #resource-pdf { width: 100%; min-height: 100%; border: 0; background: #525659; }
+  #resource-font { width: 100%; display: flex; flex-direction: column; justify-content: center; gap: 18px; padding: 28px; }
+  #resource-font .sample { font-size: 32px; line-height: 1.5; overflow-wrap: anywhere; }
+  #resource-font .alphabet { color: var(--dim); font-size: 20px; line-height: 1.7; }
   /* ---- 绘图（massCode 移植：Excalidraw .excalidraw 文件，位于 vault/drawings/） ---- */
   #pane-draw { display: flex; flex-direction: column; max-height: 70%; min-height: 40px; border-top: 1px solid var(--border); background: var(--panel); }
   #pane-draw.collapsed { height: auto !important; }
@@ -556,6 +603,23 @@
   #code .n { color: #f0a35e; }        /* number */
   #code .t { color: #ff8fb2; }        /* html tag */
   #code .a { color: #8fd6ff; }        /* html attr */
+  /* LaTeX 源码：克制的语义化配色，避免“命令全蓝、括号全粉”的杂乱感 */
+  #code-wrap.latex-code { min-width: 320px; background: #0f151d; border-color: #2a3543; box-shadow: inset 0 1px 0 rgba(255,255,255,.025); }
+  #code-wrap.latex-code #code,
+  #code-wrap.latex-code #code-edit { padding: 16px; font-size: 12.5px; line-height: 1.78; color: #d8dee9; }
+  #code-wrap.latex-code #ln { padding-top: 16px; padding-bottom: 16px; font-size: 12.5px; line-height: 1.78; color: #465365; background: #0c1118; border-right-color: #202a36; }
+  #code-wrap.latex-code #code .tex-command { color: #82aaff; }
+  #code-wrap.latex-code #code .tex-env { color: #ffc777; }
+  #code-wrap.latex-code #code .tex-resource { color: #7dcfff; }
+  #code-wrap.latex-code #code .tex-heading { color: #c3e88d; }
+  #code-wrap.latex-code #code .tex-option { color: #b8c4d6; }
+  #code-wrap.latex-code #code .tex-math { color: #c099ff; }
+  #code-wrap.latex-code #code .tex-delim { color: #66758a; }
+  #code-wrap.latex-code #code .tex-special { color: #f5a97f; }
+  #code-wrap.latex-code #code .tex-number { color: #f6c177; }
+  #code-wrap.latex-code #code .tex-comment { color: #667085; }
+  #code-wrap.latex-code #code-edit:focus { outline: 1px solid rgba(99,155,255,.85); box-shadow: inset 0 0 0 1px rgba(99,155,255,.12); }
+  #code-wrap.latex-code #code-edit.live-hl::selection { background: rgba(82,139,255,.34); -webkit-text-fill-color: transparent; }
   #output { border-top: 1px solid var(--border); background: #101216; height: 200px; min-height: 90px; max-height: 62vh; flex: none; display: flex; flex-direction: column; }
   #out-head { display: flex; gap: 10px; align-items: center; padding: 6px 14px; color: var(--dim); font-size: 12px; }
   #out-head .sp { flex: 1; }
@@ -591,10 +655,17 @@
   .sync-dot { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font-size: 12px; }
   .sync-dot::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); }
   .sync-dot.off::before { background: var(--err); box-shadow: 0 0 6px var(--err); }
+  #btn-env { position:relative; padding-right:20px; }
+  #btn-env::after { content:''; position:absolute; top:7px; right:7px; width:7px; height:7px; border-radius:50%; background:#657184; box-shadow:0 0 0 2px rgba(101,113,132,.12); }
+  #btn-env.env-ok::after { background:var(--ok); box-shadow:0 0 6px rgba(86,211,100,.75); }
+  #btn-env.env-warn::after { background:var(--err); box-shadow:0 0 6px rgba(255,107,99,.68); }
+  #btn-env.env-checking::after { background:#d9a441; animation:env-pulse .8s ease-in-out infinite alternate; }
+  @keyframes env-pulse { to { opacity:.35; transform:scale(.72); } }
   #env-panel { display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 460px; max-width: 94vw; background: var(--panel); border-left: 1px solid var(--border); z-index: 50; box-shadow: -8px 0 30px rgba(0,0,0,.4); flex-direction: column; }
   #env-panel.open { display: flex; }
   #env-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
   #env-head h2 { font-size: 14px; margin: 0; flex: 1; }
+  #env-last-check { color:var(--dim); font:10px var(--mono); white-space:nowrap; }
   #env-body { flex: 1; overflow: auto; padding: 12px 16px; }
   .env-summary { display: flex; gap: 10px; margin-bottom: 12px; }
   .env-card { flex: 1; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
@@ -608,6 +679,9 @@
   .env-deploy .desc { margin:5px 0 8px; color:var(--dim); font-size:11px; line-height:1.55; }
   .env-deploy button { width:100%; border-color:rgba(79,140,255,.6); color:#b9d3ff; }
   .env-deploy button:disabled { opacity:.55; cursor:default; }
+  #env-deploy-state { min-height:17px; margin-top:7px; color:var(--dim); font-size:11px; }
+  #env-deploy-state.ok { color:var(--ok); }
+  #env-deploy-state.err { color:var(--err); }
   #env-deploy-command { display:block; margin-top:7px; padding:6px 8px; max-height:54px; overflow:auto; border-radius:6px; background:rgba(0,0,0,.24); color:#8592a4; font:10px/1.45 var(--mono); word-break:break-all; white-space:pre-wrap; }
   .tool-row { display: grid; grid-template-columns: 10px minmax(0,1fr); column-gap: 10px; row-gap: 3px; align-items: center; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--panel2); overflow: hidden; }
   .tool-row.optional { opacity:.72; }
@@ -871,6 +945,7 @@
     #side { width:260px; }
     #outline-panel { width:320px; }
     #snippet-desc { display:none; }
+    header .sub { display:none; }
   }
 </style>
 </head>
@@ -878,6 +953,22 @@
 <header>
   <h1>⚡ massCode Runner</h1>
   <div class="sub" id="vault-path">…</div>
+  <div id="sysmon" aria-label="电脑实时状态">
+    <button class="sm-item offline" id="sm-cpu" title="点击查看电脑详细状态"><span class="sm-label">CPU</span><b class="sm-value" id="sm-cpu-v">--%</b><span class="sm-bar"><i id="sm-cpu-b"></i></span></button>
+    <button class="sm-item offline" id="sm-mem" title="点击查看电脑详细状态"><span class="sm-label">内存</span><b class="sm-value" id="sm-mem-v">--%</b><span class="sm-bar"><i id="sm-mem-b"></i></span></button>
+    <button class="sm-item offline" id="sm-disk" title="点击查看电脑详细状态"><span class="sm-label">硬盘</span><b class="sm-value" id="sm-disk-v">--%</b><span class="sm-bar"><i id="sm-disk-b"></i></span></button>
+    <div id="sysmon-detail">
+      <div class="smd-title">电脑状态 <span id="smd-time">等待采样</span></div>
+      <div class="smd-grid">
+        <span class="key">处理器</span><span class="val" id="smd-cpu">--</span>
+        <span class="key">负载</span><span class="val" id="smd-load">--</span>
+        <span class="key">内存</span><span class="val" id="smd-mem">--</span>
+        <span class="key">硬盘</span><span class="val" id="smd-disk">--</span>
+        <span class="key">系统</span><span class="val" id="smd-system">--</span>
+        <span class="key">运行时间</span><span class="val" id="smd-uptime">--</span>
+      </div>
+    </div>
+  </div>
   <span class="sync-dot" id="sync-ind" title="每 2.5s 自动检测 vault 变更">实时同步</span>
   <button id="btn-env">🔍 环境</button>
   <button id="refresh">↻ 刷新</button>
@@ -889,6 +980,7 @@
       <div id="tree-head">
         <span class="tt">📁 项目</span>
         <button id="btn-new-file" title="新建文件（创建到当前选中片段所在文件夹）">+ 文件</button>
+        <button id="btn-new-latex" title="新建 LaTeX 文档并实时预览 PDF">+ TeX</button>
         <button id="btn-new-folder" title="新建文件夹（相对 code/ 的路径，可含子路径）">+ 文件夹</button>
         <button id="btn-collapse-all" title="全部收拢">▾▾</button>
         <button id="btn-expand-all" title="全部展开">▸▸</button>
@@ -1030,6 +1122,11 @@
         <div id="mm-hint">滚轮缩放 · 拖动平移 · 点击节点折叠/展开 · 点击节点文字选中编辑 · Esc 返回渲染</div>
       </div>
     </div>
+    <div id="resource-viewer">
+      <div id="resource-head"><button id="resource-back">← 返回文档</button><span class="name" id="resource-name"></span><span class="meta" id="resource-meta"></span><span class="sp"></span><button id="resource-rename">重命名</button><button id="resource-replace">替换文件</button><button id="resource-save" style="display:none">保存</button></div>
+      <div id="resource-body"></div>
+    </div>
+    <input id="resource-upload" type="file" hidden>
     <div id="preview"><iframe id="pframe" sandbox="allow-scripts allow-modals allow-forms"></iframe></div>
     <div id="input-area" class="hidden">
       <div class="in-head"><span>⌨ stdin 输入（程序读入的内容，如 cin / input() / scanf）</span><span class="sp"></span><span id="in-status" class="in-dot">未使用</span></div>
@@ -1189,6 +1286,7 @@
 <div id="env-panel">
   <div id="env-head">
     <h2>🔍 环境检测</h2>
+    <span id="env-last-check">等待检测</span>
     <button id="btn-env-refresh">重新检测</button>
     <button id="btn-env-close">✕</button>
   </div>
@@ -1203,6 +1301,7 @@
       <div class="title">🚀 一键部署当前项目环境</div>
       <div id="env-deploy-desc" class="desc">正在生成部署方案…</div>
       <button id="btn-env-deploy" disabled>部署缺失工具</button>
+      <div id="env-deploy-state"></div>
       <code id="env-deploy-command"></code>
     </div>
     <div id="env-list"></div>
@@ -1210,7 +1309,8 @@
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
-let SNIPPETS = [], TAGS = [], FOLDERS = [], CURRENT = null, CINDEX = 0, lastRev = null;
+let SNIPPETS = [], TAGS = [], FOLDERS = [], RESOURCES = [], CURRENT = null, CINDEX = 0, lastRev = null;
+let RESOURCE_CURRENT = null, RESOURCE_UPLOAD_FOLDER = '';
 let DRAG_IDX = null; // 标签拖拽排序：当前拖拽的片段索引
 let EDITING = true; // 默认可编辑：代码区直接可改，按钮切换只读视图
 const activeTags = new Set(); // 选中的标签 id
@@ -1230,6 +1330,66 @@ async function api(path, body) {
   return r.json();
 }
 
+let SYSMON_BUSY = false;
+function formatCapacity(bytes) {
+  const n = Number(bytes || 0);
+  if (!n) return '--';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']; let value = n, i = 0;
+  while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+  return (value >= 100 || i < 3 ? value.toFixed(0) : value.toFixed(1)) + ' ' + units[i];
+}
+function formatUptime(seconds) {
+  let n = Math.max(0, Math.floor(Number(seconds || 0)));
+  const days = Math.floor(n / 86400); n %= 86400;
+  const hours = Math.floor(n / 3600); n %= 3600;
+  const mins = Math.floor(n / 60);
+  return (days ? days + ' 天 ' : '') + hours + ' 小时 ' + mins + ' 分';
+}
+function setSystemMetric(name, usage, warnAt, critAt) {
+  const card = $('sm-' + name), value = $('sm-' + name + '-v'), bar = $('sm-' + name + '-b');
+  const n = Number(usage), ok = Number.isFinite(n);
+  card.classList.toggle('offline', !ok); card.classList.remove('warn', 'crit');
+  if (!ok) { value.textContent = '--%'; bar.style.width = '0'; return; }
+  const rounded = Math.max(0, Math.min(100, Math.round(n)));
+  value.textContent = rounded + '%'; bar.style.width = rounded + '%';
+  if (rounded >= critAt) card.classList.add('crit'); else if (rounded >= warnAt) card.classList.add('warn');
+}
+async function loadSystemStatus() {
+  if (SYSMON_BUSY || document.hidden) return;
+  SYSMON_BUSY = true;
+  try {
+    const d = await api('/api/system/status');
+    if (!d.ok) throw new Error(d.error || '状态读取失败');
+    setSystemMetric('cpu', d.cpu && d.cpu.usage, 75, 90);
+    setSystemMetric('mem', d.memory && d.memory.usage, 80, 92);
+    setSystemMetric('disk', d.disk && !d.disk.error ? d.disk.usage : NaN, 85, 95);
+    const load = d.cpu && d.cpu.load || [];
+    $('smd-time').textContent = new Date(d.timestamp).toLocaleTimeString([], { hour12: false });
+    $('smd-cpu').textContent = (d.cpu.model || 'Unknown CPU') + ' · ' + d.cpu.cores + ' 核' + (d.cpu.speedMHz ? ' · ' + d.cpu.speedMHz + ' MHz' : '');
+    $('smd-cpu').title = d.cpu.model || '';
+    $('smd-load').textContent = load.length ? load.map((n) => Number(n).toFixed(2)).join(' / ') + '（1/5/15 分钟）' : 'CPU ' + Math.round(d.cpu.usage || 0) + '%';
+    $('smd-mem').textContent = formatCapacity(d.memory.used) + ' / ' + formatCapacity(d.memory.total) + ' · 可用 ' + formatCapacity(d.memory.free);
+    $('smd-disk').textContent = d.disk.error ? d.disk.error : formatCapacity(d.disk.used) + ' / ' + formatCapacity(d.disk.total) + ' · 剩余 ' + formatCapacity(d.disk.free);
+    $('smd-disk').title = d.disk.mount || '';
+    $('smd-system').textContent = d.system.hostname + ' · ' + d.system.platform + ' · ' + d.system.arch;
+    $('smd-uptime').textContent = formatUptime(d.system.uptime);
+    $('sysmon').title = 'CPU ' + Math.round(d.cpu.usage || 0) + '% · 内存 ' + Math.round(d.memory.usage || 0) + '% · 硬盘 ' + (d.disk.error ? '--' : Math.round(d.disk.usage || 0)) + '%';
+  } catch (_) {
+    setSystemMetric('cpu', NaN, 75, 90); setSystemMetric('mem', NaN, 80, 92); setSystemMetric('disk', NaN, 85, 95);
+    $('smd-time').textContent = '监测暂不可用';
+  } finally { SYSMON_BUSY = false; }
+}
+function toggleSystemDetail(force) {
+  const detail = $('sysmon-detail');
+  detail.classList.toggle('open', force === undefined ? !detail.classList.contains('open') : !!force);
+}
+for (const id of ['sm-cpu', 'sm-mem', 'sm-disk']) $(id).onclick = (e) => { e.stopPropagation(); toggleSystemDetail(); loadSystemStatus(); };
+$('sysmon-detail').onclick = (e) => e.stopPropagation();
+document.addEventListener('click', () => toggleSystemDetail(false));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) loadSystemStatus(); });
+setInterval(loadSystemStatus, 2000);
+loadSystemStatus();
+
 function setSync(on) { $('sync-ind').classList.toggle('off', !on); }
 
 async function refresh(silent) {
@@ -1244,6 +1404,7 @@ async function refresh(silent) {
   SNIPPETS = d.snippets;
   TAGS = d.tags || [];
   FOLDERS = d.folders || [];
+  RESOURCES = d.resources || [];
   invalidateSymIndexes();
   renderTagBar();
   renderTagHead();
@@ -1279,31 +1440,50 @@ function expandAll() { collapsed.clear(); saveCollapsed(); renderList(); }
 
 function buildTree(snippets, folders) {
   // 根：{ name:'', path:'', children:[], snippets:[], level:0 }
-  const root = { name: '', path: '', children: [], snippets: [], level: 0 };
+  const root = { name: '', path: '', children: [], snippets: [], resources: [], level: 0 };
   const nodeByPath = { '': root };
   // 1) 先按完整文件夹结构建节点（含空文件夹），顺序跟随 massCode 的 orderIndex
   for (const f of folders || []) {
     const parent = nodeByPath[f.parent] || root;
-    const node = { path: f.path, name: f.name || f.path.split('/').pop(), id: f.id, children: [], snippets: [], level: parent.level + 1, orderIndex: f.orderIndex };
+    const node = { path: f.path, name: f.name || f.path.split('/').pop(), id: f.id, children: [], snippets: [], resources: [], level: parent.level + 1, orderIndex: f.orderIndex };
     parent.children.push(node);
     nodeByPath[f.path] = node;
   }
   // 2) 把片段挂到对应文件夹（找不到则放根）
   for (const s of snippets) (nodeByPath[s.folder] || root).snippets.push(s);
+  for (const r of RESOURCES) (nodeByPath[r.folder] || root).resources.push(r);
   // 3) 同级排序：orderIndex 优先，其次按名称；并统计子树片段总数
   const sortKids = (n) => {
     n.children.sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0) || a.name.localeCompare(b.name, 'zh'));
     n.children.forEach(sortKids);
-    n.total = n.snippets.length + n.children.reduce((sum, c) => sum + c.total, 0);
+    n.resources.sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+    n.total = n.snippets.length + n.resources.length + n.children.reduce((sum, c) => sum + c.total, 0);
   };
-  root.total = root.snippets.length + root.children.reduce((sum, c) => sum + c.total, 0);
+  root.total = root.snippets.length + root.resources.length + root.children.reduce((sum, c) => sum + c.total, 0);
   sortKids(root);
   return root;
 }
 
+function setTreeDrag(e, type, value) {
+  try {
+    e.dataTransfer.setData('application/x-masscode-' + type, value);
+    e.dataTransfer.setData('text/plain', type + ':' + value);
+    e.dataTransfer.effectAllowed = 'move';
+  } catch (_) {}
+}
+function readTreeDrag(e) {
+  for (const type of ['folder', 'resource', 'snippet']) {
+    try { const value = e.dataTransfer.getData('application/x-masscode-' + type); if (value) return { type, value }; } catch (_) {}
+  }
+  let plain = ''; try { plain = e.dataTransfer.getData('text/plain') || ''; } catch (_) {}
+  const typed = /^(folder|resource|snippet):([\s\S]+)$/.exec(plain);
+  if (typed) return { type: typed[1], value: typed[2] };
+  return plain ? { type: 'snippet', value: plain } : null; // 兼容旧的片段拖拽数据
+}
+
 function itemEl(s) {
   const d = document.createElement('div');
-  d.className = 'item' + (CURRENT && CURRENT.file === s.file ? ' active' : '');
+  d.className = 'item' + (!RESOURCE_CURRENT && CURRENT && CURRENT.file === s.file ? ' active' : '');
   d.style.marginLeft = (12 + s._level * 14) + 'px';
   const tagChips = (s.tags && s.tags.length)
     ? `<div class="tags">${s.tags.map(t => `<span class="tag tag-nm" data-name="${escapeHtml(t)}">#${escapeHtml(t)}</span>`).join('')}</div>` : '';
@@ -1317,7 +1497,7 @@ function itemEl(s) {
   d.title = '拖到其他文件夹可移动所属';
   d.addEventListener('dragstart', (e) => {
     e.stopPropagation();
-    try { e.dataTransfer.setData('text/plain', s.file); e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+    setTreeDrag(e, 'snippet', s.file);
     d.classList.add('dragging');
   });
   d.addEventListener('dragend', () => d.classList.remove('dragging'));
@@ -1332,35 +1512,78 @@ function itemEl(s) {
   return d;
 }
 
+function resourceIcon(r) {
+  if (r.kind === 'fonts') return '🅰️';
+  if (r.ext === '.pdf') return '📕';
+  if (r.kind === 'figures') return '🖼️';
+  if (r.ext === '.bib') return '📚';
+  return '📄';
+}
+function resourceSize(n) {
+  return n < 1024 ? n + ' B' : n < 1024 * 1024 ? (n / 1024).toFixed(1) + ' KB' : (n / 1024 / 1024).toFixed(1) + ' MB';
+}
+function resourceEl(r, level) {
+  const d = document.createElement('div');
+  d.className = 'resource-row' + (RESOURCE_CURRENT && RESOURCE_CURRENT.path === r.path ? ' active' : '');
+  d.style.marginLeft = (12 + level * 14) + 'px';
+  d.innerHTML = '<span class="ricon">' + resourceIcon(r) + '</span><span class="rname">' + escapeHtml(r.name) + '</span><span class="rsize">' + resourceSize(r.size) + '</span>';
+  d.title = r.path; d.onclick = () => openLatexResource(r);
+  d.draggable = true;
+  d.title = r.path + '\n拖到另一个 ' + r.kind + ' 目录可移动所属工程';
+  d.addEventListener('dragstart', (e) => { e.stopPropagation(); setTreeDrag(e, 'resource', r.path); d.classList.add('dragging'); });
+  d.addEventListener('dragend', () => d.classList.remove('dragging'));
+  return d;
+}
+
 function renderTree(root, container) {
   const renderNode = (node, boxContainer) => {
     if (node.path) {
       const isOpen = !collapsed.has(node.path);
+      const resourceFolder = ['data', 'figures', 'fonts'].includes(node.name) && node.path.split('/').length >= 2;
+      const folderIcon = node.name === 'data' ? '🗄️' : node.name === 'figures' ? '🖼️' : node.name === 'fonts' ? '🅰️' : '📁';
       const f = document.createElement('div');
-      f.className = 'fnode';
+      f.className = 'fnode' + (resourceFolder ? ' resource-folder' : '');
       f.style.paddingLeft = (6 + (node.level - 1) * 14) + 'px';
-      f.innerHTML = `<span class="arrow">${isOpen ? '▾' : '▸'}</span><span class="ico">📁</span><span>${escapeHtml(node.name)}</span><span class="count">${node.total}</span><span class="fdel" title="删除文件夹（双重确认）">🗑</span>`;
+      f.innerHTML = `<span class="arrow">${isOpen ? '▾' : '▸'}</span><span class="ico">${folderIcon}</span><span>${escapeHtml(node.name)}</span><span class="count">${node.total}</span>${resourceFolder ? '<span class="fadd" title="上传资源">＋</span>' : ''}<span class="fdel" title="删除文件夹（双重确认）">🗑</span>`;
       f.onclick = () => { isOpen ? collapsed.add(node.path) : collapsed.delete(node.path); saveCollapsed(); renderList(); };
+      if (!resourceFolder) {
+        f.draggable = true;
+        f.title = '拖到其他项目文件夹可调整所属位置';
+        f.addEventListener('dragstart', (e) => { e.stopPropagation(); setTreeDrag(e, 'folder', node.path); f.classList.add('dragging'); });
+        f.addEventListener('dragend', () => f.classList.remove('dragging'));
+      }
       f.querySelector('.fdel').onclick = (e) => { e.stopPropagation(); if (window.__deleteFolder) window.__deleteFolder(node.path, node.name); };
+      const add = f.querySelector('.fadd'); if (add) add.onclick = (e) => { e.stopPropagation(); chooseLatexResource(node.path, node.name); };
       // 拖放：把片段拖到文件夹行 = 移动到该文件夹
       f.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; f.classList.add('drop-target'); });
       f.addEventListener('dragleave', () => f.classList.remove('drop-target'));
       f.addEventListener('drop', (e) => {
         e.preventDefault(); e.stopPropagation();
         f.classList.remove('drop-target');
-        const file = e.dataTransfer.getData('text/plain');
-        if (file) moveSnippet(file, node.path);
+        const drag = readTreeDrag(e);
+        if (!drag) return;
+        if (drag.type === 'snippet') return moveSnippet(drag.value, node.path);
+        if (drag.type === 'folder') {
+          if (resourceFolder) return setStatus('err', '项目文件夹不能放入资源目录');
+          return moveProjectFolder(drag.value, node.path);
+        }
+        if (drag.type === 'resource') {
+          if (!resourceFolder) return setStatus('err', '资源请拖到 data、figures 或 fonts 目录');
+          return moveLatexResource(drag.value, node.path, node.name);
+        }
       });
       boxContainer.appendChild(f);
     }
     const box = document.createElement('div');
     box.className = 'tree-children' + (node.path && collapsed.has(node.path) ? ' hidden' : '');
     for (const s of node.snippets) { s._level = node.level; box.appendChild(itemEl(s)); }
+    for (const r of node.resources) box.appendChild(resourceEl(r, node.level));
     for (const c of node.children) renderNode(c, box);
     if (box.children.length) boxContainer.appendChild(box);
   };
   // 根目录（无文件夹）的片段排最前
   for (const s of root.snippets) { s._level = 0; container.appendChild(itemEl(s)); }
+  for (const r of root.resources) container.appendChild(resourceEl(r, 0));
   for (const c of root.children) renderNode(c, container);
 }
 
@@ -1398,20 +1621,96 @@ function renderList() {
     list.classList.remove('drop-target');
     if (e.target.closest('.fnode')) return;   // 由文件夹行处理
     e.preventDefault();
-    const file = e.dataTransfer.getData('text/plain');
-    if (file) moveSnippet(file, '');
+    const drag = readTreeDrag(e);
+    if (!drag) return;
+    if (drag.type === 'snippet') moveSnippet(drag.value, '');
+    else if (drag.type === 'folder') moveProjectFolder(drag.value, '');
+    else setStatus('err', 'LaTeX 资源必须保留在 data、figures 或 fonts 目录中');
   });
   if (!list.children.length) list.innerHTML = '<div class="empty-state">暂无片段</div>';
 }
+
+function latexRawUrl(path) { return '/api/latex/resource/raw?path=' + encodeURIComponent(path) + '&t=' + Date.now(); }
+function chooseLatexResource(folder, kind) {
+  RESOURCE_UPLOAD_FOLDER = folder;
+  const inp = $('resource-upload');
+  inp.accept = kind === 'figures' ? 'image/*,.pdf,.eps' : kind === 'fonts' ? '.otf,.ttf,.ttc,.woff,.woff2' : '.bib,.tex,.sty,.cls,.csv,.json,.yaml,.yml,.txt';
+  inp.value = ''; inp.click();
+}
+async function openLatexResource(r) {
+  flushSave(); RESOURCE_CURRENT = r; renderList();
+  $('resource-viewer').style.display = 'flex';
+  $('edit-split').style.display = 'none'; $('preview').style.display = 'none'; $('input-area').classList.add('hidden');
+  $('split-h').style.display = 'none'; $('output').style.display = 'none'; $('tabs').innerHTML = '';
+  $('snippet-title').textContent = resourceIcon(r) + ' ' + r.name; $('snippet-desc').textContent = r.path;
+  $('resource-name').textContent = r.name; $('resource-meta').textContent = r.kind + ' · ' + resourceSize(r.size);
+  $('resource-save').style.display = 'none'; $('resource-body').innerHTML = '<span class="empty">正在加载资源…</span>';
+  $('resource-rename').onclick = () => renameLatexResource(r);
+  $('resource-replace').onclick = () => chooseLatexResource(r.folder, r.kind);
+  $('btn-edit').disabled = $('btn-run').disabled = $('btn-check').disabled = $('btn-format').disabled = $('btn-input').disabled = $('btn-info').disabled = true;
+  const raw = latexRawUrl(r.path), ext = r.ext.toLowerCase();
+  if (r.text) {
+    const data = await api('/api/latex/resource?path=' + encodeURIComponent(r.path));
+    if (!data.ok) { $('resource-body').textContent = data.error || '读取失败'; return; }
+    const ta = document.createElement('textarea'); ta.id = 'resource-text'; ta.spellcheck = false; ta.value = data.content || '';
+    $('resource-body').replaceChildren(ta); $('resource-save').style.display = '';
+    $('resource-save').onclick = async () => {
+      const saved = await api('/api/latex/resource/save', { path: r.path, content: ta.value });
+      if (!saved.ok) { setStatus('err', saved.error || '保存失败'); return; }
+      setStatus('ok', '资源已保存'); await refresh(true);
+    };
+  } else if (['.png','.jpg','.jpeg','.gif','.webp','.svg'].includes(ext)) {
+    const img = document.createElement('img'); img.id = 'resource-image'; img.src = raw; img.alt = r.name; $('resource-body').replaceChildren(img);
+  } else if (ext === '.pdf') {
+    const frame = document.createElement('iframe'); frame.id = 'resource-pdf'; frame.src = raw + '#view=FitH'; frame.title = r.name; $('resource-body').replaceChildren(frame);
+  } else if (r.kind === 'fonts') {
+    const family = 'MassCodeResourceFont' + Date.now();
+    const box = document.createElement('div'); box.id = 'resource-font';
+    box.innerHTML = '<div class="sample" contenteditable="true">中文字体预览 · LaTeX Font Preview</div><div class="alphabet">ABCDEFGHIJKLMNOPQRSTUVWXYZ<br>abcdefghijklmnopqrstuvwxyz<br>0123456789 !@#$%^&*()</div>';
+    $('resource-body').replaceChildren(box);
+    try { const face = new FontFace(family, 'url("' + raw + '")'); await face.load(); document.fonts.add(face); box.style.fontFamily = '"' + family + '"'; }
+    catch (_) { box.insertAdjacentHTML('afterbegin', '<span class="empty">浏览器无法加载该字体格式，但 XeLaTeX 仍可通过文件路径使用它。</span>'); }
+  } else {
+    $('resource-body').innerHTML = '<a href="' + raw + '" target="_blank" rel="noopener">打开 / 下载 ' + escapeHtml(r.name) + '</a>';
+  }
+}
+
+async function renameLatexResource(r) {
+  const next = prompt('输入新的资源文件名（可省略扩展名）', r.name);
+  if (next == null || !next.trim() || next.trim() === r.name) return;
+  setStatus('idle', '重命名资源…');
+  const result = await api('/api/latex/resource/rename', { path: r.path, name: next.trim() });
+  if (!result.ok) { setStatus('err', result.error || '重命名失败'); return; }
+  await refresh();
+  const found = RESOURCES.find((x) => x.path === result.path);
+  if (found) await openLatexResource(found);
+  setStatus('ok', '已重命名为 ' + result.name + '；LaTeX 中已有的文件引用请同步修改');
+}
+
+$('resource-back').onclick = () => { RESOURCE_CURRENT = null; $('resource-viewer').style.display = 'none'; renderList(); renderMain(); };
+$('resource-upload').addEventListener('change', () => {
+  const file = $('resource-upload').files && $('resource-upload').files[0];
+  if (!file || !RESOURCE_UPLOAD_FOLDER) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    setStatus('idle', '上传资源…');
+    const result = await api('/api/latex/resource/upload', { folder: RESOURCE_UPLOAD_FOLDER, name: file.name, data: reader.result, replace: true });
+    if (!result.ok) { setStatus('err', result.error || '上传失败'); return; }
+    await refresh(true); setStatus('ok', '已上传 ' + file.name);
+    const found = RESOURCES.find(x => x.path === result.path); if (found) openLatexResource(found);
+  };
+  reader.readAsDataURL(file);
+});
 
 /* --------------------------- 文件系统：新建 / 移动 --------------------------- */
 function currentFolder() { return CURRENT ? (CURRENT.folder || '') : ''; }
 
 $('btn-new-file').onclick = () => openNewDialog('file');
+$('btn-new-latex').onclick = () => openNewDialog('latex_project');
 $('btn-new-folder').onclick = () => openNewDialog('folder');
 
 /* ---------------- 新建文件/文件夹 对话框（支持 类型/标签/说明） ---------------- */
-const ND_LANGS = ['plain_text', 'c_cpp', 'c', 'python', 'javascript', 'typescript', 'java', 'go', 'rust', 'bash', 'shell', 'swift', 'ruby', 'php', 'json', 'json5', 'html', 'css', 'scss', 'less', 'yaml', 'markdown', 'sql'];
+const ND_LANGS = ['plain_text', 'c_cpp', 'c', 'python', 'javascript', 'typescript', 'java', 'go', 'rust', 'bash', 'shell', 'swift', 'ruby', 'php', 'json', 'json5', 'html', 'css', 'scss', 'less', 'yaml', 'markdown', 'latex', 'sql'];
 let ND_MODE = 'file';
 const ND_TAGS = new Set();   // 选中的已有标签 id
 
@@ -1419,10 +1718,11 @@ function openNewDialog(mode) {
   ND_MODE = mode;
   ND_TAGS.clear();
   const isFrag = mode === 'frag';
-  $('nd-title').textContent = mode === 'file' ? '新建文件' : isFrag ? '新增片段' : '新建文件夹';
+  const isLatexProject = mode === 'latex_project';
+  $('nd-title').textContent = isLatexProject ? '新建 LaTeX 工程' : mode === 'file' ? '新建文件' : isFrag ? '新增片段' : '新建文件夹';
   $('nd-hint').textContent = isFrag ? ('添加到：' + (CURRENT ? CURRENT.name : '')) : ('创建位置：' + (currentFolder() || '根目录 code/'));
   $('nd-name').value = '';
-  $('nd-name').placeholder = isFrag ? '片段名（留空自动命名：片段 N）' : (mode === 'file' ? '例如：uart_driver' : '例如：新文件夹');
+  $('nd-name').placeholder = isLatexProject ? '例如：毕业论文、技术报告' : isFrag ? '片段名（留空自动命名：片段 N）' : (mode === 'file' ? '例如：uart_driver' : '例如：新文件夹');
   $('nd-lang-label').textContent = mode === 'folder' ? '默认语言' : '类型 / 语言';
   // 新建文件夹：创建位置可选（父文件夹下拉，根目录 + 全部已有文件夹，按层级缩进）
   const parentSel = $('nd-parent');
@@ -1435,14 +1735,14 @@ function openNewDialog(mode) {
     parentSel.value = currentFolder() || '';
     $('nd-hint').textContent = '创建位置：' + (parentSel.value || '根目录 code/');
   }
-  const fileOnly = mode === 'file';
+  const fileOnly = mode === 'file' || isLatexProject;
   $('nd-delete').style.display = 'none';      // 删除按钮仅编辑信息时可见
   $('nd-tags-lbl').style.display = $('nd-tags-row').style.display = $('nd-desc-lbl').style.display = $('nd-desc').style.display = (fileOnly ? '' : 'none');
   $('nd-tagnew').value = '';
   $('nd-desc').value = '';
   const sel = $('nd-lang');
   if (!sel.options.length) for (const l of ND_LANGS) { const o = document.createElement('option'); o.value = l; o.textContent = l; sel.appendChild(o); }
-  sel.value = 'plain_text';
+  sel.value = isLatexProject ? 'latex' : 'plain_text'; sel.disabled = isLatexProject;
   $('nd-submit').textContent = '创建';
   renderNdTags();
   $('new-dialog').classList.add('open');
@@ -1464,6 +1764,7 @@ function openEditDialog() {
   $('nd-tagnew').value = '';
   $('nd-desc').value = CURRENT.description || '';
   const sel = $('nd-lang');
+  sel.disabled = false;
   if (!sel.options.length) for (const l of ND_LANGS) { const o = document.createElement('option'); o.value = l; o.textContent = l; sel.appendChild(o); }
   sel.value = (CURRENT.fragments[CINDEX] ? CURRENT.fragments[CINDEX].language : 'plain_text') || 'plain_text';
   $('nd-submit').textContent = '保存';
@@ -1497,6 +1798,29 @@ async function submitNewDialog() {
   dialog.classList.remove('open');
   const tagNames = new Set(TAGS.filter((t) => ND_TAGS.has(t.id)).map((t) => t.name));
   $('nd-tagnew').value.split(/[,，;；]/).map((s) => s.trim()).filter(Boolean).forEach((n) => tagNames.add(n));
+  if (ND_MODE === 'latex_project') {
+    tagNames.add('LaTeX');
+    const desc = $('nd-desc').value.trim(), base = currentFolder();
+    const projectFolder = base ? base + '/' + name : name;
+    setStatus('idle', '创建 LaTeX 工程…');
+    const root = await api('/api/fs/mkdir', { path: projectFolder, defaultLanguage: 'latex' });
+    if (!root.ok) { setStatus('err', root.error || '工程文件夹创建失败'); return; }
+    for (const child of ['data', 'figures', 'fonts']) {
+      const made = await api('/api/fs/mkdir', { path: projectFolder + '/' + child, defaultLanguage: child === 'data' ? 'plain_text' : 'latex' });
+      if (!made.ok) { setStatus('err', made.error || child + ' 创建失败'); return; }
+    }
+    const refs = '@article{example,\n  author  = {Author Name},\n  title   = {Reference Title},\n  journal = {Journal Name},\n  year    = {2026}\n}\n';
+    const refSaved = await api('/api/latex/resource/save', { path: projectFolder + '/data/references.bib', content: refs });
+    if (!refSaved.ok) { setStatus('err', refSaved.error || '参考文献文件创建失败'); return; }
+    const made = await api('/api/fs/newfile', { folder: projectFolder, name: 'main', language: 'latex', latexProject: true, description: desc || ('LaTeX 工程：' + name), tags: [...tagNames] });
+    if (!made.ok) { setStatus('err', made.error || 'main.tex 创建失败'); return; }
+    $('nd-lang').disabled = false;
+    await refresh();
+    const n = SNIPPETS.find((s) => s.file === made.file);
+    if (n) { CURRENT = n; CINDEX = 0; collapsed.delete(projectFolder); collapsed.delete(projectFolder + '/data'); collapsed.delete(projectFolder + '/figures'); collapsed.delete(projectFolder + '/fonts'); saveCollapsed(); renderList(); renderMain(); }
+    setStatus('ok', '已创建完整 LaTeX 工程「' + name + '」');
+    return;
+  }
   if (ND_MODE === 'frag') {
     if (!CURRENT) return;
     setStatus('idle', '新增片段…');
@@ -2178,6 +2502,48 @@ async function moveSnippet(file, toFolder) {
   setStatus('ok', '已移动到 ' + (toFolder || '根目录'));
 }
 
+async function moveProjectFolder(folder, toFolder) {
+  if (!folder || folder === toFolder || toFolder.startsWith(folder + '/')) {
+    setStatus('err', '不能把项目文件夹移动到自身内部'); return;
+  }
+  if (!(await waitForPendingSave())) { setStatus('err', '当前代码保存失败，已取消移动'); return; }
+  const currentName = CURRENT && CURRENT.name;
+  const currentFolderPath = CURRENT && CURRENT.folder;
+  const resourcePath = RESOURCE_CURRENT && RESOURCE_CURRENT.path;
+  setStatus('idle', '移动项目文件夹…');
+  const result = await api('/api/fs/move-folder', { folder, toFolder });
+  if (!result.ok) { setStatus('err', result.error || '移动文件夹失败'); return; }
+  const remap = (value) => value === folder ? result.folder : value && value.startsWith(folder + '/') ? result.folder + value.slice(folder.length) : value;
+  const nextCollapsed = new Set();
+  for (const value of collapsed) nextCollapsed.add(remap(value));
+  collapsed.clear(); for (const value of nextCollapsed) collapsed.add(value); saveCollapsed();
+  await refresh();
+  if (currentName && currentFolderPath) {
+    const next = SNIPPETS.find((s) => s.name === currentName && s.folder === remap(currentFolderPath));
+    if (next) { CURRENT = next; CINDEX = 0; }
+  }
+  if (resourcePath) {
+    const nextPath = remap(resourcePath), next = RESOURCES.find((r) => r.path === nextPath);
+    if (next) await openLatexResource(next); else RESOURCE_CURRENT = null;
+  } else { renderList(); renderMain(); }
+  setStatus('ok', '项目文件夹已移动到 ' + (toFolder || '根目录'));
+}
+
+async function moveLatexResource(resourcePath, toFolder, targetKind) {
+  const source = RESOURCES.find((r) => r.path === resourcePath);
+  if (!source) return;
+  if (source.folder === toFolder) return;
+  if (source.kind !== targetKind) { setStatus('err', '该资源只能拖到另一个 ' + source.kind + ' 目录'); return; }
+  setStatus('idle', '移动资源…');
+  const result = await api('/api/latex/resource/move', { path: resourcePath, toFolder });
+  if (!result.ok) { setStatus('err', result.error || '移动资源失败'); return; }
+  await refresh(true);
+  const next = RESOURCES.find((r) => r.path === result.path);
+  if (next && RESOURCE_CURRENT && RESOURCE_CURRENT.path === resourcePath) await openLatexResource(next);
+  else renderList();
+  setStatus('ok', '资源已移动到 ' + toFolder);
+}
+
 /* --------------------------------- Git 面板 ---------------------------------- */
 const GIT_STATUS_LABEL = { M: '改', A: '增', D: '删', '??': '新', R: '移', C: '拷' };
 const GIT_STATUS_CLS = { M: 'st-m', A: 'st-a', D: 'st-d', '??': 'st-u', R: 'st-r', C: 'st-c' };
@@ -2556,6 +2922,25 @@ function renderMarkdownOutline(src) {
     d.onclick = () => jumpToMdHeading(h.line); body.appendChild(d);
   });
 }
+function renderLatexOutline(src) {
+  const body = bodyEl(), q = $('outline-q').value.trim().toLowerCase();
+  const levels = { part: 1, chapter: 1, section: 2, subsection: 3, subsubsection: 4, paragraph: 5, subparagraph: 6 };
+  const all = [];
+  src.split('\n').forEach((ln, idx) => {
+    const m = ln.match(/^\s*\\(part|chapter|section|subsection|subsubsection|paragraph|subparagraph)\*?\s*\{([^}]*)\}/);
+    if (m) all.push({ level: levels[m[1]], kind: m[1], text: m[2].replace(/\\[A-Za-z]+\*?(?:\[[^\]]*\])?/g, '').trim(), line: idx + 1 });
+  });
+  const heads = all.filter(h => !q || h.text.toLowerCase().includes(q));
+  paneCount((q ? heads.length + '/' : '') + all.length + ' 节');
+  if (!heads.length) { body.innerHTML = '<span class="ol-empty">' + (q ? '没有匹配的章节' : '未识别到章节（使用 \\section{...}）') + '</span>'; return; }
+  body.innerHTML = '';
+  heads.forEach(h => {
+    const d = document.createElement('div'); d.className = 'ol-item class'; d.dataset.line = h.line;
+    d.style.paddingLeft = (8 + (h.level - 1) * 14) + 'px';
+    d.innerHTML = '<span class="ol-ico">§</span><span>' + escapeHtml(h.text || h.kind) + '</span><span class="ol-ln">:' + h.line + '</span>';
+    d.onclick = () => jumpToLine(h.line); body.appendChild(d);
+  });
+}
 function renderOutline() { return renderPanelInto('outline', renderOutlineContent); }
 function renderOutlineContent() {
   const f = CURRENT && CURRENT.fragments[CINDEX], body = bodyEl();
@@ -2565,6 +2950,7 @@ function renderOutlineContent() {
   if (!f) { body.innerHTML = '<span class="ol-empty">选择片段后显示代码大纲</span>'; paneCount(''); return; }
   const src = EDITING ? editText() : f.code;
   if (f.language === 'markdown') { renderMarkdownOutline(src); return; }
+  if (f.language === 'latex') { renderLatexOutline(src); return; }
   const q = $('outline-q').value.trim().toLowerCase();
   const all = outlineSymbols().filter(s => OUTLINE_SCOPE === 'all' || s.frag === CINDEX);
   const items = all.filter(s => !q || s.name.toLowerCase().includes(q) || symbolSignature(s).toLowerCase().includes(q));
@@ -2572,7 +2958,7 @@ function renderOutlineContent() {
   if (!items.length) { body.innerHTML = '<span class="ol-empty">' + (q ? '没有匹配的符号' : '未识别到函数、类型、宏或变量') + '</span>'; return; }
   if (OUTLINE_SCOPE === 'all' && !EDITING) {
     CURRENT.fragments.forEach((frag, fi) => {
-      if (frag.language === 'markdown' || frag.language === 'plain_text') return;
+      if (frag.language === 'markdown' || frag.language === 'latex' || frag.language === 'plain_text') return;
       outlineGroup(body, 'file:' + fi, (frag.label || '片段 ' + (fi + 1)) + ' · ' + frag.language,
         items.filter(s => s.frag === fi), outlineRow);
     });
@@ -2587,7 +2973,7 @@ function renderOutlineContent() {
 
 function updateOutlineActive() {
   if (SYM_MODE !== 'outline' || !CURRENT || EDITING) return;
-  const f = CURRENT.fragments[CINDEX]; if (!f || f.language === 'markdown') return;
+  const f = CURRENT.fragments[CINDEX]; if (!f || f.language === 'markdown' || f.language === 'latex') return;
   const cw = $('code-wrap'), lineH = parseFloat(getComputedStyle($('code')).lineHeight) || 20;
   const padTop = parseFloat(getComputedStyle($('code')).paddingTop) || 0;
   const locked = OL_JUMP_LOCK && OL_JUMP_LOCK.frag === CINDEX && performance.now() < OL_JUMP_LOCK.until;
@@ -2819,7 +3205,7 @@ function indexFileVariables(syms, snip, fi, maskedLines) {
 function buildSnippetIndex(snip) {
   const syms = [];
   (snip.fragments || []).forEach((f, fi) => {
-    if (!f || typeof f.code !== 'string' || f.language === 'markdown' || f.language === 'plain_text') return;
+    if (!f || typeof f.code !== 'string' || f.language === 'markdown' || f.language === 'latex' || f.language === 'plain_text') return;
     const lines = f.code.replace(/\r\n/g, '\n').split('\n');
     const maskedLines = maskNonCode(f.code.replace(/\r\n/g, '\n')).split('\n');
     outlineFor(f.code, f.language).forEach(o => {
@@ -3666,7 +4052,7 @@ function parseAiCodeBlocks(text) {
 }
 function aiCodeLanguage(raw) {
   const lang = String(raw || '').toLowerCase();
-  return ({ cpp:'c_cpp', 'c++':'c_cpp', cxx:'c_cpp', hpp:'c_cpp', h:'c_cpp', js:'javascript', jsx:'javascript', ts:'typescript', tsx:'typescript', py:'python', sh:'bash', shell:'bash', yml:'yaml', md:'markdown', text:'plain_text', plaintext:'plain_text' })[lang] || lang || 'plain_text';
+  return ({ cpp:'c_cpp', 'c++':'c_cpp', cxx:'c_cpp', hpp:'c_cpp', h:'c_cpp', js:'javascript', jsx:'javascript', ts:'typescript', tsx:'typescript', py:'python', sh:'bash', shell:'bash', yml:'yaml', md:'markdown', tex:'latex', text:'plain_text', plaintext:'plain_text' })[lang] || lang || 'plain_text';
 }
 /* ---- 轻量 markdown 渲染（零依赖）：AI 回复中的标题/列表/表格/加粗等按 md 显示；用前先 escape，安全注入 ---- */
 function mdInline(s) {
@@ -4444,7 +4830,7 @@ function renderSymbolPaneContent() {
   const body = bodyEl();
   const f = CURRENT && CURRENT.fragments[CINDEX];
   if (!CURRENT || !f) { body.innerHTML = '<span class="ol-empty">选择片段后显示符号</span>'; paneCount(''); return; }
-  if (f.language === 'markdown' || f.language === 'plain_text') { body.innerHTML = '<span class="ol-empty">当前文件不是代码，没有可索引符号</span>'; paneCount(''); return; }
+  if (f.language === 'markdown' || f.language === 'latex' || f.language === 'plain_text') { body.innerHTML = '<span class="ol-empty">当前文件不是代码，没有可索引符号</span>'; paneCount(''); return; }
   if (SYM_SEL) renderSymbolContext(SYM_SEL); else renderSymbolList();
 }
 function renderSymbolList() {
@@ -4525,7 +4911,7 @@ function collectRefs(name, kind) {
   if (REF_CACHE.has(cacheKey)) return REF_CACHE.get(cacheKey);
   const out = [], re = new RegExp('\\b' + escRe(name) + '\\b');
   SNIPPETS.forEach(snip => (snip.fragments || []).forEach((f, fi) => {
-    if (!f || typeof f.code !== 'string' || f.language === 'markdown' || f.language === 'plain_text') return;
+    if (!f || typeof f.code !== 'string' || f.language === 'markdown' || f.language === 'latex' || f.language === 'plain_text') return;
     const raw = f.code.replace(/\r\n/g, '\n').split('\n');
     const masked = maskNonCode(f.code.replace(/\r\n/g, '\n')).split('\n');
     masked.forEach((ln, i) => {
@@ -4553,7 +4939,7 @@ function preferredFunction(name, near) {
 function dynamicDispatchTargets(member, near) {
   const found = new Map(), assign = new RegExp('\\.\\s*' + escRe(member) + '\\s*=\\s*([A-Za-z_]\\w*)', 'g');
   SNIPPETS.forEach(snip => (snip.fragments || []).forEach(f => {
-    if (!f || typeof f.code !== 'string' || f.language === 'markdown' || f.language === 'plain_text') return;
+    if (!f || typeof f.code !== 'string' || f.language === 'markdown' || f.language === 'latex' || f.language === 'plain_text') return;
     const src = maskNonCode(f.code); let m;
     while ((m = assign.exec(src))) {
       const target = preferredFunction(m[1], near);
@@ -4651,7 +5037,7 @@ function relationTreeNode(body, sym, depth, dir, ancestry, root, edge) {
 function allCodeFiles() {
   const out = [];
   SNIPPETS.forEach(snippet => (snippet.fragments || []).forEach((fragment, frag) => {
-    if (fragment && typeof fragment.code === 'string' && fragment.language !== 'markdown' && fragment.language !== 'plain_text')
+    if (fragment && typeof fragment.code === 'string' && fragment.language !== 'markdown' && fragment.language !== 'latex' && fragment.language !== 'plain_text')
       out.push({ snippet, frag, fragment, name: fragment.label || fragment.filename || ('片段 ' + (frag + 1)) });
   }));
   return out;
@@ -4823,7 +5209,7 @@ function renderRelationPaneContent() {
     paneCount(count + ' 个直接关系');
   } else {
     const fragment = CURRENT.fragments[CINDEX];
-    if (fragment.language === 'markdown' || fragment.language === 'plain_text') { body.insertAdjacentHTML('beforeend', '<span class="ol-empty">当前文件没有代码依赖</span>'); paneCount(''); return; }
+    if (fragment.language === 'markdown' || fragment.language === 'latex' || fragment.language === 'plain_text') { body.insertAdjacentHTML('beforeend', '<span class="ol-empty">当前文件没有代码依赖</span>'); paneCount(''); return; }
     const root = { snippet: CURRENT, frag: CINDEX, fragment, name: fragment.label || fragment.filename || ('片段 ' + (CINDEX + 1)) };
     if (REL_LAYOUT === 'graph') { const count = renderFileGraph(body, root); paneCount(count + ' 个直接依赖'); return; }
     const dirs = REL_DIR === 'both' ? [['up','谁包含当前文件'], ['down','当前文件包含了谁']] : [[REL_DIR, REL_DIR === 'up' ? '谁包含当前文件' : '当前文件包含了谁']];
@@ -4882,7 +5268,7 @@ function findBestSymbol(name, line) {
 function onCodeClick(e) {
   if (EDITING) return;
   const f = CURRENT && CURRENT.fragments[CINDEX];
-  if (!f || f.language === 'markdown' || f.language === 'plain_text') return;
+  if (!f || f.language === 'markdown' || f.language === 'latex' || f.language === 'plain_text') return;
   const clickedLine = codeLineAt(e);
   syncRelationRoot(relationFunctionAtLine(clickedLine));
   const t = codeTokenAt(e), sym = t && findBestSymbol(t.word, t.line);
@@ -5021,6 +5407,7 @@ function highlight(code, lang) {
 function select(s) {
   if (DRAW_FILE || DRAW_ROOT) closeDrawEditor(true);   // 打开片段时退出绘图编辑（未保存改动先落盘）
   if (!confirmLeaveEdit()) return false;
+  RESOURCE_CURRENT = null; $('resource-viewer').style.display = 'none';
   CURRENT = s; CINDEX = 0; SYM_SEL = null; REL_ROOT = null; REL_EXPANDED.clear();
   renderList(); renderMain();
   return true;
@@ -5076,6 +5463,8 @@ function renderCode() {
   } else { $('multi-badge').style.display = 'none'; }
   const f = s.fragments[CINDEX];
   const isMd = f && f.language === 'markdown';
+  const isLatex = f && f.language === 'latex';
+  $('code-wrap').classList.toggle('latex-code', !!isLatex);
   applyMmMode();   /* 同步导图按钮态；切换片段后按需保留/退出导图模式（非 md 自动关闭） */
   if (EDITING) {
     // 编辑模式：代码 → 透明 textarea 叠加实时高亮层（直接编辑就是高亮文本）；markdown → 纯文本编辑（右侧渲染预览）
@@ -5088,7 +5477,7 @@ function renderCode() {
       $('code-edit').dataset.fkey = fkey;
     }
     $('code').style.display = isMd ? 'none' : '';
-    $('ln').style.display = isMd ? 'none' : '';          // 代码编辑保留行号列；markdown 编辑不显示
+    $('ln').style.display = isMd ? 'none' : '';          // 代码/LaTeX 编辑保留行号列；markdown 编辑不显示
     $('ln').style.overflow = isMd ? '' : 'hidden';       // 行号列在编辑态时自身可程序化滚动，与编辑内容同步
     $('code-edit').style.display = '';
     $('code-edit').classList.toggle('live-hl', !isMd);
@@ -5108,6 +5497,11 @@ function renderCode() {
   }
   $('btn-edit').disabled = !f;
   $('btn-run').disabled = $('btn-check').disabled = $('btn-format').disabled = $('btn-input').disabled = $('btn-info').disabled = !f;
+  $('btn-run').textContent = isLatex ? '▶ PDF' : '▶';
+  $('btn-run').title = isLatex ? '立即编译并刷新 PDF' : '运行代码';
+  $('btn-check').title = isLatex ? '检查 LaTeX 并刷新 PDF' : '语法检查';
+  $('btn-format').disabled = !f || isLatex;
+  $('btn-input').disabled = !f || isLatex;
   const isHtml = f && f.language === 'html';
   $('btn-preview').style.display = isHtml ? '' : 'none';
   $('btn-preview').disabled = !isHtml;
@@ -5129,11 +5523,68 @@ const HL_LANG = {
   python: 'python', bash: 'bash', shell: 'bash', go: 'go', java: 'java',
   ruby: 'ruby', swift: 'swift', json: 'json', json5: 'json', html: 'xml',
   css: 'css', scss: 'scss', less: 'less', yaml: 'yaml', markdown: 'markdown',
+  latex: 'latex',
   plain_text: 'plaintext',
 };
 
+// highlight.js 的精简离线包不含 LaTeX 语法，单独提供稳定的轻量高亮。
+// 只添加颜色 span，不改变字符、空格和换行，确保与透明 textarea 像素对齐。
+function highlightLatex(code) {
+  let out = '', i = 0, pendingCommand = '';
+  const push = (text, cls) => { out += cls ? '<span class="' + cls + '">' + escapeHtml(text) + '</span>' : escapeHtml(text); };
+  const semanticArg = (command) => {
+    if (/^(?:begin|end)$/.test(command)) return 'tex-env';
+    if (/^(?:documentclass|usepackage|RequirePackage|graphicspath|IfFileExists|addbibresource|bibliography|includegraphics|input|include|setmainfont|setsansfont|setmonofont)$/.test(command)) return 'tex-resource';
+    if (/^(?:title|subtitle|author|part|chapter|section|subsection|subsubsection|paragraph|subparagraph)$/.test(command)) return 'tex-heading';
+    return '';
+  };
+  while (i < code.length) {
+    const c = code[i];
+    if (c === '%' && (i === 0 || code[i - 1] !== '\\')) {
+      let j = code.indexOf('\n', i); if (j < 0) j = code.length;
+      push(code.slice(i, j), 'tex-comment'); pendingCommand = ''; i = j; continue;
+    }
+    if (c === '\\') {
+      let j = i + 1;
+      if (/[A-Za-z@]/.test(code[j] || '')) { while (j < code.length && /[A-Za-z@]/.test(code[j])) j++; if (code[j] === '*') j++; }
+      else if (j < code.length) j++;
+      const raw = code.slice(i, j);
+      pendingCommand = raw.slice(1).replace(/\*$/, '');
+      push(raw, 'tex-command'); i = j; continue;
+    }
+    if (c === '$') {
+      const delimiter = code[i + 1] === '$' ? '$$' : '$';
+      let j = code.indexOf(delimiter, i + delimiter.length);
+      j = j < 0 ? code.length : j + delimiter.length;
+      push(code.slice(i, j), 'tex-math'); pendingCommand = ''; i = j; continue;
+    }
+    if (c === '[' && pendingCommand) {
+      const j = code.indexOf(']', i + 1);
+      if (j >= 0) {
+        push('[', 'tex-delim'); push(code.slice(i + 1, j), 'tex-option'); push(']', 'tex-delim'); i = j + 1; continue;
+      }
+    }
+    if (c === '{') {
+      const cls = semanticArg(pendingCommand), j = cls ? code.indexOf('}', i + 1) : -1;
+      if (j >= 0) {
+        push('{', 'tex-delim'); push(code.slice(i + 1, j), cls); push('}', 'tex-delim');
+        pendingCommand = ''; i = j + 1; continue;
+      }
+      push(c, 'tex-delim'); pendingCommand = ''; i++; continue;
+    }
+    if (c === '}' || c === '[' || c === ']') { push(c, 'tex-delim'); pendingCommand = ''; i++; continue; }
+    if ('&#~_^'.includes(c)) { push(c, 'tex-special'); pendingCommand = ''; i++; continue; }
+    if (/[0-9]/.test(c)) { let j = i + 1; while (j < code.length && /[0-9.]/.test(code[j])) j++; push(code.slice(i, j), 'tex-number'); pendingCommand = ''; i = j; continue; }
+    let j = i + 1;
+    while (j < code.length && !'\\%${}[]&#~_^0123456789'.includes(code[j])) j++;
+    push(code.slice(i, j)); i = j;
+  }
+  return out;
+}
+
 // 优先用 highlight.js（本地资源）；加载失败时回退到内置高亮
 function codeHtml(code, lang) {
+  if (lang === 'latex') return highlightLatex(code);
   if (window.hljs) {
     const l = HL_LANG[lang] || 'plaintext';
     try { return window.hljs.highlight(code, { language: l, ignoreIllegals: true }).value; }
@@ -5283,14 +5734,17 @@ function applyMdView() {
     $('edit-preview').style.display = 'none';
     applyEditSplit(false);
   } else if (EDITING) {
-    // 编辑模式：markdown 左源码 / 右实时渲染（左右并排可拖）；代码直接全宽编辑，无预览
+    // 编辑模式：Markdown/LaTeX 左源码 / 右实时渲染（左右并排可拖）；普通代码全宽编辑
     $('btn-md').style.display = 'none';
     $('md-view').style.display = 'none';
     $('md-view').innerHTML = '';
     $('code-wrap').style.display = '';          /* 关键：编辑时必须显示编辑器（否则 markdown 编辑会整个不可见） */
-    const split = f && f.language === 'markdown';
+    const split = f && (f.language === 'markdown' || f.language === 'latex');
     applyEditSplit(split);
-    if (split) { updateEditPreview(); scheduleSyncMdPreview(); } else $('edit-preview').style.display = 'none';
+    if (split) {
+      updateEditPreview();
+      if (f.language === 'markdown') scheduleSyncMdPreview();
+    } else $('edit-preview').style.display = 'none';
   } else {
     $('md-view').style.display = 'none';
     $('md-view').innerHTML = '';
@@ -5300,7 +5754,7 @@ function applyMdView() {
   }
 }
 
-// 编辑模式左右分栏（仅 markdown）：显示分割条，并应用/重置记忆的源码宽度
+// 编辑模式左右分栏（Markdown / LaTeX）：显示分割条，并应用/重置记忆的源码宽度
 function applyEditSplit(splitMode) {
   $('edit-split-v').style.display = splitMode ? 'block' : 'none';   /* 显式值：CSS 默认是 none，inline '' 无法覆盖 */
   $('code-wrap').style.flex = '';
@@ -5312,12 +5766,101 @@ function applyEditSplit(splitMode) {
   }
 }
 
-// 编辑模式实时预览（仅 markdown）：渲染文档，跟随输入实时更新；代码编辑无预览
+let LATEX_TIMER = 0, LATEX_SEQ = 0, LATEX_PDF_URL = '', LATEX_LAST_OK = '';
+
+function ensureLatexPreview() {
+  const p = $('edit-preview');
+  if (p.dataset.mode === 'latex') return;
+  p.dataset.mode = 'latex';
+  p.classList.remove('md-doc');
+  p.classList.add('latex-preview');
+  p.innerHTML = '<div class="latex-preview-head"><strong>PDF 预览</strong><span id="latex-preview-status">等待编译</span><span class="sp"></span><button id="latex-compile-now" type="button">重新编译</button></div>' +
+    '<div id="latex-preview-empty" class="latex-preview-empty">输入 LaTeX 内容后将自动生成 PDF</div>' +
+    '<iframe id="latex-pdf-frame" class="latex-pdf-frame" title="LaTeX PDF 预览" style="display:none"></iframe>' +
+    '<pre id="latex-preview-error" class="latex-preview-error"></pre>';
+  $('latex-compile-now').onclick = () => compileLatexPreview(true);
+}
+
+function scheduleLatexCompile(delay) {
+  clearTimeout(LATEX_TIMER);
+  LATEX_TIMER = setTimeout(() => compileLatexPreview(false), delay == null ? 650 : delay);
+}
+
+function latexErrorText(r) {
+  const rawError = String((r && r.error) || '');
+  if (/Not Found:\s*\/api\/latex\/compile/i.test(rawError)) {
+    return '当前运行的是旧版后端，尚未加载 LaTeX 编译接口。\n请停止旧的 massCode Runner，重新启动后刷新页面。';
+  }
+  const log = String((r && (r.log || r.reason)) || '');
+  const lines = log.split(/\r?\n/);
+  const useful = lines.filter((line) => /main\.tex:\d+|^! |error|undefined control|emergency stop|fatal/i.test(line));
+  const detail = useful.length ? useful.slice(-24).join('\n') : lines.slice(-30).join('\n');
+  if (rawError && detail && detail !== rawError) return rawError + '\n\n' + detail;
+  return rawError || detail || '未知编译错误';
+}
+
+async function compileLatexPreview(force) {
+  const f = CURRENT && CURRENT.fragments[CINDEX];
+  if (!EDITING || !f || f.language !== 'latex' || MM_ACTIVE) return null;
+  ensureLatexPreview();
+  const code = editText(), fkey = CURRENT.file + '#' + CINDEX, seq = ++LATEX_SEQ;
+  const status = $('latex-preview-status'), err = $('latex-preview-error'), empty = $('latex-preview-empty');
+  if (!force && LATEX_LAST_OK === fkey + '\n' + code && LATEX_PDF_URL) {
+    const frame = $('latex-pdf-frame');
+    if (!frame.getAttribute('src')) frame.src = LATEX_PDF_URL + '#view=FitH&toolbar=1&navpanes=0';
+    frame.style.display = 'block'; empty.style.display = 'none'; err.style.display = 'none';
+    status.textContent = 'PDF 已是最新';
+    return { ok: true, cached: true };
+  }
+  const sameDocument = LATEX_LAST_OK.startsWith(fkey + '\n');
+  if (!sameDocument) {
+    const frame = $('latex-pdf-frame');
+    frame.style.display = 'none'; empty.style.display = 'flex';
+  }
+  status.textContent = '编译中…';
+  err.style.display = 'none'; err.classList.remove('only'); err.textContent = '';
+  if (!LATEX_PDF_URL) empty.style.display = 'flex';
+  let r;
+  try { r = await api('/api/latex/compile', { code, file: CURRENT.file }); }
+  catch (e) { r = { ok: false, error: '无法连接编译服务', log: String(e && e.message || e) }; }
+  const now = CURRENT && CURRENT.fragments[CINDEX];
+  if (seq !== LATEX_SEQ || !EDITING || !now || now.language !== 'latex' || CURRENT.file + '#' + CINDEX !== fkey) return r;
+  if (!r.ok) {
+    status.textContent = r.unsupported ? '缺少 LaTeX 环境' : '编译失败';
+    err.textContent = latexErrorText(r);
+    err.style.display = 'block';
+    if (!LATEX_PDF_URL || !sameDocument) { empty.style.display = 'none'; err.classList.add('only'); }
+    setStatus('err', status.textContent);
+    return r;
+  }
+  const raw = atob(r.pdf), bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  const nextUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  const frame = $('latex-pdf-frame'), oldUrl = LATEX_PDF_URL;
+  LATEX_PDF_URL = nextUrl;
+  LATEX_LAST_OK = fkey + '\n' + code;
+  frame.onload = () => { if (oldUrl) URL.revokeObjectURL(oldUrl); };
+  frame.src = nextUrl + '#view=FitH&toolbar=1&navpanes=0';
+  frame.style.display = 'block'; empty.style.display = 'none'; err.style.display = 'none';
+  status.textContent = (r.engine || 'LaTeX') + ' · ' + (r.pages ? r.pages + ' 页 · ' : '') + ((r.elapsedMs || 0) / 1000).toFixed(2) + 's';
+  setStatus('ok', 'PDF 已更新');
+  return r;
+}
+
+// 编辑模式实时预览：Markdown 直接渲染；LaTeX 防抖编译成 PDF。
 function updateEditPreview() {
   const p = $('edit-preview');
   const f = CURRENT && CURRENT.fragments[CINDEX];
-  if (!EDITING || !f || f.language !== 'markdown') { p.style.display = 'none'; return; }
+  if (!EDITING || !f || (f.language !== 'markdown' && f.language !== 'latex')) { p.style.display = 'none'; return; }
   if (MM_ACTIVE) { p.style.display = 'none'; return; }   /* 导图模式下不弹预览，避免三窗口 */
+  if (f.language === 'latex') {
+    ensureLatexPreview();
+    p.style.display = 'flex';
+    scheduleLatexCompile(LATEX_PDF_URL ? 650 : 80);
+    return;
+  }
+  p.dataset.mode = 'markdown';
+  p.classList.remove('latex-preview');
   p.classList.add('md-doc');
   p.innerHTML = renderMarkdown(editText());
   p.style.display = 'block';
@@ -5631,6 +6174,7 @@ function jumpToMdHeading(line) {
 }
 
 function renderMain() {
+  $('resource-viewer').style.display = 'none';
   renderCode();
   $('preview').style.display = 'none';
   $('edit-split').style.display = '';
@@ -5650,6 +6194,12 @@ function setStatus(kind, text) {
 
 async function doRun() {
   if (!CURRENT) return;
+  const currentFragment = CURRENT.fragments[CINDEX];
+  if (currentFragment && currentFragment.language === 'latex') {
+    if (!EDITING) { EDITING = true; renderCode(); }
+    await compileLatexPreview(true);
+    return;
+  }
   switchOutTab('out');   // 运行结果显示在输出 tab
   const inp = $('input-box').value;
   $('in-status').textContent = inp ? '已传入 ' + inp.split('\n').length + ' 行' : '未使用';
@@ -5677,6 +6227,12 @@ async function doRun() {
 
 async function doCheck() {
   if (!CURRENT) return;
+  const currentFragment = CURRENT.fragments[CINDEX];
+  if (currentFragment && currentFragment.language === 'latex') {
+    if (!EDITING) { EDITING = true; renderCode(); }
+    await compileLatexPreview(true);
+    return;
+  }
   setStatus('idle', '检查中…');
   const body = { file: CURRENT.file, fragment: CINDEX };
   if (EDITING) body.code = editText();
@@ -5729,13 +6285,14 @@ function toggleEdit() {
 }
 
 // Cmd/Ctrl+/ 注释切换（VSCode 风格）：对选中行（无选中则当前行）加/去注释
-// 代码用 // ，markdown 用 #
+// 代码用 //，Markdown 用 #，LaTeX 用 %
 function toggleComment() {
   if (!EDITING) return;
   const f = CURRENT && CURRENT.fragments[CINDEX];
   const isMd = f && f.language === 'markdown';
-  const prefix = isMd ? '#' : '//';
-  const reComment = isMd ? /^\s*#/ : /^\s*\/\//;
+  const isLatex = f && f.language === 'latex';
+  const prefix = isMd ? '#' : isLatex ? '%' : '//';
+  const reComment = isMd ? /^\s*#/ : isLatex ? /^\s*%/ : /^\s*\/\//;
   const ta = $('code-edit');
   const val = ta.value;
   if (!val) return;
@@ -5871,6 +6428,7 @@ function doPreview() {
 
 /* ----------------------------- 底部终端（xterm + PTY） ----------------------------- */
 let term = null, TERM_TAB_OPEN = false, termConnecting = false;
+let TERM_SCAN_BUFFER = '';
 function switchOutTab(which) {
   TERM_TAB_OPEN = which === 'term';
   $('tab-out').classList.toggle('on', which === 'out');
@@ -5920,7 +6478,11 @@ async function termConnect() {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      try { term.write(dec.decode(value, { stream: true })); } catch (_) {}
+      try {
+        const chunk = dec.decode(value, { stream: true });
+        term.write(chunk);
+        scanDeployOutput(chunk);
+      } catch (_) {}
     }
   } catch (_) { st.textContent = '连接断开'; st.className = 'pill err'; }
   termConnecting = false;
@@ -6211,10 +6773,21 @@ async function syncLoop() {
 setInterval(syncLoop, 2500);
 
 // 环境检测面板
-let ENV_DATA = null;
-async function loadEnv(refreshNow) {
+let ENV_DATA = null, ENV_LOADING = false, DEPLOY_RUNNING = false;
+async function loadEnv(refreshNow, quiet) {
+  if (ENV_LOADING) return ENV_DATA;
+  ENV_LOADING = true;
+  const envButton = $('btn-env');
+  envButton.classList.remove('env-ok', 'env-warn');
+  envButton.classList.add('env-checking');
+  try {
   const d = await api('/api/env' + (refreshNow ? '?refresh=1' : ''));
+  if (!d || !d.summary || !d.env) throw new Error((d && d.error) || '环境检测返回异常');
   ENV_DATA = d;
+  envButton.classList.remove('env-checking');
+  envButton.classList.add(d.summary.requiredMissing ? 'env-warn' : 'env-ok');
+  envButton.title = d.summary.requiredMissing ? `当前项目缺失 ${d.summary.requiredMissing} 项环境，点击查看` : '当前项目环境已就绪，点击查看';
+  $('env-last-check').textContent = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
   $('env-ready').textContent = d.summary.requiredReady;
   $('env-missing').textContent = d.summary.requiredMissing;
   $('env-optional').textContent = d.summary.optionalMissing;
@@ -6224,8 +6797,8 @@ async function loadEnv(refreshNow) {
   const deploy = d.deployment || {};
   const deployBtn = $('btn-env-deploy');
   const missingNames = (deploy.missing || []).map((key) => (d.env[key] && d.env[key].label) || key);
-  deployBtn.disabled = !deploy.supported || !deploy.command;
-  deployBtn.textContent = missingNames.length ? '部署 ' + missingNames.length + ' 项缺失工具' : '当前项目环境已就绪';
+  deployBtn.disabled = DEPLOY_RUNNING || !deploy.supported || !deploy.command;
+  deployBtn.textContent = DEPLOY_RUNNING ? '配置进行中…' : (missingNames.length ? '一键配置 ' + missingNames.length + ' 项缺失工具' : '当前项目环境已就绪');
   $('env-deploy-desc').textContent = missingNames.length
     ? '只部署当前 vault 实际用到的缺失项：' + missingNames.join('、') + '。安装过程在终端中显示，需要时可输入 sudo 密码。'
     : '当前项目所需工具均已就绪；下方仍会列出未安装的可选语言环境。';
@@ -6245,6 +6818,21 @@ async function loadEnv(refreshNow) {
       <div class="ver" title="${escapeHtml(t.path || '')}">${t.available ? escapeHtml(t.version || 'ok') : escapeHtml(t.installed ? '需升级' : '缺失')}</div>`;
     list.appendChild(row);
   }
+  return d;
+  } catch (err) {
+    envButton.classList.remove('env-checking', 'env-ok');
+    envButton.classList.add('env-warn');
+    envButton.title = '环境检测失败，点击重试';
+    $('env-last-check').textContent = '检测失败';
+    if (!quiet) {
+      $('env-deploy-desc').textContent = '检测失败：' + (err && err.message ? err.message : String(err));
+      $('env-deploy-state').className = 'err';
+      $('env-deploy-state').textContent = '请确认 Runner 服务正常后重新检测。';
+    }
+    return null;
+  } finally {
+    ENV_LOADING = false;
+  }
 }
 async function sendTermLine(line) {
   for (let i = 0; i < 20; i++) {
@@ -6258,24 +6846,51 @@ async function sendTermLine(line) {
 }
 async function deployCurrentEnv() {
   const deploy = ENV_DATA && ENV_DATA.deployment;
-  if (!deploy || !deploy.command) return;
-  if (ENV_DATA.system && ENV_DATA.system.id === 'win32') {
-    try {
-      await navigator.clipboard.writeText(deploy.command);
-      $('env-deploy-desc').textContent = 'Windows 部署命令已复制，请在 PowerShell 中粘贴执行。';
-    } catch (_) {
-      $('env-deploy-desc').textContent = '请复制下方命令到 PowerShell 执行。';
-    }
-    return;
-  }
+  if (DEPLOY_RUNNING || !deploy || !deploy.command) return;
+  DEPLOY_RUNNING = true;
+  TERM_SCAN_BUFFER = '';
+  $('btn-env-deploy').disabled = true;
+  $('btn-env-deploy').textContent = '配置进行中…';
+  $('env-deploy-state').className = '';
+  $('env-deploy-state').textContent = '已发送到内置终端，完成后将自动重新检测。';
   $('env-panel').classList.remove('open');
   $('output').style.display = 'flex'; $('split-h').style.display = '';
   switchOutTab('term');
   if (term) term.writeln('\r\n\x1b[36m准备部署当前项目缺失环境…\x1b[0m');
   const ok = await sendTermLine(deploy.command);
   if (!ok) {
+    DEPLOY_RUNNING = false;
     setStatus('err', '终端尚未就绪，请打开终端后执行环境面板中的命令');
     $('env-panel').classList.add('open');
+    $('env-deploy-state').className = 'err';
+    $('env-deploy-state').textContent = '命令发送失败，请重试。';
+    loadEnv(false, false);
+  }
+}
+function scanDeployOutput(chunk) {
+  TERM_SCAN_BUFFER = (TERM_SCAN_BUFFER + String(chunk || '')).slice(-1600);
+  const match = TERM_SCAN_BUFFER.match(/__MASSCODE_DEPLOY_DONE__:(-?\d+)/);
+  if (!match) return;
+  TERM_SCAN_BUFFER = '';
+  finishEnvironmentDeploy(Number(match[1]));
+}
+async function finishEnvironmentDeploy(exitCode) {
+  if (!DEPLOY_RUNNING) return;
+  DEPLOY_RUNNING = false;
+  const d = await loadEnv(true, false);
+  $('env-panel').classList.add('open');
+  const state = $('env-deploy-state');
+  const missing = d && d.summary ? d.summary.requiredMissing : null;
+  if (exitCode === 0 && missing === 0) {
+    state.className = 'ok';
+    state.textContent = '✓ 配置完成，当前项目环境已全部就绪。';
+    setStatus('ok', '环境配置完成');
+  } else {
+    state.className = 'err';
+    state.textContent = exitCode === 0
+      ? `命令已执行，但仍有 ${missing == null ? '部分' : missing + ' 项'}环境未就绪，请查看下方说明。`
+      : `配置命令退出码 ${exitCode}，请根据终端输出处理后重新检测。`;
+    setStatus('err', '环境配置未完全成功');
   }
 }
 // 安装提示映射（与服务端一致）
@@ -6284,14 +6899,17 @@ const installHints = {
   gcc: 'xcode-select --install', gpp: 'xcode-select --install', java: 'brew install --cask temurin',
   ruby: 'brew install ruby', swift: 'xcode-select --install', go: 'brew install go',
   clangformat: 'xcode-select --install 或 brew install clang-format', gofmt: 'brew install go',
-  black: 'pip3 install --user black', npx: 'brew install node',
+  black: 'pip3 install --user black', npx: 'brew install node', latex: 'brew install --cask mactex-no-gui',
+  biber: 'brew install --cask mactex-no-gui', ctex: 'brew install --cask mactex-no-gui',
 };
-$('btn-env').onclick = () => { $('env-panel').classList.add('open'); loadEnv(false); };
+$('btn-env').onclick = () => { $('env-panel').classList.add('open'); loadEnv(false, false); };
 $('btn-env-close').onclick = () => $('env-panel').classList.remove('open');
-$('btn-env-refresh').onclick = () => loadEnv(true);
+$('btn-env-refresh').onclick = () => loadEnv(true, false);
 $('btn-env-deploy').onclick = deployCurrentEnv;
 
 refresh(false);
+loadEnv(false, true);
+setInterval(() => loadEnv(true, true), 60000);
 </script>
 
 <!-- 新建文件 / 文件夹 对话框 -->
