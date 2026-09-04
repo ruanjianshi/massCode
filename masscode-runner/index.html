@@ -591,7 +591,7 @@
   .sync-dot { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font-size: 12px; }
   .sync-dot::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); }
   .sync-dot.off::before { background: var(--err); box-shadow: 0 0 6px var(--err); }
-  #env-panel { display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 400px; max-width: 92vw; background: var(--panel); border-left: 1px solid var(--border); z-index: 50; box-shadow: -8px 0 30px rgba(0,0,0,.4); flex-direction: column; }
+  #env-panel { display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 460px; max-width: 94vw; background: var(--panel); border-left: 1px solid var(--border); z-index: 50; box-shadow: -8px 0 30px rgba(0,0,0,.4); flex-direction: column; }
   #env-panel.open { display: flex; }
   #env-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
   #env-head h2 { font-size: 14px; margin: 0; flex: 1; }
@@ -602,14 +602,24 @@
   .env-card.good b { color: var(--ok); }
   .env-card.bad b { color: var(--err); }
   .env-card span { color: var(--dim); font-size: 12px; }
-  .tool-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--panel2); }
-  .tool-row .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .env-card.optional b { color: #d9a441; }
+  .env-deploy { margin: 10px 0 13px; padding: 11px; border: 1px solid rgba(79,140,255,.35); border-radius: 9px; background: rgba(79,140,255,.07); }
+  .env-deploy .title { display:flex; align-items:center; gap:7px; font-size:12px; font-weight:650; }
+  .env-deploy .desc { margin:5px 0 8px; color:var(--dim); font-size:11px; line-height:1.55; }
+  .env-deploy button { width:100%; border-color:rgba(79,140,255,.6); color:#b9d3ff; }
+  .env-deploy button:disabled { opacity:.55; cursor:default; }
+  #env-deploy-command { display:block; margin-top:7px; padding:6px 8px; max-height:54px; overflow:auto; border-radius:6px; background:rgba(0,0,0,.24); color:#8592a4; font:10px/1.45 var(--mono); word-break:break-all; white-space:pre-wrap; }
+  .tool-row { display: grid; grid-template-columns: 10px minmax(0,1fr); column-gap: 10px; row-gap: 3px; align-items: center; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: var(--panel2); overflow: hidden; }
+  .tool-row.optional { opacity:.72; }
+  .tool-row .dot { grid-column:1; grid-row:1 / span 2; width: 10px; height: 10px; border-radius: 50%; align-self:center; }
   .tool-row .dot.ok { background: var(--ok); }
   .tool-row .dot.bad { background: var(--err); }
-  .tool-row .info { flex: 1; min-width: 0; }
-  .tool-row .info .nm { font-weight: 600; }
-  .tool-row .info .sub { color: var(--dim); font-size: 12px; }
-  .tool-row .ver { color: var(--accent); font: 11px var(--mono); white-space: nowrap; }
+  .tool-row .info { grid-column:2; min-width:0; overflow:hidden; }
+  .tool-row .info .nm { display:flex; align-items:center; min-width:0; font-weight:600; white-space:nowrap; }
+  .tool-row .scope { display:inline-block; margin-left:6px; padding:1px 5px; border-radius:8px; color:var(--accent); background:rgba(79,140,255,.1); font-size:9px; font-weight:500; vertical-align:1px; }
+  .tool-row.optional .scope { color:var(--dim); background:rgba(255,255,255,.05); }
+  .tool-row .info .sub { color: var(--dim); font-size: 11px; line-height:1.45; white-space:normal; word-break:normal; overflow-wrap:anywhere; }
+  .tool-row .ver { grid-column:2; min-width:0; max-width:100%; color: var(--accent); font: 10px/1.4 var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.9; }
   .hint { color: var(--err); font-size: 12px; font-family: var(--mono); word-break: break-all; }
   /* ---- Source Insight 阅读模式：符号面板 / 全局检索 ---- */
   #sym-tabs { display: flex; gap: 6px; padding: 6px 10px 0; }
@@ -1184,10 +1194,17 @@
   </div>
   <div id="env-body">
     <div class="env-summary">
-      <div class="env-card good"><b id="env-ready">–</b><span>就绪</span></div>
-      <div class="env-card bad"><b id="env-missing">–</b><span>缺失</span></div>
+      <div class="env-card good"><b id="env-ready">–</b><span>项目就绪</span></div>
+      <div class="env-card bad"><b id="env-missing">–</b><span>待部署</span></div>
+      <div class="env-card optional"><b id="env-optional">–</b><span>可选缺失</span></div>
     </div>
     <div id="env-meta" style="color:var(--dim);font-size:12px;margin-bottom:10px"></div>
+    <div class="env-deploy">
+      <div class="title">🚀 一键部署当前项目环境</div>
+      <div id="env-deploy-desc" class="desc">正在生成部署方案…</div>
+      <button id="btn-env-deploy" disabled>部署缺失工具</button>
+      <code id="env-deploy-command"></code>
+    </div>
     <div id="env-list"></div>
   </div>
 </div>
@@ -6194,21 +6211,71 @@ async function syncLoop() {
 setInterval(syncLoop, 2500);
 
 // 环境检测面板
+let ENV_DATA = null;
 async function loadEnv(refreshNow) {
   const d = await api('/api/env' + (refreshNow ? '?refresh=1' : ''));
-  $('env-ready').textContent = d.summary.ready;
-  $('env-missing').textContent = d.summary.missing;
-  $('env-meta').innerHTML = `Vault: <code style="font-size:11px">${escapeHtml(d.vault)}</code><br>平台: ${escapeHtml(d.platform)}`;
+  ENV_DATA = d;
+  $('env-ready').textContent = d.summary.requiredReady;
+  $('env-missing').textContent = d.summary.requiredMissing;
+  $('env-optional').textContent = d.summary.optionalMissing;
+  const pm = d.system && d.system.packageManager ? ' · 包管理器 ' + d.system.packageManager : '';
+  const langs = d.project && d.project.languages && d.project.languages.length ? d.project.languages.join(' / ') : '仅文档';
+  $('env-meta').innerHTML = `Vault: <code style="font-size:11px">${escapeHtml(d.vault)}</code><br>平台: ${escapeHtml(d.platform + pm)}<br>项目语言: ${escapeHtml(langs)}`;
+  const deploy = d.deployment || {};
+  const deployBtn = $('btn-env-deploy');
+  const missingNames = (deploy.missing || []).map((key) => (d.env[key] && d.env[key].label) || key);
+  deployBtn.disabled = !deploy.supported || !deploy.command;
+  deployBtn.textContent = missingNames.length ? '部署 ' + missingNames.length + ' 项缺失工具' : '当前项目环境已就绪';
+  $('env-deploy-desc').textContent = missingNames.length
+    ? '只部署当前 vault 实际用到的缺失项：' + missingNames.join('、') + '。安装过程在终端中显示，需要时可输入 sudo 密码。'
+    : '当前项目所需工具均已就绪；下方仍会列出未安装的可选语言环境。';
+  $('env-deploy-command').textContent = deploy.command || (deploy.supported ? '无需执行部署命令' : '当前平台暂不支持自动部署');
   const list = $('env-list'); list.innerHTML = '';
-  const tools = Object.values(d.env).sort((a, b) => (a.available === b.available ? 0 : a.available ? 1 : -1));
+  const tools = Object.values(d.env).sort((a, b) => {
+    if (a.required !== b.required) return a.required ? -1 : 1;
+    if (a.available !== b.available) return a.available ? 1 : -1;
+    return String(a.group || '').localeCompare(String(b.group || ''));
+  });
   for (const t of tools) {
     const row = document.createElement('div');
-    row.className = 'tool-row';
-    const hint = t.available ? '' : `<div class="hint">⚠ ${escapeHtml(t.label)} 缺失 · ${escapeHtml(t.for)}<br>安装: ${escapeHtml(t.hint || installHints[t.key] || '')}</div>`;
+    row.className = 'tool-row' + (t.required ? '' : ' optional');
+    const hint = t.available ? '' : `<div class="hint">⚠ ${escapeHtml(t.label)}：${escapeHtml(t.issue || '缺失')} · ${escapeHtml(t.for)}<br>安装: ${escapeHtml(t.hint || installHints[t.key] || '')}</div>`;
     row.innerHTML = `<div class="dot ${t.available ? 'ok' : 'bad'}"></div>
-      <div class="info"><div class="nm">${escapeHtml(t.label)}</div><div class="sub">${escapeHtml(t.for)}</div>${hint}</div>
-      <div class="ver">${t.available ? escapeHtml(t.version || 'ok') : '缺失'}</div>`;
+      <div class="info"><div class="nm">${escapeHtml(t.label)}<span class="scope">${t.required ? '当前项目' : '可选'}</span></div><div class="sub">${escapeHtml(t.group || '')} · ${escapeHtml(t.for)}</div>${hint}</div>
+      <div class="ver" title="${escapeHtml(t.path || '')}">${t.available ? escapeHtml(t.version || 'ok') : escapeHtml(t.installed ? '需升级' : '缺失')}</div>`;
     list.appendChild(row);
+  }
+}
+async function sendTermLine(line) {
+  for (let i = 0; i < 20; i++) {
+    try {
+      const r = await api('/api/term/input', { data: line + '\n' });
+      if (r.ok) return true;
+    } catch (_) {}
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  return false;
+}
+async function deployCurrentEnv() {
+  const deploy = ENV_DATA && ENV_DATA.deployment;
+  if (!deploy || !deploy.command) return;
+  if (ENV_DATA.system && ENV_DATA.system.id === 'win32') {
+    try {
+      await navigator.clipboard.writeText(deploy.command);
+      $('env-deploy-desc').textContent = 'Windows 部署命令已复制，请在 PowerShell 中粘贴执行。';
+    } catch (_) {
+      $('env-deploy-desc').textContent = '请复制下方命令到 PowerShell 执行。';
+    }
+    return;
+  }
+  $('env-panel').classList.remove('open');
+  $('output').style.display = 'flex'; $('split-h').style.display = '';
+  switchOutTab('term');
+  if (term) term.writeln('\r\n\x1b[36m准备部署当前项目缺失环境…\x1b[0m');
+  const ok = await sendTermLine(deploy.command);
+  if (!ok) {
+    setStatus('err', '终端尚未就绪，请打开终端后执行环境面板中的命令');
+    $('env-panel').classList.add('open');
   }
 }
 // 安装提示映射（与服务端一致）
@@ -6222,6 +6289,7 @@ const installHints = {
 $('btn-env').onclick = () => { $('env-panel').classList.add('open'); loadEnv(false); };
 $('btn-env-close').onclick = () => $('env-panel').classList.remove('open');
 $('btn-env-refresh').onclick = () => loadEnv(true);
+$('btn-env-deploy').onclick = deployCurrentEnv;
 
 refresh(false);
 </script>

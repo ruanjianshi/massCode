@@ -13,7 +13,8 @@ const os = require('os');
 const { spawn, execFile, execFileSync } = require('child_process');
 
 const PORT = Number(process.env.MASSCODE_RUNNER_PORT || 4877);
-const HOST = '127.0.0.1';
+// 默认仅本机访问；显式设置 MASSCODE_RUNNER_HOST=0.0.0.0 时允许局域网访问。
+const HOST = process.env.MASSCODE_RUNNER_HOST || '127.0.0.1';
 
 /* ---------------------------------- 路径发现 ---------------------------------- */
 
@@ -78,36 +79,122 @@ function pythonCmd() {
 }
 
 const TOOLS = [
-  { key: 'node',       probe: ['node', '--version'],            label: 'Node.js',              for: 'JS / TS 运行' },
-  { key: 'python3',    probe: () => [pythonCmd(), '--version'], label: 'Python 3',             for: 'Python 运行/检查' },
-  { key: 'bash',       probe: ['bash', '--version'],            label: 'Bash',                 for: 'Bash 运行/检查' },
-  { key: 'gcc',        probe: ['gcc', '--version'],             label: 'GCC（C 编译）',         for: 'C 运行/检查' },
-  { key: 'gpp',        probe: ['g++', '--version'],             label: 'G++（C++ 编译）',       for: 'C++ 运行/检查' },
-  { key: 'java',       probe: ['java', '--version'],            label: 'Java',                 for: 'Java 运行/检查' },
-  { key: 'ruby',       probe: ['ruby', '--version'],            label: 'Ruby',                 for: 'Ruby 运行/检查' },
-  { key: 'swift',      probe: ['swift', '--version'],           label: 'Swift',                for: 'Swift 运行/检查' },
-  { key: 'go',         probe: ['go', 'version'],                label: 'Go',                   for: 'Go 运行/检查' },
-  { key: 'clangformat', probe: ['clang-format', '--version'],   label: 'clang-format',         for: 'C/C++ 格式化' },
-  { key: 'gofmt',      probe: ['gofmt', '-h'],                  label: 'gofmt',                for: 'Go 格式化' },
-  { key: 'black',      probe: () => [pythonCmd(), '-m', 'black', '--version'], label: 'black', for: 'Python 格式化' },
-  { key: 'npx',        probe: ['npx', '--version'],             label: 'npx（Prettier）',       for: 'JS/TS/JSON/HTML 等格式化' },
+  { key: 'node',       probe: ['node', '--version'],            label: 'Node.js',              for: 'Runner / JS / TS', group: '基础环境', minMajor: 18 },
+  { key: 'python3',    probe: () => [pythonCmd(), '--version'], label: 'Python 3',             for: 'Python 运行/检查与交互终端', group: '运行环境', minMajor: 3 },
+  { key: 'bash',       probe: ['bash', '--version'],            label: 'Bash',                 for: 'Shell 运行/部署脚本', group: '运行环境' },
+  { key: 'gcc',        probe: ['gcc', '--version'],             label: 'GCC（C 编译）',         for: 'C 运行/检查', group: '编译工具链' },
+  { key: 'gpp',        probe: ['g++', '--version'],             label: 'G++（C++ 编译）',       for: 'C++ 运行/检查', group: '编译工具链' },
+  { key: 'java',       probe: ['javac', '--version'],           label: 'Java JDK',             for: 'Java 运行/检查', group: '运行环境', minMajor: 11 },
+  { key: 'ruby',       probe: ['ruby', '--version'],            label: 'Ruby',                 for: 'Ruby 运行/检查', group: '运行环境' },
+  { key: 'swift',      probe: ['swift', '--version'],           label: 'Swift',                for: 'Swift 运行/检查', group: '运行环境' },
+  { key: 'go',         probe: ['go', 'version'],                label: 'Go',                   for: 'Go 运行/检查', group: '运行环境' },
+  { key: 'clangformat', probe: ['clang-format', '--version'],   label: 'clang-format',         for: 'C/C++ 格式化', group: '格式化工具' },
+  { key: 'gofmt',      probe: ['gofmt', '-h'],                  label: 'gofmt',                for: 'Go 格式化', group: '格式化工具' },
+  { key: 'black',      probe: () => [pythonCmd(), '-m', 'black', '--version'], label: 'black', for: 'Python 格式化', group: '格式化工具' },
+  { key: 'npx',        probe: ['npx', '--version'],             label: 'npx（Prettier）',       for: '前端/文档格式化', group: '格式化工具' },
 ];
+
+const TOOLS_BY_LANGUAGE = {
+  javascript: ['node', 'npx'], typescript: ['node', 'npx'],
+  python: ['python3', 'black'], bash: ['bash', 'npx'], shell: ['bash', 'npx'],
+  c: ['gcc', 'clangformat'], c_cpp: ['gcc', 'gpp', 'clangformat'],
+  java: ['java'], ruby: ['ruby'], swift: ['swift'], go: ['go', 'gofmt'],
+  json: ['npx'], json5: ['npx'], html: ['npx'], css: ['npx'], scss: ['npx'],
+  less: ['npx'], yaml: ['npx'], markdown: ['npx'],
+};
+
+function projectToolKeys() {
+  const keys = new Set(['node']);
+  const languages = new Set();
+  try {
+    for (const s of walkSnippets()) for (const f of (s.fragments || [])) {
+      const lang = String(f.language || '').toLowerCase();
+      if (!lang || lang === 'plain_text') continue;
+      languages.add(lang);
+      for (const key of (TOOLS_BY_LANGUAGE[lang] || [])) keys.add(key);
+    }
+  } catch (_) { /* vault 尚未就绪时至少检测 Node */ }
+  return { keys, languages: [...languages].sort() };
+}
+
+function executablePath(cmd) {
+  try {
+    const finder = process.platform === 'win32' ? 'where' : 'which';
+    return execFileSync(finder, [cmd], { encoding: 'utf8', timeout: 3000 }).split(/\r?\n/)[0].trim();
+  } catch (_) { return ''; }
+}
+
+function readLinuxRelease() {
+  if (process.platform !== 'linux') return {};
+  try {
+    const text = fs.readFileSync('/etc/os-release', 'utf8');
+    const data = {};
+    for (const line of text.split(/\r?\n/)) {
+      const m = /^([A-Z0-9_]+)=(.*)$/.exec(line);
+      if (m) data[m[1]] = m[2].replace(/^['"]|['"]$/g, '');
+    }
+    return data;
+  } catch (_) { return {}; }
+}
+
+function platformInfo() {
+  const rel = readLinuxRelease();
+  const packageManager = ['apt-get', 'dnf', 'yum', 'pacman', 'zypper', 'apk'].find(executablePath) || '';
+  let variant = process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : (rel.PRETTY_NAME || rel.NAME || 'Linux');
+  let isWsl = false;
+  if (process.platform === 'linux') {
+    try { isWsl = /microsoft/i.test(os.release() + ' ' + fs.readFileSync('/proc/version', 'utf8')); } catch (_) {}
+    if (isWsl) variant += '（WSL）';
+  }
+  return {
+    id: process.platform, arch: process.arch, label: variant,
+    release: os.release(), distro: rel.ID || '', distroLike: rel.ID_LIKE || '',
+    packageManager, isWsl,
+  };
+}
+
+function shellQuote(value) { return "'" + String(value).replace(/'/g, "'\\''") + "'"; }
+
+function deploymentInfo(env, requiredKeys) {
+  const missing = [...requiredKeys].filter((key) => env[key] && !env[key].available);
+  const script = process.platform === 'win32' ? path.join(__dirname, 'deploy-env.ps1') : path.join(__dirname, 'deploy-env.sh');
+  const supported = fs.existsSync(script) && (process.platform === 'darwin' || process.platform === 'linux' || process.platform === 'win32');
+  let command = '';
+  if (supported && missing.length) {
+    command = process.platform === 'win32'
+      ? 'powershell -NoProfile -ExecutionPolicy Bypass -File "' + script.replace(/"/g, '""') + '" ' + missing.join(' ')
+      : 'bash ' + shellQuote(script) + ' ' + missing.map(shellQuote).join(' ');
+  }
+  return { supported, command, missing, script, needsTerminal: true };
+}
 
 let envCache = null;
 async function detectEnv() {
+  const project = projectToolKeys();
   const results = await Promise.all(TOOLS.map((t) => new Promise((resolve) => {
     const cmd = typeof t.probe === 'function' ? t.probe() : t.probe;
-    execFile(cmd[0], cmd.slice(1), { timeout: 15000 }, (err, stdout) => {
+    const started = Date.now();
+    execFile(cmd[0], cmd.slice(1), { timeout: 15000 }, (err, stdout, stderr) => {
+      const rawVersion = !err ? String(stdout || stderr || '').split(/\r?\n/)[0].trim().slice(0, 80) : '';
+      const majorMatch = rawVersion.match(/\d+/);
+      const major = majorMatch ? Number(majorMatch[0]) : null;
+      const versionOk = !t.minMajor || (major != null && major >= t.minMajor);
       resolve({
-        key: t.key, label: t.label, for: t.for,
-        available: !err,
-        version: !err ? String(stdout || '').split('\n')[0].trim().slice(0, 60) : '',
+        key: t.key, label: t.label, for: t.for, group: t.group,
+        available: !err && versionOk,
+        installed: !err,
+        required: project.keys.has(t.key),
+        version: rawVersion,
+        minVersion: t.minMajor ? String(t.minMajor) + '+' : '',
+        issue: !err && !versionOk ? '版本过低，需要 ' + t.minMajor + '+' : (!err ? '' : '未安装或不在 PATH'),
+        path: !err ? executablePath(cmd[0]) : '',
+        elapsedMs: Date.now() - started,
       });
     });
   })));
   const map = {};
   for (const r of results) map[r.key] = r;
-  return map;
+  return { tools: map, project };
 }
 async function getEnv(force) {
   if (force || !envCache) envCache = await detectEnv();
@@ -115,31 +202,51 @@ async function getEnv(force) {
 }
 
 // 给某工具缺失时的安装提示（按平台给不同命令）
+function linuxInstallHint(key) {
+  const pm = platformInfo().packageManager || 'apt-get';
+  const packages = {
+    'apt-get': { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'build-essential', gpp:'build-essential', java:'default-jdk', ruby:'ruby', go:'golang-go', clangformat:'clang-format', gofmt:'golang-go', npx:'npm' },
+    dnf: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-21-openjdk-devel', ruby:'ruby', go:'golang', clangformat:'clang-tools-extra', gofmt:'golang', npx:'npm' },
+    yum: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-17-openjdk-devel', ruby:'ruby', go:'golang', clangformat:'clang', gofmt:'golang', npx:'npm' },
+    pacman: { node:'nodejs npm', python3:'python python-pip', bash:'bash', gcc:'base-devel', gpp:'base-devel', java:'jdk-openjdk', ruby:'ruby', go:'go', clangformat:'clang', gofmt:'go', npx:'npm' },
+    zypper: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-17-openjdk-devel', ruby:'ruby', go:'go', clangformat:'clang-tools', gofmt:'go', npx:'npm' },
+    apk: { node:'nodejs npm', python3:'python3 py3-pip', bash:'bash', gcc:'build-base', gpp:'build-base', java:'openjdk17', ruby:'ruby', go:'go', clangformat:'clang-extra-tools', gofmt:'go', npx:'npm' },
+  };
+  if (key === 'swift') return '从 swift.org 安装对应 Linux 工具链';
+  if (key === 'black') return 'python3 -m pip install --user black';
+  const pkg = (packages[pm] || packages['apt-get'])[key];
+  if (!pkg) return '请使用系统包管理器安装 ' + key;
+  if (pm === 'pacman') return 'sudo pacman -S --needed ' + pkg;
+  if (pm === 'apk') return 'sudo apk add ' + pkg;
+  return 'sudo ' + pm + ' install -y ' + pkg;
+}
+
 function installHint(key) {
   const win = process.platform === 'win32';
   const lin = process.platform === 'linux';
   const mac = !win && !lin;
   const H = {
-    node: mac ? 'brew install node' : win ? 'winget install OpenJS.NodeJS.LTS（或 nodejs.org 下载）' : 'apt install nodejs（或装 nvm）',
-    python3: mac ? 'brew install python' : win ? 'winget install Python.Python.3.12（自带 python 命令）' : 'apt install python3',
-    bash: mac ? '系统自带' : win ? '安装 Git Bash 或启用 WSL（Windows 默认无 bash）' : '系统自带',
-    gcc: mac ? 'xcode-select --install' : win ? '安装 MinGW-w64 或 Visual Studio 的 C/C++ 工具' : 'apt install gcc',
-    gpp: mac ? 'xcode-select --install' : win ? '安装 MinGW-w64 或 Visual Studio 的 C/C++ 工具' : 'apt install g++',
-    java: mac ? 'brew install --cask temurin' : win ? 'winget install EclipseAdoptium.Temurin.21.JDK' : 'apt install default-jdk',
-    ruby: mac ? 'brew install ruby' : win ? '安装 RubyInstaller（rubyinstaller.org）' : 'apt install ruby',
+    node: mac ? 'brew install node' : win ? 'winget install OpenJS.NodeJS.LTS（或 nodejs.org 下载）' : linuxInstallHint(key),
+    python3: mac ? 'brew install python' : win ? 'winget install Python.Python.3.12（自带 python 命令）' : linuxInstallHint(key),
+    bash: mac ? '系统自带' : win ? '安装 Git Bash 或启用 WSL（Windows 默认无 bash）' : linuxInstallHint(key),
+    gcc: mac ? 'xcode-select --install' : win ? '安装 MinGW-w64 或 Visual Studio 的 C/C++ 工具' : linuxInstallHint(key),
+    gpp: mac ? 'xcode-select --install' : win ? '安装 MinGW-w64 或 Visual Studio 的 C/C++ 工具' : linuxInstallHint(key),
+    java: mac ? 'brew install --cask temurin' : win ? 'winget install EclipseAdoptium.Temurin.21.JDK' : linuxInstallHint(key),
+    ruby: mac ? 'brew install ruby' : win ? '安装 RubyInstaller（rubyinstaller.org）' : linuxInstallHint(key),
     swift: mac ? 'xcode-select --install' : win ? 'Swift 官方 Windows 工具链（实验性）' : 'swift.org 工具链',
-    go: mac ? 'brew install go' : win ? 'winget install GoLang.Go' : 'apt install golang',
-    clangformat: mac ? 'xcode-select --install 或 brew install clang-format' : win ? '安装 LLVM（releases.llvm.org）' : 'apt install clang-format',
-    gofmt: mac ? 'brew install go（自带 gofmt）' : win ? '安装 Go（自带 gofmt）' : 'apt install golang（自带 gofmt）',
-    black: mac ? 'pip3 install --user black' : win ? (pythonCmd() === 'py' ? 'py -m pip install black' : 'python -m pip install black') : 'pip3 install black',
-    npx: mac ? 'brew install node（自带 npx）' : win ? '安装 Node.js（自带 npx）' : 'apt install nodejs（自带 npx）',
+    go: mac ? 'brew install go' : win ? 'winget install GoLang.Go' : linuxInstallHint(key),
+    clangformat: mac ? 'xcode-select --install 或 brew install clang-format' : win ? '安装 LLVM（releases.llvm.org）' : linuxInstallHint(key),
+    gofmt: mac ? 'brew install go（自带 gofmt）' : win ? '安装 Go（自带 gofmt）' : linuxInstallHint(key),
+    black: mac ? 'pip3 install --user black' : win ? (pythonCmd() === 'py' ? 'py -m pip install black' : 'python -m pip install black') : linuxInstallHint(key),
+    npx: mac ? 'brew install node（自带 npx）' : win ? '安装 Node.js（自带 npx）' : linuxInstallHint(key),
   };
   return H[key] || '请安装对应工具';
 }
 
-function missingReason(key) {
+function missingReason(key, detected) {
   const t = TOOLS.find((x) => x.key === key);
-  return '本机缺少 ' + (t ? t.label : key) + '（用于 ' + (t ? t.for : '') + '）。安装: ' + installHint(key);
+  const issue = detected && detected.issue ? detected.issue : '未安装或不在 PATH';
+  return (t ? t.label : key) + '不可用：' + issue + '（用于 ' + (t ? t.for : '') + '）。安装/升级: ' + installHint(key);
 }
 
 /* --------------------------------- frontmatter 解析 -------------------------------- */
@@ -531,8 +638,8 @@ const LANGUAGE_MAP = {
 
 // 环境守卫：缺工具时返回明确提示，而不是晦涩的 spawn 报错
 async function guard(key, fn) {
-  const env = await getEnv();
-  if (!env[key] || !env[key].available) return { ok: false, unsupported: true, reason: missingReason(key) };
+  const { tools: env } = await getEnv();
+  if (!env[key] || !env[key].available) return { ok: false, unsupported: true, reason: missingReason(key, env[key]) };
   return fn();
 }
 
@@ -765,7 +872,7 @@ function formatWithBlack(code) {
   // black 就地改写文件；--line-length 100 减少意外换行
   const { dir, file } = writeTemp('format.py', code);
   return new Promise((resolve) => {
-    execFile('python3', ['-m', 'black', '--quiet', '--line-length', '100', file], { timeout: 30000 }, (err, stdout, stderr) => {
+    execFile(pythonCmd(), ['-m', 'black', '--quiet', '--line-length', '100', file], { timeout: 30000 }, (err, stdout, stderr) => {
       let formatted;
       if (!err) { try { formatted = fs.readFileSync(file, 'utf8'); } catch (_) { formatted = null; } }
       try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
@@ -919,10 +1026,14 @@ function reorderFragments(file, order) {
 let TERM = null;   // 当前终端会话 { child, res }
 function termSpawn() {
   try {
-    const shell = process.env.SHELL || '/bin/bash';
-    // ptybridge.py 用 python3 pty.fork 分配真实伪终端，双向转发 stdin/stdout
+    const shell = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || '/bin/bash');
+    const py = process.platform === 'win32' ? '' : executablePath(pythonCmd());
+    // Unix 优先用 ptybridge 获得真实交互终端（sudo 可输入密码）；缺 Python 时回退普通交互 shell。
+    // Windows 使用 PowerShell 管道模式，至少保证环境部署命令和常规命令可执行。
     const bridge = path.join(__dirname, 'ptybridge.py');
-    const child = spawn('python3', ['-u', bridge], { env: { ...process.env, SHELL: shell } });
+    const command = py ? py : shell;
+    const args = py ? ['-u', bridge] : (process.platform === 'win32' ? ['-NoLogo', '-NoProfile'] : ['-i']);
+    const child = spawn(command, args, { cwd: __dirname, env: { ...process.env, SHELL: shell } });
     TERM = { child, res: null };
     child.stdout.on('data', (d) => { if (TERM && TERM.res) { try { TERM.res.write(d); } catch (_) {} } });
     child.stderr.on('data', (d) => { if (TERM && TERM.res) { try { TERM.res.write(d); } catch (_) {} } });
@@ -1068,15 +1179,27 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && u.pathname === '/api/env') {
       const force = u.searchParams.get('refresh') === '1';
-      const env = await getEnv(force);
-      const missing = Object.values(env).filter((e) => !e.available).length;
-      const total = Object.keys(env).length;
-      for (const e of Object.values(env)) e.hint = installHint(e.key); // 按当前平台给安装提示
+      const detected = await getEnv(force);
+      const env = detected.tools;
+      const all = Object.values(env);
+      const required = all.filter((e) => e.required);
+      const missing = all.filter((e) => !e.available).length;
+      const requiredMissing = required.filter((e) => !e.available).length;
+      const total = all.length;
+      for (const e of all) e.hint = installHint(e.key); // 按当前平台给安装提示
+      const system = platformInfo();
       send(res, 200, {
         env,
-        summary: { total, missing, ready: total - missing, ok: missing === 0 },
+        summary: {
+          total, missing, ready: total - missing, ok: requiredMissing === 0,
+          required: required.length, requiredMissing, requiredReady: required.length - requiredMissing,
+          optionalMissing: missing - requiredMissing,
+        },
+        project: { languages: detected.project.languages, tools: [...detected.project.keys] },
+        deployment: deploymentInfo(env, detected.project.keys),
         vault: (() => { try { return vaultPath(); } catch (e) { return String(e.message); } })(),
-        platform: process.platform + ' ' + process.arch,
+        platform: system.label + ' · ' + system.arch,
+        system,
       });
       return;
     }
@@ -1126,9 +1249,9 @@ const server = http.createServer(async (req, res) => {
         const supported = Object.keys(FORMATTERS).join(' / ');
         return send(res, 200, { ok: false, reason: '该语言暂不支持格式化：' + frag.language + '（支持: ' + supported + '）' });
       }
-      const env = await getEnv();
+      const { tools: env } = await getEnv();
       if (!env[fspec.key] || !env[fspec.key].available) {
-        return send(res, 200, { ok: false, formatter: fspec.name, reason: missingReason(fspec.key) });
+        return send(res, 200, { ok: false, formatter: fspec.name, reason: missingReason(fspec.key, env[fspec.key]) });
       }
       const code = b.code != null ? b.code : frag.code;
       const fr = fspec.format ? await fspec.format(code) : await formatWithPrettier(fspec.prettier, code);
@@ -1810,8 +1933,9 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && u.pathname === '/api/term/input') {
       const b = await readBody(req);
       const data = String((b && b.data) || '');
-      if (TERM && TERM.child) { try { TERM.child.stdin.write(data); } catch (_) {} }
-      return send(res, 200, { ok: true });
+      if (!TERM || !TERM.child) return send(res, 409, { ok: false, error: '终端尚未连接' });
+      try { TERM.child.stdin.write(data); return send(res, 200, { ok: true }); }
+      catch (e) { return send(res, 500, { ok: false, error: String(e.message || e) }); }
     }
     if (req.method === 'POST' && u.pathname === '/api/term/stop') {
       if (TERM && TERM.child) { try { TERM.child.kill(); } catch (_) {} }
@@ -1826,11 +1950,22 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log('masscode-runner 已启动: http://' + HOST + ':' + PORT);
+  if (HOST !== '127.0.0.1' && HOST !== 'localhost' && HOST !== '::1') {
+    const addresses = [];
+    for (const rows of Object.values(os.networkInterfaces())) for (const row of (rows || [])) {
+      if (row.family === 'IPv4' && !row.internal) addresses.push('http://' + row.address + ':' + PORT);
+    }
+    if (addresses.length) console.log('局域网访问: ' + addresses.join('  '));
+    console.log('⚠ 当前为局域网模式：终端、代码运行和文件修改接口可被同网段设备访问。');
+  }
   try { console.log('Vault: ' + vaultPath()); } catch (e) { console.log('Vault: ' + e.message); }
   console.log('正在检测本机环境…');
-  getEnv(true).then((env) => {
-    const missing = Object.values(env).filter((e) => !e.available);
-    console.log('环境检测完成：' + (Object.keys(env).length - missing.length) + '/' + Object.keys(env).length + ' 项就绪');
+  getEnv(true).then(({ tools: env, project }) => {
+    const all = Object.values(env);
+    const missing = all.filter((e) => e.required && !e.available);
+    const needed = all.filter((e) => e.required);
+    console.log('环境检测完成：当前项目需要 ' + (needed.length - missing.length) + '/' + needed.length + ' 项就绪');
+    if (project.languages.length) console.log('检测到语言：' + project.languages.join(', '));
     if (missing.length) {
       console.log('缺失项：');
       for (const m of missing) console.log('  - ' + m.label + '（' + m.for + '）→ ' + installHint(m.key));

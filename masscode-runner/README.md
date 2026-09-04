@@ -18,6 +18,7 @@ iCloud Drive/massCode/
 │   └── README.md
 └── 启动伴生工具.command        ← macOS 一键启动（前台运行，Ctrl+C 停止）
 └── 启动伴生工具.bat            ← Windows 一键启动（前台运行，Ctrl+C 停止）
+└── 启动伴生工具.sh             ← Linux / WSL 一键启动
 ```
 
 ## 快速开始
@@ -30,6 +31,16 @@ iCloud Drive/massCode/
 **Windows**：打开 `iCloud Drive/massCode`（或同步下来的 `massCode` 文件夹），**双击「启动伴生工具.bat」**
 - 黑窗口前台运行服务并自动打开浏览器；用完 `Ctrl+C` 或关窗口即停止
 - 首次使用需先装 [Node.js](https://nodejs.org)（脚本会自动检查并提示）
+
+**Linux / WSL**：在终端进入项目目录后执行：
+```bash
+chmod +x 启动伴生工具.sh
+./启动伴生工具.sh
+```
+- 自动定位同级 `markdown-vault`，支持 `MASSCODE_VAULT` 和 `MASSCODE_RUNNER_PORT` 覆盖。
+- 桌面 Linux 使用 `xdg-open` / `gio` 打开浏览器，WSL 安装了 `wslview` 时自动打开 Windows 浏览器。
+- Debian、Ubuntu、Fedora、RHEL、Arch、openSUSE、Alpine 均可识别对应包管理器。
+- Node.js 需要 18 或更高版本；启动脚本和环境面板都会区分“未安装”与“版本过低”。
 
 **命令行（任意系统）**：
 ```bash
@@ -58,7 +69,7 @@ node server.js
 | 窗口与标签 | 大纲、符号、关系、AI 都可作为独立窗口：从横向标签栏向下拖出后，像左侧面板一样纵向排列并可上下拉伸；把窗口标题拖回标签栏后，重新变成点一个显示一个的标签 |
 | ▶ / ✓ / ✨ / ⌨（位置） | 运行/检查/格式化/输入按钮**固定在大纲面板顶部**，与大纲排在一起；点「🧭 大纲」收起大纲列表后，仍保留一列操作按钮，随时可用 |
 | ✏ 编辑 / 💾 保存 | 只读 ↔ 可编辑切换：**markdown** 编辑时左侧源码 / 右侧实时渲染文档并排（随输入更新，分割条可拖、宽度自动记忆）；**代码**编辑全宽直接改源码、**实时语法高亮**（透明编辑层叠加高亮，边打字边着色，中文输入法合成期临时显示明文）；Cmd/Ctrl+S 或点保存写回 vault（massCode 实时同步），编辑中自动同步不覆盖你的修改，原生撤销 Ctrl/⌘+Z 可用；运行/检查/格式化可直接作用于编辑框内容（未保存也生效） |
-| 🔍 环境 | 环境检测面板：列出每个工具是否可用、版本、用途；缺失时给出安装命令 |
+| 🔍 环境 | 按 vault 实际语言区分“当前项目需要/可选”工具，显示版本、可执行路径、Linux 发行版和包管理器；可一键在终端部署缺失项 |
 
 **布局与侧栏**：
 - 📐 **拖拽调整**：左侧列表宽度、右侧大纲宽度、底部输出窗口高度均可直接拖拽，自动记忆（左侧向右拉变宽；右侧**向左**拉变宽；输出向上拉变高）
@@ -69,8 +80,9 @@ node server.js
 > - 代码区带内置语法高亮（离线可用，无需联网）。
 > - **阅读快捷键**：单击代码中的符号 → 右侧预览定义；双击 → 跳转到最佳定义（跨片段自动切换文件）；Ctrl/⌘+Shift+F → 全局符号检索。
 > - **实时同步**：每 2.5s 自动检测 vault 变更（新增/修改/删除片段都会立刻反映），无需手动刷新；编辑模式不会被同步覆盖。
-> - **环境检测**：启动时自动检测 13 项工具并在日志输出汇总；界面「🔍 环境」可随时查看/重测。
+> - **环境检测**：启动时自动检测 13 项工具，并根据 vault 中实际使用的语言计算项目所需环境；界面「🔍 环境」可随时查看/重测。
 >   缺某个工具时，运行/检查/格式化会给出明确的「缺少 xx，安装: xxx」提示，而不是晦涩报错。
+> - **一键部署**：只部署当前项目实际需要且尚未安装的工具。Linux/macOS 会切换到底部交互终端执行，涉及系统包时可直接输入 `sudo` 密码；Windows 会复制 PowerShell 部署命令。
 
 ## 多文件片段（.cpp + .hpp 一起编译）
 
@@ -107,6 +119,7 @@ massCode 一个片段里可以有多个 fragment。**把 fragment 标签写成�
 ## 配置
 
 - 端口：`MASSCODE_RUNNER_PORT`（默认 `4877`），仅绑定 `127.0.0.1`
+- 监听地址：默认 `MASSCODE_RUNNER_HOST=127.0.0.1`（仅本机）；局域网访问时设置为 `0.0.0.0`，再通过本机局域网 IP 访问，例如 `http://10.16.0.205:4877`
 - 手动指定 vault：`MASSCODE_VAULT=/path/to/markdown-vault node server.js`
 - 自动从 massCode 偏好设置（`~/Library/Application Support/massCode/v2/preferences.json` 的 `storage.rootPath`）
   读取 vault 路径（vault = rootPath 下的 `markdown-vault`）；读不到时按 `~/massCode/markdown-vault` 兜底
@@ -156,8 +169,9 @@ massCode 一个片段里可以有多个 fragment。**把 fragment 标签写成�
 | **vault 自动定位** | ① 优先找工具目录上级的 `markdown-vault`（整个文件夹一起放云盘/本地时一定成立，**跨系统最稳**）；② 再读 massCode 各平台偏好设置（macOS/Win/Linux 路径均已内置）；③ 最后常用路径兜底。Windows 上无需手动配置也能找到 vault |
 | **Python** | Windows 通常没有 `python3`，已自动回退用 `python` / `py`（运行、检查、black 均生效） |
 | **超时终止** | Windows 没有 POSIX 进程组，已改用在任何系统都能杀掉超时子进程的方式 |
-| **安装提示** | 「🔍 环境」面板按当前系统给出安装命令：mac→brew，Win→winget/安装包，Linux→apt |
-| **一键启动** | macOS `.command` / Windows `.bat`（前台运行、Ctrl+C 停止） |
+| **安装提示** | 「🔍 环境」面板按当前系统给出安装命令：macOS→brew，Windows→winget，Linux→自动识别 apt/dnf/yum/pacman/zypper/apk |
+| **一键部署** | 扫描 vault 语言后只安装缺失依赖；部署过程进入交互终端，不隐藏权限申请和错误输出 |
+| **一键启动** | macOS `.command` / Windows `.bat` / Linux、WSL `.sh`（前台运行、Ctrl+C 停止） |
 
 ### 各平台开箱即用 / 需安装
 
