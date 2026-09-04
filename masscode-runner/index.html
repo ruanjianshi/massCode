@@ -441,6 +441,37 @@
   #git-reset-confirm #rc-yes { color: var(--err); border-color: rgba(248,81,73,.5); }
   #git-reset-confirm #rc-yes:not(:disabled):hover { background: var(--err); color: #fff; }
   #git-reset-confirm #rc-yes:disabled { opacity: .4; cursor: not-allowed; }
+  #review-dialog { position:fixed; inset:0; z-index:1200; display:flex; align-items:center; justify-content:center; padding:28px; background:rgba(3,7,12,.76); backdrop-filter:blur(6px); }
+  #review-dialog.hidden { display:none; }
+  .review-panel { width:min(1180px,94vw); height:min(780px,90vh); display:flex; flex-direction:column; overflow:hidden; border:1px solid #38485d; border-radius:12px; background:#0f151d; box-shadow:0 24px 80px rgba(0,0,0,.55); }
+  .review-head { min-height:52px; display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid #273241; background:#121a24; }
+  .review-head .title { font-weight:700; color:#e6edf7; }
+  .review-head .path { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#8290a3; font:11px var(--mono); }
+  .review-head button, .review-foot button { border:1px solid #34445a; border-radius:7px; background:#17212d; color:#cbd5e2; padding:6px 10px; cursor:pointer; }
+  .review-head button:hover, .review-foot button:hover { border-color:#6598e5; color:#fff; }
+  .review-layout { display:flex; flex:1; min-height:0; }
+  #review-list { width:250px; flex:none; overflow:auto; padding:8px; border-right:1px solid #273241; background:#0c1219; }
+  #review-list.hidden { display:none; }
+  .review-version { width:100%; display:block; margin:0 0 5px; padding:8px 9px; text-align:left; border:1px solid transparent; border-radius:7px; background:transparent; color:#cbd5e2; cursor:pointer; }
+  .review-version:hover { background:#17212d; }
+  .review-version.on { border-color:#4f8cff; background:rgba(79,140,255,.12); }
+  .review-version b, .review-version span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .review-version b { font-size:12px; }
+  .review-version span { margin-top:3px; color:#7f8da1; font-size:10px; }
+  .review-main { flex:1; min-width:0; display:flex; flex-direction:column; }
+  #review-summary { min-height:34px; padding:7px 12px; border-bottom:1px solid #273241; color:#8c9aad; font-size:11px; }
+  #review-summary .add { color:#62cf82; } #review-summary .del { color:#ff7b72; }
+  #review-diff { flex:1; overflow:auto; margin:0; padding:10px 0 18px; background:#090f16; color:#b8c3d1; font:12px/1.55 var(--mono); tab-size:4; }
+  .diff-line { min-height:19px; padding:0 12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .diff-line.add { color:#a8e6b9; background:rgba(46,160,67,.13); }
+  .diff-line.del { color:#ffb0aa; background:rgba(248,81,73,.13); }
+  .diff-line.hunk { color:#8cb8ff; background:rgba(56,114,196,.12); }
+  .diff-line.meta { color:#8391a4; }
+  .review-empty { padding:24px; color:#7f8da1; text-align:center; }
+  .review-foot { min-height:48px; display:flex; align-items:center; gap:8px; padding:8px 12px; border-top:1px solid #273241; background:#101720; }
+  .review-foot .sp { flex:1; }
+  #review-restore { border-color:#80651c; color:#f0c94d; }
+  #review-restore.hidden { display:none; }
   .item { padding: 7px 10px; border-radius: 6px; cursor: pointer; }
   .item:hover { background: var(--panel2); }
   .item.active { background: #2b3342; outline: 1px solid var(--accent); }
@@ -728,8 +759,14 @@
   #btn-remote { position:relative; padding-right:22px; }
   #btn-remote::after { content:''; position:absolute; top:8px; right:8px; width:7px; height:7px; border-radius:50%; background:#657184; }
   #btn-remote.remote-on::after { background:var(--ok); box-shadow:0 0 6px rgba(86,211,100,.7); }
-  #remote-panel { display:none; position:fixed; inset:0 0 0 auto; width:460px; max-width:94vw; z-index:70; flex-direction:column; background:#101720; border-left:1px solid #324054; box-shadow:-18px 0 60px rgba(0,0,0,.46); }
+  #remote-panel { display:none; position:fixed; inset:auto 0 0 auto; width:460px; height:100vh; max-width:94vw; max-height:100vh; z-index:70; flex-direction:column; background:#101720; border-left:1px solid #324054; border-top:1px solid #324054; box-shadow:-18px -8px 60px rgba(0,0,0,.46); }
   #remote-panel.open { display:flex; }
+  #remote-resizer { position:absolute; z-index:3; left:-5px; top:0; bottom:0; width:10px; cursor:ew-resize; touch-action:none; }
+  #remote-resizer::after { content:''; position:absolute; left:4px; top:0; bottom:0; width:1px; background:#324054; transition:.15s; }
+  #remote-resizer:hover::after, #remote-resizer.active::after { width:2px; background:var(--accent); box-shadow:0 0 8px rgba(79,140,255,.65); }
+  #remote-resizer-y { position:absolute; z-index:4; left:0; right:0; top:0; height:10px; cursor:ns-resize; touch-action:none; }
+  #remote-resizer-y::after { content:''; position:absolute; left:0; right:0; top:0; height:1px; background:#324054; transition:.15s; }
+  #remote-resizer-y:hover::after, #remote-resizer-y.active::after { height:2px; background:var(--accent); box-shadow:0 0 8px rgba(79,140,255,.65); }
   #remote-head { min-height:54px; display:flex; align-items:center; gap:9px; padding:10px 14px; background:#111a24; border-bottom:1px solid #2b3747; }
   #remote-head h2 { flex:1; margin:0; font-size:14px; }
   #remote-status { color:var(--dim); font:10px var(--mono); }
@@ -752,6 +789,45 @@
   .remote-note { margin-top:13px; padding:10px 11px; border:1px solid #2a3747; border-radius:8px; background:#111a24; color:#7f8da0; font-size:11px; line-height:1.6; }
   .remote-msg { min-height:20px; margin-top:10px; color:var(--dim); font-size:11px; }
   .remote-msg.ok { color:var(--ok); } .remote-msg.err { color:#ff8c88; }
+  .remote-file-auth { margin-bottom:9px; }
+  .remote-file-auth label { display:block; margin-bottom:4px; color:#8b98aa; font-size:11px; }
+  .remote-file-auth > div { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px; }
+  .remote-file-auth input { min-width:0; height:34px; padding:6px 8px; color:var(--text); background:#0a1118; border:1px solid #2c3949; border-radius:6px; outline:none; font:11px var(--mono); }
+  .remote-file-auth input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,140,255,.1); }
+  .remote-pathbar { display:grid; grid-template-columns:34px minmax(0,1fr) auto; gap:6px; margin-bottom:7px; }
+  .remote-pathbar input { min-width:0; color:var(--text); background:#0a1118; border:1px solid #2c3949; border-radius:6px; padding:6px 8px; font:11px var(--mono); }
+  .remote-transferbar { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+  .remote-transferbar .hint { flex:1; min-width:140px; color:#748397; font:9px/1.4 var(--mono); text-align:right; }
+  .remote-files-list { height:210px; overflow:auto; border:1px solid #293646; border-radius:7px; background:#0a1017; }
+  .remote-files-list.dragover { border-color:var(--accent); background:rgba(79,140,255,.08); box-shadow:inset 0 0 0 2px rgba(79,140,255,.15); }
+  .remote-files-empty { padding:18px; color:var(--dim); text-align:center; font-size:11px; }
+  .remote-file-row { display:grid; grid-template-columns:18px minmax(0,1fr) auto; gap:6px; align-items:center; min-height:29px; padding:4px 8px; border-bottom:1px solid #16202b; cursor:pointer; font:11px var(--mono); }
+  .remote-file-row:hover { background:#162230; } .remote-file-row .sz { color:#718095; font-size:9px; }
+  .remote-file-head { display:flex; align-items:center; gap:7px; min-height:37px; margin-top:10px; color:#aeb9c8; font:11px var(--mono); }
+  .remote-file-head #remote-file-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #remote-file-dirty { color:#e1ad47; }
+  #remote-file-editor { width:100%; min-height:260px; resize:vertical; padding:10px; color:#dce5ef; background:#080d13; border:1px solid #293646; border-radius:7px; outline:none; font:11px/1.55 var(--mono); tab-size:2; }
+  #remote-file-editor:focus { border-color:#4f79b3; }
+  /* ---- 通用工程工具 ---- */
+  #project-panel { display:none; position:fixed; inset:0 0 0 auto; width:600px; max-width:96vw; z-index:72; flex-direction:column; background:#101720; border-left:1px solid #324054; box-shadow:-18px 0 60px rgba(0,0,0,.46); }
+  #project-panel.open { display:flex; }
+  .project-head { min-height:54px; display:flex; align-items:center; gap:9px; padding:10px 14px; border-bottom:1px solid #2b3747; }
+  .project-head h2 { margin:0; font-size:14px; } .project-head span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dim); font:9px var(--mono); }
+  .project-tabs { display:flex; gap:6px; padding:12px 14px 0; } .project-tabs button { flex:1; }
+  .project-tabs button.on { color:var(--accent); border-color:var(--accent); background:rgba(79,140,255,.1); }
+  .project-body { flex:1; min-height:0; overflow:auto; padding:14px; }
+  .project-pane.hidden { display:none; }
+  .project-list { display:flex; flex-direction:column; gap:7px; }
+  .task-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; padding:9px 10px; border:1px solid #293646; border-radius:8px; background:#111a24; }
+  .task-row b { display:block; font-size:12px; } .task-row code { color:#8392a5; font:10px var(--mono); }
+  .custom-task { display:grid; grid-template-columns:90px 1fr auto; gap:7px; margin-top:12px; }
+  .custom-task input { min-width:0; padding:7px 8px; color:var(--text); background:#0a1017; border:1px solid #293646; border-radius:6px; font:11px var(--mono); }
+  .project-output { min-height:180px; max-height:42vh; overflow:auto; margin-top:12px; padding:11px; border:1px solid #293646; border-radius:7px; background:#080d13; color:#aebbd0; white-space:pre-wrap; font:10px/1.55 var(--mono); }
+  .project-card { margin-bottom:9px; padding:11px; border:1px solid #293646; border-radius:8px; background:#111a24; }
+  .project-card h3 { margin:0 0 7px; font-size:12px; } .project-card p { margin:4px 0; color:#8b99ad; font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
+  .metric-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-bottom:10px; }
+  .metric { padding:10px 7px; border:1px solid #293646; border-radius:7px; background:#0b121a; text-align:center; }
+  .metric b { display:block; color:#cfe0f8; font-size:17px; } .metric span { color:var(--dim); font-size:9px; }
   #vnc-workspace { display:none; position:fixed; inset:56px 0 0; z-index:65; flex-direction:column; background:#090e14; }
   #vnc-workspace.open { display:flex; }
   #vnc-toolbar { flex:none; display:flex; align-items:center; gap:8px; min-height:43px; padding:6px 10px; border-bottom:1px solid #2c3949; background:#111923; }
@@ -765,7 +841,8 @@
   @media (max-width:760px) {
     #btn-remote { font-size:0; width:38px; padding:6px; }
     #btn-remote::before { content:'🖥'; font-size:13px; }
-    #remote-panel { width:100%; max-width:none; }
+    #remote-panel { width:100%; height:100vh; max-width:none; max-height:none; }
+    #remote-resizer, #remote-resizer-y { display:none; }
   }
   /* ---- Source Insight 阅读模式：符号面板 / 全局检索 ---- */
   #sym-tabs { display: flex; gap: 6px; padding: 6px 10px 0; }
@@ -1171,6 +1248,8 @@
   #md-view, #resource-viewer { margin:0; border:0; border-radius:0; background:#101720; }
   .md-doc { max-width:980px; margin:0 auto; padding:28px 42px 64px; color:#dce5ef; font-size:14px; line-height:1.78; }
   .md-doc .md-pre { border-color:#2a3747; background:#0a1017; }
+  .md-code-link { cursor:pointer; color:#8db9ff !important; border-bottom:1px dashed rgba(120,169,255,.58); }
+  .md-code-link:hover { background:rgba(120,169,255,.16); border-bottom-style:solid; }
   #resource-head { min-height:44px; padding:7px 11px; background:#111821; }
   #resource-body { background:#0b1017; }
 
@@ -1222,10 +1301,11 @@
     #toolbar { flex-wrap:nowrap; }
     #toolbar .sp { min-width:0; }
     #multi-badge { max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #btn-symbols, #btn-outline, #btn-mindmap, #btn-info { width:34px; flex:none; padding:0; font-size:0; }
+    #btn-symbols, #btn-outline, #btn-mindmap, #btn-history, #btn-info { width:34px; flex:none; padding:0; font-size:0; }
     #btn-symbols::before { content:'🔎'; font-size:12px; }
     #btn-outline::before { content:'🧭'; font-size:12px; }
     #btn-mindmap::before { content:'🧠'; font-size:12px; }
+    #btn-history::before { content:'🕘'; font-size:12px; }
     #btn-info::before { content:'📝'; font-size:12px; }
     #btn-edit { flex:none; white-space:nowrap; }
     #autosave-hint { width:28px; flex:none; padding:4px 6px; overflow:hidden; white-space:nowrap; font-size:0; }
@@ -1266,6 +1346,7 @@
     </div>
   </div>
   <span class="sync-dot" id="sync-ind" title="每 2.5s 自动检测 vault 变更">实时同步</span>
+  <button id="btn-project" title="构建任务、编译数据库与工程健康报告">◫ 工程</button>
   <button id="btn-remote" title="SSH 终端与 VNC 桌面">🖥 远程</button>
   <button id="btn-env">🔍 环境</button>
   <button id="refresh">↻ 刷新</button>
@@ -1362,6 +1443,7 @@
       <button id="btn-symbols" title="跨库符号检索（Source Insight 式 Lookup，Ctrl+Shift+F）">🔎 符号</button>
       <button id="btn-outline" title="显示/隐藏代码大纲">🧭 大纲</button>
       <button id="btn-mindmap" disabled title="把当前 Markdown 文档转为思维导图">🧠 导图</button>
+      <button id="btn-history" disabled title="查看当前文件的自动保存时间线">🕘 历史</button>
       <button id="btn-edit" disabled>✏ 编辑</button>
       <button id="btn-info" disabled title="编辑片段信息：名称/类型/标签/说明">📝 信息</button>
       <span id="save-tick" class="pill idle" style="display:none">已保存</span>
@@ -1581,6 +1663,16 @@
     <div id="sym-modal-res"><span class="ol-empty">输入符号名，Enter 打开第一个结果</span></div>
   </div>
 </div>
+<div id="review-dialog" class="hidden" role="dialog" aria-modal="true" aria-labelledby="review-title">
+  <div class="review-panel">
+    <div class="review-head"><span class="title" id="review-title">差异查看</span><span class="path" id="review-path"></span><button id="review-close">关闭</button></div>
+    <div class="review-layout">
+      <div id="review-list" class="hidden"></div>
+      <div class="review-main"><div id="review-summary"></div><pre id="review-diff"><span class="review-empty">正在读取…</span></pre></div>
+    </div>
+    <div class="review-foot"><span id="review-note"></span><span class="sp"></span><button id="review-restore" class="hidden">恢复此版本</button></div>
+  </div>
+</div>
 <div id="env-panel">
   <div id="env-head">
     <h2>🔍 环境检测</h2>
@@ -1605,7 +1697,18 @@
     <div id="env-list"></div>
   </div>
 </div>
+<div id="project-panel" aria-label="工程工具">
+  <div class="project-head"><h2>◫ 工程工具</h2><span id="project-root"></span><button id="btn-project-close">✕</button></div>
+  <div class="project-tabs"><button data-project-tab="tasks" class="on">构建任务</button><button data-project-tab="compile">编译数据库</button><button data-project-tab="health">健康报告</button></div>
+  <div class="project-body">
+    <section id="project-tasks" class="project-pane"><div id="task-list" class="project-list"></div><div class="custom-task"><input id="task-cwd" value="." aria-label="工作目录"><input id="task-command" placeholder="自定义命令，例如 npm test" aria-label="自定义命令"><button id="task-run-custom">运行</button></div><pre id="task-output" class="project-output">选择任务后在这里显示输出。</pre></section>
+    <section id="project-compile" class="project-pane hidden"><div id="compile-summary"></div></section>
+    <section id="project-health" class="project-pane hidden"><div id="health-summary"></div></section>
+  </div>
+</div>
 <div id="remote-panel" aria-label="远程开发">
+  <div id="remote-resizer" title="左右拖动调整远程窗口宽度；双击恢复默认"></div>
+  <div id="remote-resizer-y" title="上下拖动调整远程窗口高度；双击恢复全高"></div>
   <div id="remote-head">
     <h2>🖥 远程开发</h2>
     <span id="remote-status">正在检测…</span>
@@ -1613,6 +1716,7 @@
   </div>
   <div class="remote-tabs">
     <button id="remote-tab-ssh" class="on">⌘ SSH 终端</button>
+    <button id="remote-tab-files">▤ 远程文件</button>
     <button id="remote-tab-vnc">▣ VNC 桌面</button>
   </div>
   <div id="remote-body">
@@ -1627,6 +1731,18 @@
       </div>
       <div id="ssh-msg" class="remote-msg"></div>
       <div class="remote-note">密码不会被网页或服务端保存；需要密码时请在底部终端提示后输入。首次连接出现主机指纹确认也属于正常现象。</div>
+    </section>
+    <section id="remote-files" class="remote-pane hidden">
+      <p class="remote-intro">复用 SSH 页的主机、用户、端口和私钥。终端中输入的密码无法被网页读取，如使用密码登录，请在这里再输入一次。</p>
+      <div class="remote-file-auth"><label for="remote-files-password">远程文件密码（不保存）</label><div><input id="remote-files-password" type="password" autocomplete="new-password" placeholder="使用私钥或 SSH Agent 时可留空"><button id="remote-files-toggle-password" type="button" title="显示或隐藏密码">显示</button></div></div>
+      <div class="remote-pathbar"><button id="remote-files-up" title="上级目录">↑</button><input id="remote-files-path" value="." spellcheck="false" aria-label="远程目录"><button id="remote-files-refresh">刷新</button></div>
+      <div class="remote-transferbar"><button id="remote-files-upload">上传文件</button><button id="remote-folder-upload">上传文件夹</button><button id="remote-folder-download">下载当前文件夹</button><span class="hint">不限文件大小 · 支持拖放文件夹</span></div>
+      <input id="remote-files-picker" type="file" multiple hidden>
+      <input id="remote-folder-picker" type="file" webkitdirectory directory multiple hidden>
+      <div id="remote-files-list" class="remote-files-list" title="可把本机文件或文件夹拖到这里上传"><div class="remote-files-empty">填写 SSH 信息后点击刷新；也可拖入本机文件或文件夹上传</div></div>
+      <div class="remote-file-head"><span id="remote-file-name">未打开文件</span><span id="remote-file-dirty"></span><button id="remote-file-download" disabled>下载</button><button id="remote-file-save" disabled>保存</button></div>
+      <textarea id="remote-file-editor" disabled spellcheck="false" aria-label="远程文件编辑器"></textarea>
+      <div id="remote-files-msg" class="remote-msg"></div>
     </section>
     <section id="remote-vnc" class="remote-pane hidden">
       <p class="remote-intro">直接在工作区查看远程桌面。目标机器需已开启 VNC/屏幕共享，并允许这台电脑访问对应端口。</p>
@@ -1668,7 +1784,14 @@ function confirmLeaveEdit() {
 
 async function api(path, body) {
   const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined);
-  return r.json();
+  const data = await r.json();
+  if (r.status === 404 && data && /^Not Found:/i.test(String(data.error || ''))) data.backendOutdated = true;
+  return data;
+}
+
+function apiError(data, fallback) {
+  if (data && data.backendOutdated) return new Error('当前仍在运行旧版 CodeScope 后端。请在原启动终端按 Ctrl+C 完全停止，然后重新启动码境并刷新页面。');
+  return new Error(String((data && data.error) || fallback || '请求失败'));
 }
 
 let SYSMON_BUSY = false;
@@ -1995,7 +2118,7 @@ async function openLatexResource(r) {
   $('resource-save').style.display = 'none'; $('resource-body').innerHTML = '<span class="empty">正在加载资源…</span>';
   $('resource-rename').onclick = () => renameLatexResource(r);
   $('resource-replace').onclick = () => chooseLatexResource(r.folder, r.kind);
-  $('btn-edit').disabled = $('btn-run').disabled = $('btn-check').disabled = $('btn-format').disabled = $('btn-info').disabled = true;
+  $('btn-edit').disabled = $('btn-history').disabled = $('btn-run').disabled = $('btn-check').disabled = $('btn-format').disabled = $('btn-info').disabled = true;
   const raw = latexRawUrl(r.path), ext = r.ext.toLowerCase();
   if (r.text) {
     const data = await api('/api/latex/resource?path=' + encodeURIComponent(r.path));
@@ -2969,6 +3092,11 @@ function renderGit(d) {
         `<span class="gnm">${isDir ? '📁 ' : ''}${escapeHtml(parts[parts.length - 1] || '?')}</span>` +
         (parts.length > 1 ? `<span class="gpath">${escapeHtml(parts.slice(0, -1).join('/'))}</span>` : '');
       d2.title = f.path;
+      d2.tabIndex = 0;
+      d2.setAttribute('role', 'button');
+      d2.setAttribute('aria-label', '查看 ' + f.path + ' 的 Git 差异');
+      d2.onclick = () => showGitDiff(f.path);
+      d2.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); showGitDiff(f.path); } };
       listEl.appendChild(d2);
     }
   };
@@ -3076,6 +3204,133 @@ async function gitReset() {
     gitMsg(r.error || '回退失败', true);
   }
   await refreshGit();
+}
+
+/* -------------------------- Git Diff / 本地时间线 -------------------------- */
+let REVIEW_TIMELINE_ID = '';
+
+function closeReview() {
+  $('review-dialog').classList.add('hidden');
+  REVIEW_TIMELINE_ID = '';
+}
+
+function paintReviewDiff(diff, emptyText) {
+  const box = $('review-diff');
+  box.innerHTML = '';
+  const value = String(diff || '');
+  if (!value) {
+    const empty = document.createElement('div');
+    empty.className = 'review-empty'; empty.textContent = emptyText || '没有文本差异';
+    box.appendChild(empty); return;
+  }
+  for (const line of value.split('\n')) {
+    const row = document.createElement('div');
+    row.className = 'diff-line';
+    if (line.startsWith('@@')) row.classList.add('hunk');
+    else if (line.startsWith('+') && !line.startsWith('+++')) row.classList.add('add');
+    else if (line.startsWith('-') && !line.startsWith('---')) row.classList.add('del');
+    else if (/^(diff --git|index |--- |\+\+\+ )/.test(line)) row.classList.add('meta');
+    row.textContent = line || ' ';
+    box.appendChild(row);
+  }
+}
+
+function showReviewShell(title, pathText, withList) {
+  $('review-title').textContent = title;
+  $('review-path').textContent = pathText || '';
+  $('review-list').classList.toggle('hidden', !withList);
+  $('review-list').innerHTML = '';
+  $('review-summary').textContent = '正在读取…';
+  $('review-note').textContent = '';
+  $('review-restore').classList.add('hidden');
+  paintReviewDiff('', '正在读取…');
+  $('review-dialog').classList.remove('hidden');
+}
+
+async function showGitDiff(filePath) {
+  showReviewShell('Git Diff · 提交前检查', filePath, false);
+  try {
+    const d = await api('/api/git/diff?path=' + encodeURIComponent(filePath));
+    if (!d.ok) throw new Error(d.error || '差异读取失败');
+    $('review-summary').innerHTML = `<span class="add">+${Number(d.additions || 0)}</span>　<span class="del">-${Number(d.deletions || 0)}</span>　${d.tracked ? '已跟踪文件' : '未跟踪文件'}`;
+    $('review-note').textContent = d.binary ? '二进制文件不显示内容差异' : '只读检查 · 提交前请逐文件确认';
+    paintReviewDiff(d.diff, d.binary ? '二进制文件已发生变化' : '文件内容没有变化');
+  } catch (e) {
+    $('review-summary').textContent = '读取失败';
+    paintReviewDiff('', e.message || '差异读取失败');
+  }
+}
+
+function timelineTime(timestamp) {
+  const date = new Date(Number(timestamp || 0));
+  return Number.isFinite(date.getTime()) ? date.toLocaleString('zh-CN', { hour12:false }) : '未知时间';
+}
+
+async function selectTimeline(entry, button) {
+  REVIEW_TIMELINE_ID = entry.id;
+  [...$('review-list').querySelectorAll('.review-version')].forEach((node) => node.classList.toggle('on', node === button));
+  $('review-summary').textContent = '正在比较…';
+  try {
+    const query = '?file=' + encodeURIComponent(CURRENT.file) + '&fragment=' + CINDEX + '&id=' + encodeURIComponent(entry.id);
+    const d = await api('/api/timeline/item' + query);
+    if (!d.ok) throw new Error(d.error || '历史版本读取失败');
+    const lines = String(d.diff || '').split('\n');
+    const additions = lines.filter((line) => line.startsWith('+') && !line.startsWith('+++')).length;
+    const deletions = lines.filter((line) => line.startsWith('-') && !line.startsWith('---')).length;
+    $('review-summary').innerHTML = `${escapeHtml(timelineTime(d.timestamp))}　<span class="add">+${additions}</span>　<span class="del">-${deletions}</span>　${formatCapacity(d.size)}`;
+    $('review-note').textContent = d.reason || '自动保存';
+    $('review-restore').classList.remove('hidden');
+    paintReviewDiff(d.diff, '该历史版本与当前内容相同');
+  } catch (e) {
+    REVIEW_TIMELINE_ID = '';
+    $('review-restore').classList.add('hidden');
+    $('review-summary').textContent = '读取失败';
+    paintReviewDiff('', e.message || '历史版本读取失败');
+  }
+}
+
+async function openTimeline() {
+  if (!CURRENT || !CURRENT.fragments[CINDEX]) return;
+  if (!(await waitForPendingSave())) { setStatus('err', '当前代码保存失败，无法打开时间线'); return; }
+  showReviewShell('本地时间线', (CURRENT.name || CURRENT.file) + ' · ' + (CURRENT.fragments[CINDEX].label || ('片段 ' + (CINDEX + 1))), true);
+  try {
+    const query = '?file=' + encodeURIComponent(CURRENT.file) + '&fragment=' + CINDEX;
+    const d = await api('/api/timeline' + query);
+    if (!d.ok) throw new Error(d.error || '时间线读取失败');
+    const entries = d.entries || [], list = $('review-list');
+    $('review-summary').textContent = entries.length ? '选择左侧版本，与当前内容进行比较' : '尚无历史版本';
+    $('review-note').textContent = entries.length + ' 个本地检查点 · 最多保留 60 个';
+    if (!entries.length) { list.innerHTML = '<div class="review-empty">编辑并自动保存后，这里会出现历史版本</div>'; paintReviewDiff('', '暂无可比较的历史版本'); return; }
+    for (const entry of entries) {
+      const button = document.createElement('button');
+      button.className = 'review-version';
+      button.innerHTML = `<b>${escapeHtml(timelineTime(entry.timestamp))}</b><span>${escapeHtml(entry.reason || '自动保存')} · ${escapeHtml(formatCapacity(entry.size))}</span><span>${escapeHtml(entry.preview || '空内容')}</span>`;
+      button.onclick = () => selectTimeline(entry, button);
+      list.appendChild(button);
+    }
+    list.firstElementChild.click();
+  } catch (e) {
+    $('review-summary').textContent = '读取失败';
+    paintReviewDiff('', e.message || '时间线读取失败');
+  }
+}
+
+function restoreTimeline() {
+  if (!CURRENT || !REVIEW_TIMELINE_ID) return;
+  const file = CURRENT.file, fragment = CINDEX, id = REVIEW_TIMELINE_ID;
+  openConfirm({
+    title: '恢复历史版本',
+    message: '将用选中的历史版本替换当前片段；恢复前内容会自动创建一个新检查点。',
+    onOk: async () => {
+      const r = await api('/api/timeline/restore', { file, fragment, id });
+      if (!r.ok) { setStatus('err', r.error || '恢复失败'); return; }
+      closeReview();
+      await refresh(true);
+      const next = SNIPPETS.find((item) => item.file === file);
+      if (next) { CURRENT = next; CINDEX = Math.min(fragment, next.fragments.length - 1); renderList(); renderMain(); }
+      setStatus('ok', '已恢复历史版本，可继续编辑或撤回到“恢复前版本”');
+    },
+  });
 }
 
 // 标签栏：全部 + 各标签（含数量），点击多选（AND）
@@ -5946,6 +6201,7 @@ function renderCode() {
     $('ln').textContent = f ? f.code.split('\n').map((_, i) => i + 1).join('\n') : '';
   }
   $('btn-edit').disabled = !f;
+  $('btn-history').disabled = !f;
   $('btn-run').disabled = $('btn-check').disabled = $('btn-format').disabled = $('btn-info').disabled = !f;
   $('btn-run').textContent = isLatex ? '▶ PDF' : '▶';
   $('btn-run').title = isLatex ? '立即编译并刷新 PDF' : '运行代码';
@@ -6164,6 +6420,28 @@ function renderMarkdown(md, baseLine) {
   return html;
 }
 
+function decorateMarkdownLinks(root) {
+  if (!root) return;
+  root.querySelectorAll('code:not(pre code)').forEach((node) => {
+    const value = node.textContent.trim(); if (!value || value.length > 160) return;
+    let target = null, label = '';
+    if (/^[A-Za-z_$][\w:$.-]*$/.test(value)) {
+      const matches = globalIndex().filter((sym) => sym.name === value);
+      target = matches.find((sym) => sym.isDefinition) || matches[0] || null;
+      if (target) label = `跳转到 ${target.snippet.name} · ${(target.snippet.fragments[target.frag] || {}).label || ''}:${target.line}`;
+    }
+    if (!target && /[./\\]|\.[A-Za-z0-9]+$/.test(value)) {
+      for (const snippet of SNIPPETS) {
+        const fi = (snippet.fragments || []).findIndex((fragment) => fragment.label === value || fragment.label.endsWith('/' + value) || fragment.label.endsWith('\\' + value));
+        if (fi >= 0) { target={snippet,frag:fi,line:1}; label=`打开 ${snippet.name} · ${snippet.fragments[fi].label}`; break; }
+      }
+    }
+    if (!target) return;
+    node.classList.add('md-code-link'); node.tabIndex=0; node.title=label;
+    const jump=()=>goToLocation(target); node.onclick=(event)=>{event.preventDefault();jump();}; node.onkeydown=(event)=>{if(event.key==='Enter'){event.preventDefault();jump();}};
+  });
+}
+
 function applyMdView() {
   if (MM_ACTIVE) {   /* 导图模式下右侧渲染区被导图接管：任何视图重建都不得重新弹出预览/渲染（避免三窗口） */
     $('edit-preview').style.display = 'none';
@@ -6177,6 +6455,7 @@ function applyMdView() {
   if (isMd) {
     $('btn-md').textContent = MD_RENDER_MODE ? '📄 源码' : '👁 渲染';
     $('md-view').innerHTML = renderMarkdown(f.code);
+    decorateMarkdownLinks($('md-view'));
     const show = MD_RENDER_MODE;
     $('md-view').style.display = show ? 'block' : 'none';   /* block，不能 flex，否则块元素横排 */
     $('code-wrap').style.display = show ? 'none' : '';
@@ -6312,6 +6591,7 @@ function updateEditPreview() {
   p.classList.remove('latex-preview');
   p.classList.add('md-doc');
   p.innerHTML = renderMarkdown(editText());
+  decorateMarkdownLinks(p);
   p.style.display = 'block';
 }
 
@@ -6357,6 +6637,7 @@ function scheduleSyncMdPreview() {
 
 /* ------------------------- 智能补全（简单符号前缀补全） ------------------------- */
 let COMP_IDX = new Map(), COMP_IDX_FILE = '', COMP_MATCHES = [], COMP_SEL = 0, COMP_PREFIX_LEN = 0, COMP_HIDDEN = false;
+let COMPILE_DB = { found:false, defines:[], includePaths:[] };
 let COMP_FIELDS = new Map(), COMP_VARS = new Map();   // 结构体字段表 / 变量→类型（供 . -> 成员补全）
 const COMP_KIND = { struct: '结构体', enum: '枚举', typedef: '类型', class: '类', union: '联合体', macro: '宏', function: '函数', var: '变量', field: '字段' };
 // 常见内建类型：字段提取时排除（避免把类型名当作成员）
@@ -6434,6 +6715,9 @@ function buildCompIndex() {
   const idx = new Map();
   COMP_FIELDS = new Map(); COMP_VARS = new Map();
   for (const f of CURRENT ? CURRENT.fragments : []) scanSyms(idx, f.code);
+  for (const define of COMPILE_DB.defines || []) {
+    const name=String(define).split('=')[0]; if (/^[A-Za-z_]\w*$/.test(name) && !idx.has(name)) idx.set(name,'macro');
+  }
   return idx;
 }
 function hideComp() {
@@ -7114,7 +7398,8 @@ function stopRemoteLatency(kind) {
   state.generation++;
   if (state.timer) clearInterval(state.timer);
   state.timer = null;
-  const el = $(kind + '-latency');
+  const el = $(kind === 'ssh' ? 'term-latency' : kind + '-latency');
+  if (!el) return;
   el.className = 'remote-latency';
   el.textContent = '';
 }
@@ -7123,7 +7408,8 @@ function startRemoteLatency(kind, host, port) {
   if (!host || !port) return;
   const state = REMOTE_LATENCY[kind];
   const generation = state.generation;
-  const el = $(kind + '-latency');
+  const el = $(kind === 'ssh' ? 'term-latency' : kind + '-latency');
+  if (!el) return;
   el.className = 'remote-latency show';
   el.textContent = '延迟 …';
   const update = async () => {
@@ -7151,11 +7437,15 @@ function remoteMessage(id, message, kind = '') {
   el.className = 'remote-msg' + (kind ? ' ' + kind : '');
 }
 function remoteTab(name) {
-  const ssh = name === 'ssh';
-  $('remote-tab-ssh').classList.toggle('on', ssh);
-  $('remote-tab-vnc').classList.toggle('on', !ssh);
-  $('remote-ssh').classList.toggle('hidden', !ssh);
-  $('remote-vnc').classList.toggle('hidden', ssh);
+  for (const key of ['ssh', 'files', 'vnc']) {
+    $('remote-tab-' + key).classList.toggle('on', name === key);
+    $('remote-' + key).classList.toggle('hidden', name !== key);
+  }
+  if (name === 'files' && !$('remote-files-list').dataset.loaded) {
+    remoteMessage('remote-files-msg', $('ssh-host').value.trim() && $('ssh-user').value.trim()
+      ? '填写远程文件密码后点击“刷新”；使用私钥或 SSH Agent 时可直接刷新。'
+      : '请先在“SSH 终端”页填写主机和用户名。');
+  }
 }
 function restoreRemoteFields() {
   let saved = {};
@@ -7221,6 +7511,158 @@ async function disconnectSsh() {
   stopRemoteLatency('ssh');
   $('btn-remote').classList.toggle('remote-on', VNC_CONNECTED);
   remoteMessage('ssh-msg', 'SSH 已断开；再次打开终端时会启动本地 shell。', 'ok');
+}
+let REMOTE_FILE_PATH = '', REMOTE_FILE_ORIGINAL = '';
+function remoteFileAuth(extra = {}) {
+  return { host:$('ssh-host').value.trim(), port:Number($('ssh-port').value || 22), user:$('ssh-user').value.trim(), password:$('remote-files-password').value, identityFile:$('ssh-key').value.trim(), ...extra };
+}
+function formatRemoteSize(size) {
+  const n = Number(size || 0); if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(1) + ' KB'; return (n / 1048576).toFixed(1) + ' MB';
+}
+async function loadRemoteFiles(target) {
+  const pathValue = target == null ? $('remote-files-path').value.trim() || '.' : target;
+  const list = $('remote-files-list'); list.replaceChildren();
+  const waiting = document.createElement('div'); waiting.className = 'remote-files-empty'; waiting.textContent = '正在读取远程目录…'; list.appendChild(waiting);
+  remoteMessage('remote-files-msg', '');
+  try {
+    const d = await api('/api/remote/files/list', remoteFileAuth({ path:pathValue }));
+    if (!d.ok) throw new Error(d.error || '目录读取失败');
+    $('remote-files-path').value = d.path; list.replaceChildren(); list.dataset.loaded = '1'; saveRemoteFields();
+    if (!d.entries.length) { waiting.textContent = '此目录为空'; list.appendChild(waiting); }
+    for (const item of d.entries) {
+      const row = document.createElement('div'); row.className = 'remote-file-row'; row.tabIndex = 0;
+      const icon = document.createElement('span'); icon.textContent = item.directory ? '📁' : '▤';
+      const name = document.createElement('span'); name.textContent = item.name;
+      const size = document.createElement('span'); size.className = 'sz'; size.textContent = item.directory ? '' : formatRemoteSize(item.size);
+      row.append(icon, name, size);
+      const open = () => item.directory ? loadRemoteFiles(item.path) : openRemoteFile(item.path);
+      row.onclick = open; row.onkeydown = (event) => { if (event.key === 'Enter') open(); };
+      list.appendChild(row);
+    }
+  } catch (error) {
+    list.replaceChildren(waiting); waiting.textContent = '无法读取目录';
+    const raw=error.message || String(error), message=/All configured authentication methods failed/i.test(raw)
+      ? '远程文件认证失败。请检查上方密码；终端中输入过的密码需要在这里重新输入。'
+      : raw;
+    remoteMessage('remote-files-msg', message, 'err');
+  }
+}
+async function openRemoteFile(target) {
+  remoteMessage('remote-files-msg', '正在打开文件…');
+  REMOTE_FILE_PATH = target;
+  $('remote-file-name').textContent = target;
+  $('remote-file-download').disabled = false;
+  REMOTE_FILE_ORIGINAL=''; $('remote-file-editor').value=''; $('remote-file-editor').disabled=true; $('remote-file-save').disabled=true; $('remote-file-dirty').textContent='';
+  try {
+    const d = await api('/api/remote/files/read', remoteFileAuth({ path:target }));
+    if (!d.ok) throw new Error(d.error || '文件读取失败');
+    REMOTE_FILE_PATH = d.path; REMOTE_FILE_ORIGINAL = d.content;
+    $('remote-file-name').textContent = d.path; $('remote-file-editor').value = d.content; $('remote-file-editor').disabled = false; $('remote-file-save').disabled = true; $('remote-file-dirty').textContent = '';
+    remoteMessage('remote-files-msg', `已打开 ${formatRemoteSize(d.size)}`, 'ok');
+  } catch (error) { remoteMessage('remote-files-msg', error.message || String(error), 'err'); }
+}
+async function saveRemoteFile() {
+  if (!REMOTE_FILE_PATH) return;
+  $('remote-file-save').disabled = true; remoteMessage('remote-files-msg', '正在保存…');
+  try {
+    const d = await api('/api/remote/files/write', remoteFileAuth({ path:REMOTE_FILE_PATH, content:$('remote-file-editor').value }));
+    if (!d.ok) throw new Error(d.error || '保存失败');
+    REMOTE_FILE_ORIGINAL = $('remote-file-editor').value; $('remote-file-dirty').textContent = ''; remoteMessage('remote-files-msg', `已保存 ${formatRemoteSize(d.bytes)}`, 'ok');
+  } catch (error) { remoteMessage('remote-files-msg', error.message || String(error), 'err'); $('remote-file-save').disabled = false; }
+}
+async function downloadRemoteFile() {
+  if (!REMOTE_FILE_PATH) return;
+  const button=$('remote-file-download'); button.disabled=true; remoteMessage('remote-files-msg','正在下载到本机…');
+  try {
+    const name=await downloadRemotePath(REMOTE_FILE_PATH,false);
+    remoteMessage('remote-files-msg',`已开始下载到本机：${name}`,'ok');
+  } catch(error) { remoteMessage('remote-files-msg',error.message || String(error),'err'); }
+  finally { button.disabled=!REMOTE_FILE_PATH; }
+}
+async function downloadRemotePath(remotePath,isFolder) {
+  const response=await fetch('/api/remote/files/download-stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(remoteFileAuth({path:remotePath,archive:!!isFolder}))});
+  const contentType=response.headers.get('content-type')||'';
+  if(!response.ok || contentType.includes('application/json')) {
+    let d={}; try{d=await response.json();}catch(_){} throw apiError(d,'下载失败');
+  }
+  const fallback=(isFolder?'remote-folder.tar.gz':remotePath.split('/').pop())||'download';
+  let name=fallback; try{name=decodeURIComponent(response.headers.get('x-codescope-filename')||fallback);}catch(_){}
+  const url=URL.createObjectURL(await response.blob()); const link=document.createElement('a'); link.href=url; link.download=name; document.body.appendChild(link); link.click(); link.remove(); setTimeout(()=>URL.revokeObjectURL(url),1500);
+  return name;
+}
+async function downloadRemoteFolder() {
+  const target=$('remote-files-path').value.trim()||'.'; const button=$('remote-folder-download'); button.disabled=true;
+  remoteMessage('remote-files-msg','正在打包远程文件夹并下载…');
+  try { const name=await downloadRemotePath(target,true); remoteMessage('remote-files-msg',`已开始下载到本机：${name}`,'ok'); }
+  catch(error) { remoteMessage('remote-files-msg',error.message || String(error),'err'); }
+  finally { button.disabled=false; }
+}
+function utf8Base64(value) {
+  const bytes=new TextEncoder().encode(value); let binary=''; const step=0x8000;
+  for(let i=0;i<bytes.length;i+=step) binary+=String.fromCharCode(...bytes.subarray(i,i+step));
+  return btoa(binary);
+}
+async function uploadRemoteStream(file,relativePath,overwrite) {
+  const meta=remoteFileAuth({path:$('remote-files-path').value.trim()||'.',relativePath,overwrite:!!overwrite,size:file.size});
+  const response=await fetch('/api/remote/files/upload-stream',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-CodeScope-Remote':utf8Base64(JSON.stringify(meta))},body:file});
+  let d={}; try{d=await response.json();}catch(_){}
+  if(response.status===409 || d.exists) return d;
+  if(!response.ok || !d.ok) throw apiError(d,'上传失败');
+  return d;
+}
+async function uploadLocalFiles(fileList) {
+  const files=[...(fileList||[])].map((item)=>item && item.file ? item : {file:item,relativePath:(item&&item.webkitRelativePath)||item.name}); if(!files.length) return;
+  if(!$('ssh-host').value.trim() || !$('ssh-user').value.trim()) { remoteMessage('remote-files-msg','请先在“SSH 终端”页填写主机和用户名。','err'); return; }
+  let completed=0;
+  for(const item of files) {
+    const file=item.file, relativePath=item.relativePath||file.name;
+    remoteMessage('remote-files-msg',`正在上传 ${relativePath}（${completed+1}/${files.length}）…`);
+    try {
+      let d=await uploadRemoteStream(file,relativePath,false);
+      if(d.exists) {
+        if(!window.confirm(`远端已存在 ${relativePath}，是否覆盖？`)) continue;
+        d=await uploadRemoteStream(file,relativePath,true);
+      }
+      if(!d.ok) throw apiError(d,'上传失败'); completed++;
+    } catch(error) { remoteMessage('remote-files-msg',`${relativePath}：${error.message || error}`,'err'); }
+  }
+  $('remote-files-picker').value='';
+  $('remote-folder-picker').value='';
+  await loadRemoteFiles();
+  remoteMessage('remote-files-msg',completed?`已上传 ${completed}/${files.length} 个文件到 ${$('remote-files-path').value}`:'没有上传文件',completed?'ok':'');
+}
+function readDirectoryEntries(reader) {
+  return new Promise((resolve,reject)=>{const all=[];const next=()=>reader.readEntries((rows)=>{if(!rows.length){resolve(all);return;}all.push(...rows);next();},reject);next();});
+}
+async function droppedRemoteFiles(dataTransfer) {
+  const items=[...(dataTransfer.items||[])], result=[];
+  async function walk(entry,prefix='') {
+    if(entry.isFile) { const file=await new Promise((resolve,reject)=>entry.file(resolve,reject)); result.push({file,relativePath:prefix+file.name}); return; }
+    if(entry.isDirectory) { const nextPrefix=prefix+entry.name+'/'; for(const child of await readDirectoryEntries(entry.createReader())) await walk(child,nextPrefix); }
+  }
+  if(items.length && items.some((item)=>typeof item.webkitGetAsEntry==='function')) {
+    for(const item of items) { const entry=item.webkitGetAsEntry&&item.webkitGetAsEntry(); if(entry) await walk(entry); }
+    if(result.length) return result;
+  }
+  return [...(dataTransfer.files||[])].map((file)=>({file,relativePath:file.name}));
+}
+function restoreRemotePanelSize() {
+  let width=0,height=0; try { width=Number(localStorage.getItem('mc-remote-panel-width')||0); height=Number(localStorage.getItem('mc-remote-panel-height')||0); } catch(_) {}
+  if(width>=360) $('remote-panel').style.width=Math.min(width,window.innerWidth*.94)+'px';
+  if(height>=320) $('remote-panel').style.height=Math.min(height,window.innerHeight)+'px';
+}
+function initRemotePanelResize() {
+  const grip=$('remote-resizer'), topGrip=$('remote-resizer-y'), panel=$('remote-panel');
+  makeResizer(grip,'v',()=>panel.getBoundingClientRect().width,(value)=>{
+    const width=clampV(value,360,Math.max(360,window.innerWidth-220)); panel.style.width=width+'px';
+    try{localStorage.setItem('mc-remote-panel-width',String(Math.round(width)));}catch(_){}
+  },true);
+  makeResizer(topGrip,'h',()=>panel.getBoundingClientRect().height,(value)=>{
+    const height=clampV(value,320,window.innerHeight); panel.style.height=height+'px';
+    try{localStorage.setItem('mc-remote-panel-height',String(Math.round(height)));}catch(_){}
+  });
+  grip.ondblclick=()=>{panel.style.width='460px';try{localStorage.removeItem('mc-remote-panel-width');}catch(_) {}};
+  topGrip.ondblclick=()=>{panel.style.height='100vh';try{localStorage.removeItem('mc-remote-panel-height');}catch(_) {}};
 }
 function closeVnc(message = '已断开') {
   if (VNC_RFB) { try { VNC_RFB.disconnect(); } catch (_) {} }
@@ -7333,9 +7775,30 @@ async function connectVnc() {
 $('btn-remote').onclick = () => { $('remote-panel').classList.add('open'); loadRemoteStatus(); };
 $('btn-remote-close').onclick = () => $('remote-panel').classList.remove('open');
 $('remote-tab-ssh').onclick = () => remoteTab('ssh');
+$('remote-tab-files').onclick = () => remoteTab('files');
 $('remote-tab-vnc').onclick = () => remoteTab('vnc');
 $('ssh-connect').onclick = connectSsh;
 $('ssh-disconnect').onclick = disconnectSsh;
+$('remote-files-refresh').onclick = () => loadRemoteFiles();
+$('remote-files-upload').onclick = () => $('remote-files-picker').click();
+$('remote-files-picker').onchange = (event) => uploadLocalFiles(event.target.files);
+$('remote-folder-upload').onclick = () => $('remote-folder-picker').click();
+$('remote-folder-picker').onchange = (event) => uploadLocalFiles(event.target.files);
+$('remote-folder-download').onclick = downloadRemoteFolder;
+$('remote-files-toggle-password').onclick = () => {
+  const input=$('remote-files-password'), visible=input.type==='text'; input.type=visible?'password':'text'; $('remote-files-toggle-password').textContent=visible?'显示':'隐藏'; input.focus();
+};
+$('remote-files-password').onkeydown = (event) => { if (event.key === 'Enter') loadRemoteFiles(); };
+$('remote-files-up').onclick = () => {
+  const current = $('remote-files-path').value.trim() || '.';
+  const bits = current.replace(/\/$/, '').split('/'); bits.pop(); loadRemoteFiles(bits.join('/') || (current.startsWith('/') ? '/' : '.'));
+};
+$('remote-file-editor').oninput = () => { const dirty = $('remote-file-editor').value !== REMOTE_FILE_ORIGINAL; $('remote-file-dirty').textContent = dirty ? '● 未保存' : ''; $('remote-file-save').disabled = !dirty; };
+$('remote-file-save').onclick = saveRemoteFile;
+$('remote-file-download').onclick = downloadRemoteFile;
+for(const eventName of ['dragenter','dragover']) $('remote-files-list').addEventListener(eventName,(event)=>{event.preventDefault();event.dataTransfer.dropEffect='copy';$('remote-files-list').classList.add('dragover');});
+$('remote-files-list').addEventListener('dragleave',()=> $('remote-files-list').classList.remove('dragover'));
+$('remote-files-list').addEventListener('drop',async(event)=>{event.preventDefault();$('remote-files-list').classList.remove('dragover');try{await uploadLocalFiles(await droppedRemoteFiles(event.dataTransfer));}catch(error){remoteMessage('remote-files-msg',error.message||String(error),'err');}});
 $('vnc-connect').onclick = connectVnc;
 $('vnc-disconnect').onclick = () => closeVnc();
 $('vnc-close').onclick = () => closeVnc();
@@ -7368,7 +7831,63 @@ $('vnc-keyboard-input').addEventListener('input', (event) => {
   sendVncText(input.value);
   input.value = '';
 });
+
+let PROJECT_DATA = { tasks:null, compile:null, health:null };
+function projectTab(name) {
+  document.querySelectorAll('[data-project-tab]').forEach((button) => button.classList.toggle('on', button.dataset.projectTab === name));
+  for (const key of ['tasks', 'compile', 'health']) $('project-' + key).classList.toggle('hidden', name !== key);
+  if (name === 'tasks') loadProjectTasks();
+  if (name === 'compile') loadCompileDatabase();
+  if (name === 'health') loadProjectHealth();
+}
+async function loadProjectTasks(force = false) {
+  if (PROJECT_DATA.tasks && !force) return renderProjectTasks(PROJECT_DATA.tasks);
+  $('task-list').textContent = '正在检测构建入口…';
+  try { PROJECT_DATA.tasks = await api('/api/project/tasks'); if (!PROJECT_DATA.tasks.ok) throw apiError(PROJECT_DATA.tasks, '构建任务读取失败'); renderProjectTasks(PROJECT_DATA.tasks); }
+  catch (error) { $('task-list').textContent = error.message || String(error); }
+}
+function renderProjectTasks(data) {
+  $('project-root').textContent = data.root || ''; const list = $('task-list'); list.replaceChildren();
+  if (!data.tasks || !data.tasks.length) { const empty=document.createElement('div'); empty.className='project-card'; empty.textContent='未检测到常见构建入口，可以在下方运行自定义命令。'; list.appendChild(empty); return; }
+  for (const task of data.tasks) {
+    const row=document.createElement('div'); row.className='task-row'; const info=document.createElement('div'); const title=document.createElement('b'); title.textContent=task.name; const cmd=document.createElement('code'); cmd.textContent=task.command; info.append(title,cmd); const run=document.createElement('button'); run.textContent='运行'; run.onclick=()=>runProjectTask({id:task.id}, run); row.append(info,run); list.appendChild(row);
+  }
+}
+async function runProjectTask(payload, button) {
+  if (button) button.disabled=true; const out=$('task-output'); out.textContent='正在运行…';
+  try {
+    const d=await api('/api/project/tasks/run',payload); out.textContent=`$ ${d.command || payload.command}\n\n${d.stdout || ''}${d.stderr || ''}${d.error ? '\n' + d.error : ''}\n\n[退出码 ${d.exitCode ?? '-'} · ${d.durationMs || 0} ms]`; out.style.color=d.ok?'#aebbd0':'#ff9690';
+  } catch(error) { out.textContent=error.message || String(error); out.style.color='#ff9690'; }
+  finally { if(button) button.disabled=false; }
+}
+async function loadCompileDatabase(force = false) {
+  const root=$('compile-summary'); root.textContent='正在查找 compile_commands.json…';
+  try { if (!PROJECT_DATA.compile || force) PROJECT_DATA.compile=await api('/api/project/compile-db'); }
+  catch(error) { root.textContent=error.message || String(error); return; }
+  const d=PROJECT_DATA.compile; root.replaceChildren();
+  if (!d || !d.ok) { const card=document.createElement('div'); card.className='project-card'; const h=document.createElement('h3'); h.textContent='编译数据库接口不可用'; const p=document.createElement('p'); p.textContent=apiError(d,'读取失败').message; card.append(h,p); root.appendChild(card); return; }
+  COMPILE_DB=d; COMP_IDX_FILE='';
+  const card=document.createElement('div'); card.className='project-card'; const h=document.createElement('h3'); h.textContent=d.found?'✓ 已读取 compile_commands.json':'尚未生成 compile_commands.json'; const p=document.createElement('p'); p.textContent=d.found?`${d.path} · ${d.entries} 条编译单元`:'这不是故障。普通项目可以继续使用；C/C++ 项目可在 CMake 中启用 CMAKE_EXPORT_COMPILE_COMMANDS 后重新打开本页。'; card.append(h,p); root.appendChild(card);
+  if (d.found && d.ok) {
+    const detail=document.createElement('div'); detail.className='project-card'; const dh=document.createElement('h3'); dh.textContent='索引上下文'; const dp=document.createElement('p'); dp.textContent=`头文件路径 ${d.includePaths.length} 个 · 宏 ${d.defines.length} 个`; const code=document.createElement('pre'); code.className='project-output'; code.textContent=[...d.includePaths.map(x=>'I  '+x),...d.defines.map(x=>'D  '+x)].join('\n') || '没有额外参数'; detail.append(dh,dp,code); root.appendChild(detail);
+  }
+}
+async function loadProjectHealth(force = false) {
+  const root=$('health-summary'); root.textContent='正在扫描工程…';
+  try {
+    if (!PROJECT_DATA.health || force) PROJECT_DATA.health=await api('/api/project/health'); const d=PROJECT_DATA.health; if (!d || !d.ok || !d.summary) throw apiError(d,'健康报告读取失败'); root.replaceChildren(); $('project-root').textContent=d.root || '';
+    const grid=document.createElement('div'); grid.className='metric-grid'; for(const [label,value] of [['文件',d.summary.files],['代码行',d.summary.lines],['TODO',d.summary.todos],['循环依赖',d.summary.cycles],['构建任务',d.tasks],['体积',formatCapacity(d.summary.bytes)]]) { const m=document.createElement('div'); m.className='metric'; const b=document.createElement('b'); b.textContent=value; const s=document.createElement('span'); s.textContent=label; m.append(b,s); grid.appendChild(m); } root.appendChild(grid);
+    const langs=document.createElement('div'); langs.className='project-card'; const lh=document.createElement('h3'); lh.textContent='语言构成'; const lp=document.createElement('p'); lp.textContent=Object.entries(d.languages).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${v}`).join(' · '); langs.append(lh,lp); root.appendChild(langs);
+    const issues=document.createElement('div'); issues.className='project-card'; const ih=document.createElement('h3'); ih.textContent='检查结果'; issues.appendChild(ih); const rows=(d.issues||[]).concat((d.cycles||[]).slice(0,8).map(c=>({message:'循环：'+c.join(' → ')}))); if(!rows.length){const p=document.createElement('p');p.textContent='未发现明显问题。';issues.appendChild(p);} for(const item of rows){const p=document.createElement('p');p.textContent=(item.level==='warn'?'⚠ ':'• ')+(item.file?item.file+'：':'')+item.message;issues.appendChild(p);} root.appendChild(issues);
+  } catch(error) { root.textContent=error.message || String(error); }
+}
+$('btn-project').onclick=()=>{ $('project-panel').classList.add('open'); projectTab('tasks'); };
+$('btn-project-close').onclick=()=> $('project-panel').classList.remove('open');
+document.querySelectorAll('[data-project-tab]').forEach((button)=>button.onclick=()=>projectTab(button.dataset.projectTab));
+$('task-run-custom').onclick=()=>runProjectTask({command:$('task-command').value.trim(),cwd:$('task-cwd').value.trim()||'.'},$('task-run-custom'));
 restoreRemoteFields();
+restoreRemotePanelSize();
+initRemotePanelResize();
 loadRemoteStatus();
 
 $('btn-run').onclick = doRun;
@@ -7376,7 +7895,12 @@ $('btn-check').onclick = doCheck;
 $('btn-format').onclick = doFormat;
 $('btn-preview').onclick = doPreview;
 $('btn-edit').onclick = toggleEdit;
+$('btn-history').onclick = openTimeline;
 $('btn-info').onclick = openEditDialog;
+$('review-close').onclick = closeReview;
+$('review-restore').onclick = restoreTimeline;
+$('review-dialog').addEventListener('click', (event) => { if (event.target === $('review-dialog')) closeReview(); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !$('review-dialog').classList.contains('hidden')) closeReview(); });
 // Cmd/Ctrl+S 立即落盘（自动保存已覆盖，此处保险同步）
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -7817,6 +8341,7 @@ $('btn-env-refresh').onclick = () => loadEnv(true, false);
 $('btn-env-deploy').onclick = deployCurrentEnv;
 
 refresh(false);
+api('/api/project/compile-db').then((data) => { if (data && data.ok) { COMPILE_DB=data; PROJECT_DATA.compile=data; COMP_IDX_FILE=''; } }).catch(() => {});
 loadEnv(false, true);
 setInterval(() => loadEnv(true, true), 60000);
 </script>

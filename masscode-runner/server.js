@@ -12,7 +12,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawn, execFile, execFileSync } = require('child_process');
+const { pipeline } = require('stream/promises');
 const { WebSocketServer } = require('ws');
+const { Client: SshClient } = require('ssh2');
 const APP_VERSION = require('./package.json').version;
 
 const PORT_VALUE = Number(process.env.CODESCOPE_PORT || process.env.MASSCODE_RUNNER_PORT || 4877);
@@ -1471,6 +1473,243 @@ function sshSessionSpec(body) {
   return { command: ssh, args, mode: 'ssh', label: 'SSH · ' + target + ':' + port, host, port, user };
 }
 
+function sshFileConfig(body) {
+  const host = remoteHost(body && body.host);
+  const port = remotePort(body && body.port, 22);
+  const username = String((body && body.user) || '').trim();
+  if (!host) throw new Error('SSH 主机地址不合法');
+  if (!port) throw new Error('SSH 端口必须在 1–65535 之间');
+  if (!/^[A-Za-z0-9._-]+$/.test(username)) throw new Error('请填写有效的 SSH 用户名');
+  const config = { host: host.replace(/^\[|\]$/g, ''), port, username, readyTimeout: 12000, keepaliveInterval: 8000, keepaliveCountMax: 2 };
+  if (process.env.SSH_AUTH_SOCK) config.agent = process.env.SSH_AUTH_SOCK;
+  const password = String((body && body.password) || '');
+  if (password) {
+    config.password = password.slice(0, 4096);
+    // 部分 Linux SSH 服务关闭 password 方法，只通过 keyboard-interactive 询问密码。
+    // 系统 ssh 会自动处理该流程；ssh2 需要显式开启并在连接事件中作答。
+    config.tryKeyboard = true;
+  }
+  const keyInput = String((body && body.identityFile) || '').trim();
+  if (keyInput) {
+    const keyFile = path.resolve(keyInput.startsWith('~/') ? path.join(os.homedir(), keyInput.slice(2)) : keyInput);
+    try { config.privateKey = fs.readFileSync(keyFile); }
+    catch (_) { throw new Error('SSH 私钥文件不存在或不可读取'); }
+  }
+  if (!config.password && !config.privateKey) {
+    const candidates = ['id_ed25519', 'id_rsa', 'id_ecdsa'].map((name) => path.join(os.homedir(), '.ssh', name));
+    const found = candidates.find((file) => fs.existsSync(file));
+    if (found) config.privateKey = fs.readFileSync(found);
+  }
+  return config;
+}
+
+function remoteFilePath(value, fallback = '.') {
+  const raw = String(value == null ? fallback : value).trim() || fallback;
+  if (raw.includes('\0') || raw.length > 4096) throw new Error('远程路径不合法');
+  return path.posix.normalize(raw.replace(/\\/g, '/'));
+}
+
+function withSftp(body, work) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const client = new SshClient();
+    const keyboardPassword = String((body && body.password) || '').slice(0, 4096);
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      try { client.end(); } catch (_) {}
+      error ? reject(error) : resolve(value);
+    };
+    client.once('ready', () => client.sftp((error, sftp) => {
+      if (error) return finish(error);
+      Promise.resolve().then(() => work(sftp)).then((value) => finish(null, value), finish);
+    }));
+    client.on('keyboard-interactive', (_name, _instructions, _language, prompts, finish) => {
+      if (!keyboardPassword) return finish([]);
+      finish((prompts || []).map(() => keyboardPassword));
+    });
+    client.once('error', (error) => finish(new Error('SSH 连接失败: ' + String(error.message || error))));
+    try { client.connect(sshFileConfig(body)); } catch (error) { finish(error); }
+  });
+}
+
+function sftpCall(sftp, method, ...args) {
+  return new Promise((resolve, reject) => sftp[method](...args, (error, value) => error ? reject(error) : resolve(value)));
+}
+
+async function remoteList(body) {
+  const target = remoteFilePath(body && body.path);
+  return withSftp(body, async (sftp) => {
+    const rows = await sftpCall(sftp, 'readdir', target);
+    const entries = rows.map((row) => {
+      const attrs = row.attrs || {};
+      const name = String(row.filename || '');
+      const fullPath = path.posix.join(target === '.' ? '' : target, name) || '.';
+      return { name, path: fullPath, directory: !!(attrs.isDirectory && attrs.isDirectory()), symlink: !!(attrs.isSymbolicLink && attrs.isSymbolicLink()), size: Number(attrs.size || 0), mtime: Number(attrs.mtime || 0) };
+    }).filter((row) => row.name !== '.' && row.name !== '..')
+      .sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name, 'zh-CN'));
+    return { ok: true, path: target, parent: target === '/' ? '/' : (path.posix.dirname(target) || '.'), entries };
+  });
+}
+
+async function remoteRead(body) {
+  const target = remoteFilePath(body && body.path, '');
+  if (!target || target === '.') throw new Error('请选择远程文件');
+  return withSftp(body, async (sftp) => {
+    const attrs = await sftpCall(sftp, 'stat', target);
+    if (attrs.isDirectory && attrs.isDirectory()) throw new Error('目标是文件夹');
+    if (Number(attrs.size || 0) > 2 * 1024 * 1024) throw new Error('远程文件超过 2 MB，暂不在编辑器中打开');
+    const data = await sftpCall(sftp, 'readFile', target);
+    if (data.includes(0)) throw new Error('二进制文件不支持文本编辑');
+    return { ok: true, path: target, content: data.toString('utf8'), size: data.length, mtime: Number(attrs.mtime || 0) };
+  });
+}
+
+async function remoteWrite(body) {
+  const target = remoteFilePath(body && body.path, '');
+  const content = String((body && body.content) == null ? '' : body.content);
+  if (!target || target === '.') throw new Error('请选择远程文件');
+  if (Buffer.byteLength(content) > 2 * 1024 * 1024) throw new Error('远程文件超过 2 MB，无法保存');
+  return withSftp(body, async (sftp) => {
+    await sftpCall(sftp, 'writeFile', target, Buffer.from(content, 'utf8'));
+    return { ok: true, path: target, bytes: Buffer.byteLength(content), savedAt: Date.now() };
+  });
+}
+
+function remoteTransferMeta(req) {
+  const encoded = String(req.headers['x-codescope-remote'] || '');
+  if (!encoded || encoded.length > 32768) throw new Error('缺少远程传输参数');
+  try { return JSON.parse(Buffer.from(encoded, 'base64').toString('utf8')); }
+  catch (_) { throw new Error('远程传输参数不正确'); }
+}
+
+function safeRemoteRelative(value) {
+  const raw = String(value || '').replace(/\\/g, '/').replace(/^\.\//, '');
+  const normalized = path.posix.normalize(raw);
+  if (!raw || raw.includes('\0') || raw.length > 4096 || raw.startsWith('/') || normalized === '.' || normalized === '..' || normalized.startsWith('../')) {
+    throw new Error('上传相对路径不合法');
+  }
+  return normalized;
+}
+
+function connectSshClient(body) {
+  return new Promise((resolve, reject) => {
+    const client = new SshClient();
+    let settled = false;
+    const password = String((body && body.password) || '').slice(0, 4096);
+    client.once('ready', () => { if (!settled) { settled = true; resolve(client); } });
+    client.on('keyboard-interactive', (_name, _instructions, _language, prompts, finish) => {
+      finish(password ? (prompts || []).map(() => password) : []);
+    });
+    client.once('error', (error) => {
+      if (!settled) { settled = true; reject(new Error('SSH 连接失败: ' + String(error.message || error))); }
+    });
+    try { client.connect(sshFileConfig(body)); }
+    catch (error) { settled = true; reject(error); }
+  });
+}
+
+function clientSftp(client) {
+  return new Promise((resolve, reject) => client.sftp((error, sftp) => error ? reject(error) : resolve(sftp)));
+}
+
+async function sftpMkdirp(sftp, target) {
+  const normalized = path.posix.normalize(target || '.');
+  if (normalized === '.' || normalized === '/') return;
+  const absolute = normalized.startsWith('/');
+  let current = absolute ? '/' : '';
+  for (const part of normalized.split('/').filter(Boolean)) {
+    current = current === '/' ? '/' + part : (current ? current + '/' + part : part);
+    try { await sftpCall(sftp, 'mkdir', current); }
+    catch (_) {
+      const attrs = await sftpCall(sftp, 'stat', current);
+      if (!(attrs.isDirectory && attrs.isDirectory())) throw new Error('远端路径中存在同名文件: ' + current);
+    }
+  }
+}
+
+async function streamRemoteUpload(req, res) {
+  let body;
+  try { body = remoteTransferMeta(req); }
+  catch (error) { req.resume(); send(res, 400, { ok:false, error:String(error.message || error) }); return; }
+  let client;
+  try {
+    const dir = remoteFilePath(body.path);
+    const relativePath = safeRemoteRelative(body.relativePath || body.name);
+    const target = path.posix.join(dir === '.' ? '' : dir, relativePath) || relativePath;
+    client = await connectSshClient(body);
+    const sftp = await clientSftp(client);
+    await sftpMkdirp(sftp, path.posix.dirname(target));
+    let exists = false;
+    try {
+      const attrs = await sftpCall(sftp, 'stat', target);
+      if (attrs.isDirectory && attrs.isDirectory()) throw new Error('远端已存在同名目录');
+      exists = true;
+    } catch (error) {
+      if (/同名目录/.test(String(error.message || error))) throw error;
+    }
+    if (exists && !body.overwrite) {
+      req.resume();
+      send(res, 409, { ok:false, exists:true, path:target, error:'远端已存在同名文件' });
+      return;
+    }
+    let bytes = 0;
+    req.on('data', (chunk) => { bytes += chunk.length; });
+    await pipeline(req, sftp.createWriteStream(target, { flags:'w' }));
+    send(res, 200, { ok:true, path:target, name:path.posix.basename(target), bytes, overwritten:exists, savedAt:Date.now() });
+  } catch (error) {
+    req.resume();
+    if (!res.headersSent) send(res, 200, { ok:false, error:String(error.message || error) });
+    else res.destroy(error);
+  } finally {
+    if (client) { try { client.end(); } catch (_) {} }
+  }
+}
+
+function shellQuote(value) {
+  return "'" + String(value).replace(/'/g, "'\"'\"'") + "'";
+}
+
+function downloadHeaders(res, name, contentType, size) {
+  const safeName = String(name || 'download').replace(/[\r\n]/g, '_');
+  const headers = {
+    'Content-Type': contentType || 'application/octet-stream',
+    'Content-Disposition': `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(safeName)}`,
+    'X-CodeScope-Filename': encodeURIComponent(safeName),
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+  };
+  if (Number.isFinite(size) && size >= 0) headers['Content-Length'] = String(size);
+  res.writeHead(200, headers);
+}
+
+async function streamRemoteDownload(res, body) {
+  const target = remoteFilePath(body && body.path, '');
+  if (!target) throw new Error('请选择远程文件或文件夹');
+  let client;
+  try {
+    client = await connectSshClient(body);
+    const sftp = await clientSftp(client);
+    const attrs = await sftpCall(sftp, 'stat', target);
+    if (!(attrs.isDirectory && attrs.isDirectory())) {
+      const name = path.posix.basename(target) || 'download';
+      downloadHeaders(res, name, 'application/octet-stream', Number(attrs.size || 0));
+      await pipeline(sftp.createReadStream(target), res);
+      return;
+    }
+    const normalized = target === '.' ? '.' : target.replace(/\/$/, '');
+    const parent = normalized === '/' ? '/' : path.posix.dirname(normalized);
+    const base = normalized === '/' || normalized === '.' ? '.' : path.posix.basename(normalized);
+    const archiveName = (normalized === '/' ? 'root' : normalized === '.' ? 'remote-folder' : path.posix.basename(normalized)) + '.tar.gz';
+    const command = `tar -czf - -C ${shellQuote(parent)} -- ${shellQuote(base)}`;
+    const stream = await new Promise((resolve, reject) => client.exec(command, (error, channel) => error ? reject(error) : resolve(channel)));
+    downloadHeaders(res, archiveName, 'application/gzip');
+    await pipeline(stream, res);
+  } finally {
+    if (client) { try { client.end(); } catch (_) {} }
+  }
+}
+
 /* --------------------------------- Git 面板 ---------------------------------- */
 
 let GIT_ROOT = null;   // 缓存仓库根（vault 所在 git 仓库，通常在其上级目录）
@@ -1537,6 +1776,258 @@ function gitStatus() {
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
+}
+
+function safeGitPath(input) {
+  const root = gitRoot();
+  if (!root) throw new Error('未找到 Git 仓库');
+  const value = String(input || '').replace(/\\/g, '/').replace(/^\.\//, '');
+  if (!value || value.includes('\0') || path.isAbsolute(value)) throw new Error('文件路径不合法');
+  const full = path.resolve(root, value);
+  if (full !== root && !full.startsWith(root + path.sep)) throw new Error('文件路径越界');
+  return { root, full, relative: path.relative(root, full).split(path.sep).join('/') };
+}
+
+function unifiedTextDiff(before, after, beforeLabel, afterLabel) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codescope-diff-'));
+  const left = path.join(dir, 'before.txt'), right = path.join(dir, 'after.txt');
+  try {
+    fs.writeFileSync(left, String(before || ''), 'utf8');
+    fs.writeFileSync(right, String(after || ''), 'utf8');
+    let output = '';
+    try {
+      output = execFileSync('git', ['diff', '--no-index', '--no-color', '--no-ext-diff', '--unified=3', '--', left, right], {
+        encoding: 'utf8', timeout: 15000, maxBuffer: 4 * 1024 * 1024,
+      });
+    } catch (e) {
+      // git diff 用退出码 1 表示“存在差异”，并非执行失败。
+      if (e && e.status === 1) output = String(e.stdout || '');
+      else throw e;
+    }
+    return output
+      .split(left).join(beforeLabel || '旧版本')
+      .split(right).join(afterLabel || '当前版本')
+      .slice(0, 2 * 1024 * 1024);
+  } finally {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  }
+}
+
+function gitFileDiff(input) {
+  const item = safeGitPath(input);
+  let tracked = true;
+  try { execFileSync('git', ['ls-files', '--error-unmatch', '--', item.relative], { cwd: item.root, stdio: 'ignore', timeout: 10000 }); }
+  catch (_) { tracked = false; }
+  let diff = '', binary = false;
+  if (tracked) {
+    try {
+      diff = execFileSync('git', ['-c', 'core.quotepath=false', 'diff', '--no-color', '--no-ext-diff', '--unified=3', 'HEAD', '--', item.relative], {
+        cwd: item.root, encoding: 'utf8', timeout: 20000, maxBuffer: 4 * 1024 * 1024,
+      });
+    } catch (e) { throw new Error(String((e && e.stderr) || e.message || e).slice(0, 600)); }
+    binary = /^(?:Binary files .* differ|GIT binary patch)$/m.test(diff);
+  } else if (fs.existsSync(item.full) && fs.statSync(item.full).isFile()) {
+    const data = fs.readFileSync(item.full);
+    binary = data.includes(0);
+    if (!binary && data.length <= 2 * 1024 * 1024) diff = unifiedTextDiff('', data.toString('utf8'), '/dev/null', 'b/' + item.relative);
+  }
+  const lines = diff.split('\n');
+  const additions = lines.filter((line) => line.startsWith('+') && !line.startsWith('+++')).length;
+  const deletions = lines.filter((line) => line.startsWith('-') && !line.startsWith('---')).length;
+  return { ok: true, path: item.relative, tracked, binary, additions, deletions, diff };
+}
+
+function shortHash(text) {
+  let h = 2166136261;
+  const value = String(text || '');
+  for (let i = 0; i < value.length; i++) { h ^= value.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36);
+}
+
+function timelineRoot() {
+  let base;
+  if (process.env.CODESCOPE_DATA_HOME) base = path.resolve(process.env.CODESCOPE_DATA_HOME);
+  else if (process.platform === 'darwin') base = path.join(os.homedir(), 'Library/Application Support');
+  else if (process.platform === 'win32') base = process.env.APPDATA || path.join(os.homedir(), 'AppData/Roaming');
+  else base = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local/share');
+  return path.join(base, 'CodeScope', 'timeline', shortHash(path.resolve(vaultPath())));
+}
+
+function timelineTarget(file, fragment) {
+  const codeRoot = path.resolve(path.join(vaultPath(), 'code'));
+  const full = path.resolve(String(file || ''));
+  if (!full.startsWith(codeRoot + path.sep) || path.extname(full).toLowerCase() !== '.md') throw new Error('时间线文件不合法');
+  const index = Number(fragment);
+  if (!Number.isInteger(index) || index < 0 || index > 10000) throw new Error('片段索引不合法');
+  const relative = path.relative(codeRoot, full).split(path.sep).join('/');
+  const dir = path.join(timelineRoot(), shortHash(relative + '#' + index));
+  return { full, relative, fragment: index, dir };
+}
+
+function timelineEntries(target) {
+  let names = [];
+  try { names = fs.readdirSync(target.dir).filter((name) => /^\d+-[a-z0-9]+\.json$/i.test(name)).sort().reverse(); } catch (_) { return []; }
+  return names.slice(0, 60).flatMap((name) => {
+    try {
+      const value = JSON.parse(fs.readFileSync(path.join(target.dir, name), 'utf8'));
+      return [{ id: name.slice(0, -5), timestamp: Number(value.timestamp || 0), size: Number(value.size || Buffer.byteLength(String(value.code || ''))), reason: String(value.reason || '自动保存'), preview: String(value.preview || '').slice(0, 120) }];
+    } catch (_) { return []; }
+  });
+}
+
+function recordTimeline(file, fragment, code, reason, force) {
+  try {
+    const target = timelineTarget(file, fragment);
+    const value = String(code == null ? '' : code);
+    if (Buffer.byteLength(value, 'utf8') > 1024 * 1024) return;
+    fs.mkdirSync(target.dir, { recursive: true });
+    const entries = timelineEntries(target);
+    if (entries.length) {
+      try {
+        const latest = JSON.parse(fs.readFileSync(path.join(target.dir, entries[0].id + '.json'), 'utf8'));
+        if (String(latest.code || '') === value) return;
+      } catch (_) {}
+    }
+    const now = Date.now();
+    // 自动保存以 15 秒为一个检查点，保留该时间段最后一次成功写入的内容。
+    const bucket = force ? now : Math.floor(now / 15000) * 15000;
+    const id = bucket + '-' + shortHash(target.relative + '#' + target.fragment);
+    const firstLine = value.split(/\r?\n/).find((line) => line.trim()) || '空内容';
+    fs.writeFileSync(path.join(target.dir, id + '.json'), JSON.stringify({
+      timestamp: now, file: target.relative, fragment: target.fragment, reason: reason || '自动保存',
+      size: Buffer.byteLength(value, 'utf8'), preview: firstLine.trim().slice(0, 120), code: value,
+    }), 'utf8');
+    const stale = fs.readdirSync(target.dir).filter((name) => /^\d+-[a-z0-9]+\.json$/i.test(name)).sort().reverse().slice(60);
+    for (const name of stale) { try { fs.unlinkSync(path.join(target.dir, name)); } catch (_) {} }
+  } catch (_) { /* 时间线失败不能阻断正常保存 */ }
+}
+
+function timelineItem(file, fragment, id, currentCode) {
+  const target = timelineTarget(file, fragment);
+  if (!/^\d+-[a-z0-9]+$/i.test(String(id || ''))) throw new Error('时间线版本标识不合法');
+  const value = JSON.parse(fs.readFileSync(path.join(target.dir, id + '.json'), 'utf8'));
+  const code = String(value.code || '');
+  return {
+    ok: true, id, timestamp: Number(value.timestamp || 0), reason: String(value.reason || '自动保存'),
+    size: Buffer.byteLength(code, 'utf8'), code,
+    diff: unifiedTextDiff(code, String(currentCode || ''), '历史版本', '当前版本'),
+  };
+}
+
+/* -------------------------- 通用工程：任务 / 编译数据库 / 健康 -------------------------- */
+
+function projectRoot() { return gitRoot() || path.resolve(vaultPath(), '..'); }
+function safeProjectDir(value) {
+  const root = projectRoot();
+  const full = path.resolve(root, String(value || '.'));
+  if (full !== root && !full.startsWith(root + path.sep)) throw new Error('工作目录超出当前工程');
+  if (!fs.existsSync(full) || !fs.statSync(full).isDirectory()) throw new Error('工作目录不存在');
+  return full;
+}
+function walkProject(limit = 6000) {
+  const root = projectRoot(), out = [], ignored = new Set(['.git', 'node_modules', '.venv', 'venv', 'dist', 'build', 'out', 'coverage', '__pycache__', '.idea', '.vscode']);
+  const visit = (dir, depth) => {
+    if (out.length >= limit || depth > 12) return;
+    let rows = []; try { rows = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+    for (const row of rows) {
+      if (out.length >= limit || ignored.has(row.name)) continue;
+      const full = path.join(dir, row.name);
+      if (row.isDirectory()) visit(full, depth + 1);
+      else if (row.isFile()) out.push({ full, relative: path.relative(root, full).split(path.sep).join('/'), ext: path.extname(row.name).toLowerCase(), name: row.name });
+    }
+  };
+  visit(root, 0);
+  return out;
+}
+function taskCatalog() {
+  const root = projectRoot(), tasks = [];
+  const add = (id, name, command, cwd = '.') => tasks.push({ id:id + '@' + cwd, name, command, cwd, detected:true });
+  const markers = walkProject(4000).filter((f) => ['CMakeLists.txt','Makefile','makefile','build.ninja','package.json','pyproject.toml','requirements.txt'].includes(f.name)).slice(0,100);
+  for (const file of markers) {
+    const cwd = path.posix.dirname(file.relative) === '.' ? '.' : path.posix.dirname(file.relative), suffix = cwd === '.' ? '' : ` · ${cwd}`;
+    if (file.name === 'CMakeLists.txt') { add('cmake-configure','CMake 配置'+suffix,'cmake -S . -B build',cwd); add('cmake-build','CMake 构建'+suffix,'cmake --build build',cwd); }
+    else if (file.name === 'Makefile' || file.name === 'makefile') add('make','Make 构建'+suffix,'make',cwd);
+    else if (file.name === 'build.ninja') add('ninja','Ninja 构建'+suffix,'ninja',cwd);
+    else if (file.name === 'package.json') {
+      try { const pkg=JSON.parse(fs.readFileSync(file.full,'utf8')); for(const name of Object.keys(pkg.scripts||{})) add('npm:'+name,'npm · '+name+suffix,'npm run '+name,cwd); } catch (_) {}
+    } else if (file.name === 'pyproject.toml') add('python-build','Python 构建'+suffix,'python -m build',cwd);
+    else if (file.name === 'requirements.txt') add('python-install','Python 安装依赖'+suffix,'python -m pip install -r requirements.txt',cwd);
+  }
+  return { ok: true, root, tasks };
+}
+function runProjectCommand(command, cwd) {
+  const value = String(command || '').trim();
+  if (!value || value.length > 4000 || /[\0\r\n]/.test(value)) return Promise.resolve({ ok: false, error: '命令不合法' });
+  let dir; try { dir = safeProjectDir(cwd); } catch (error) { return Promise.resolve({ ok:false, error:String(error.message || error) }); }
+  const shell = process.platform === 'win32' ? (process.env.COMSPEC || 'cmd.exe') : (process.env.SHELL || '/bin/sh');
+  const args = process.platform === 'win32' ? ['/d', '/s', '/c', value] : ['-lc', value];
+  const started = Date.now();
+  return new Promise((resolve) => execFile(shell, args, { cwd: dir, encoding: 'utf8', timeout: 120000, maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => resolve({
+    ok: !error, command: value, cwd: path.relative(projectRoot(), dir) || '.', durationMs: Date.now() - started,
+    exitCode: error && Number.isInteger(error.code) ? error.code : 0, stdout: String(stdout || ''), stderr: String(stderr || ''), error: error ? String(error.killed ? '任务超时（120 秒）' : error.message || error).slice(0, 500) : '',
+  })));
+}
+function findCompileDatabase() {
+  const root = projectRoot();
+  const direct = [path.join(root, 'compile_commands.json'), path.join(root, 'build', 'compile_commands.json')].find((file) => fs.existsSync(file));
+  if (direct) return direct;
+  return (walkProject(3000).find((item) => item.name === 'compile_commands.json') || {}).full || '';
+}
+function shellWords(command) {
+  return String(command || '').match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)?.map((v) => v.replace(/^(?:"(.*)"|'(.*)')$/, '$1$2')) || [];
+}
+function compileDatabaseInfo() {
+  const file = findCompileDatabase();
+  if (!file) return { ok: true, found: false, entries: 0, path: '', includePaths: [], defines: [], languages: {} };
+  const st = fs.statSync(file); if (st.size > 20 * 1024 * 1024) throw new Error('compile_commands.json 超过 20 MB');
+  const rows = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!Array.isArray(rows)) throw new Error('compile_commands.json 格式不正确');
+  const includes = new Set(), defines = new Set(), languages = {};
+  for (const row of rows.slice(0, 20000)) {
+    const args = Array.isArray(row.arguments) ? row.arguments.map(String) : shellWords(row.command);
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i];
+      if (arg === '-I' || arg === '-isystem') { if (args[i + 1]) includes.add(path.resolve(row.directory || projectRoot(), args[++i])); }
+      else if (arg.startsWith('-I') && arg.length > 2) includes.add(path.resolve(row.directory || projectRoot(), arg.slice(2)));
+      else if (arg === '-D') { if (args[i + 1]) defines.add(args[++i]); }
+      else if (arg.startsWith('-D') && arg.length > 2) defines.add(arg.slice(2));
+    }
+    const ext = path.extname(String(row.file || '')).toLowerCase() || 'unknown'; languages[ext] = (languages[ext] || 0) + 1;
+  }
+  return { ok: true, found: true, entries: rows.length, path: path.relative(projectRoot(), file).split(path.sep).join('/'), includePaths: [...includes].slice(0, 300), defines: [...defines].slice(0, 1000), languages };
+}
+const LANGUAGE_BY_EXT = { '.js':'JavaScript','.mjs':'JavaScript','.cjs':'JavaScript','.ts':'TypeScript','.tsx':'TypeScript','.jsx':'JavaScript','.py':'Python','.c':'C','.h':'C/C++','.cc':'C++','.cpp':'C++','.cxx':'C++','.hpp':'C++','.java':'Java','.go':'Go','.rs':'Rust','.rb':'Ruby','.php':'PHP','.swift':'Swift','.kt':'Kotlin','.sh':'Shell','.md':'Markdown','.tex':'LaTeX','.html':'HTML','.css':'CSS','.json':'JSON','.yaml':'YAML','.yml':'YAML' };
+async function projectHealth() {
+  const files = walkProject(), languages = {}, issues = [], includeGraph = new Map();
+  let lines = 0, bytes = 0, todos = 0;
+  const byBase = new Map(files.map((f) => [f.name, f.relative]));
+  for (const file of files) {
+    let st; try { st = fs.statSync(file.full); } catch (_) { continue; }
+    bytes += st.size;
+    const lang = LANGUAGE_BY_EXT[file.ext] || 'Other'; languages[lang] = (languages[lang] || 0) + 1;
+    if (st.size > 1024 * 1024 || (!LANGUAGE_BY_EXT[file.ext] && !['.txt','.cmake'].includes(file.ext))) continue;
+    let text = ''; try { text = fs.readFileSync(file.full, 'utf8'); } catch (_) { continue; }
+    lines += text.split(/\r?\n/).length;
+    todos += (text.match(/\b(?:TODO|FIXME|XXX)\b/g) || []).length;
+    const unfinished = text.split(/\r?\n/).some((line) => /^\s*(?:throw\s+new\s+Error\s*\(\s*['"]not implemented|raise\s+NotImplementedError\b|TODO\s*\(\s*\)\s*[;{])/i.test(line));
+    if (unfinished) issues.push({ level:'warn', file:file.relative, message:'发现可能未实现的代码' });
+    if (['.c','.h','.cc','.cpp','.cxx','.hpp'].includes(file.ext)) {
+      const deps = [...text.matchAll(/^\s*#\s*include\s*["<]([^">]+)[">]/gm)].map((m) => byBase.get(path.basename(m[1]))).filter(Boolean);
+      includeGraph.set(file.relative, [...new Set(deps)]);
+    }
+  }
+  const cycles = [], visiting = new Set(), visited = new Set();
+  const dfs = (node, stack) => {
+    if (visiting.has(node)) { const at = stack.indexOf(node); cycles.push(stack.slice(at).concat(node)); return; }
+    if (visited.has(node) || cycles.length >= 20) return;
+    visiting.add(node); stack.push(node); for (const dep of includeGraph.get(node) || []) dfs(dep, stack); stack.pop(); visiting.delete(node); visited.add(node);
+  };
+  for (const node of includeGraph.keys()) dfs(node, []);
+  let compileDb; try { compileDb = compileDatabaseInfo(); } catch (error) { compileDb = { ok:false, found:true, error:String(error.message || error) }; }
+  const tasks = taskCatalog();
+  if (!tasks.tasks.length) issues.push({ level:'info', message:'未检测到常见构建入口，可使用自定义命令' });
+  if (cycles.length) issues.push({ level:'warn', message:`检测到 ${cycles.length} 条 C/C++ 头文件循环依赖` });
+  return { ok:true, root:projectRoot(), generatedAt:Date.now(), summary:{ files:files.length, lines, bytes, todos, cycles:cycles.length }, languages, issues:issues.slice(0,100), cycles, compileDb, tasks:tasks.tasks.length };
 }
 
 /* --------------------------------- HTTP 服务 ---------------------------------- */
@@ -1618,7 +2109,8 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.method === 'GET' && u.pathname === '/api/version') {
-      return send(res, 200, { ok: true, name: '码境 CodeScope', version: APP_VERSION });
+      return send(res, 200, { ok: true, name: '码境 CodeScope', version: APP_VERSION, apiRevision: 2,
+        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links'] });
     }
     if (req.method === 'GET' && u.pathname === '/api/env') {
       const force = u.searchParams.get('refresh') === '1';
@@ -1807,7 +2299,13 @@ const server = http.createServer(async (req, res) => {
       const frag = snip.fragments[b.fragment];
       if (!frag) return send(res, 400, { ok: false, error: '片段索引无效' });
       if (typeof b.code !== 'string') return send(res, 400, { ok: false, error: '缺少 code' });
-      const written = writeBackFragment(b.file, frag, b.code.replace(/\n+$/, ''));
+      const nextCode = b.code.replace(/\n+$/, '');
+      if (nextCode === String(frag.code || '').replace(/\n+$/, '')) {
+        return send(res, 200, { ok: true, written: false, unchanged: true, message: '内容未变化' });
+      }
+      const written = writeBackFragment(b.file, frag, nextCode);
+      // 保存成功后记录“覆盖前”的内容，保证时间线第一项就能真正撤回本次编辑。
+      if (written) recordTimeline(b.file, b.fragment, frag.code, '自动保存');
       return send(res, 200, { ok: written, written, message: written ? '已保存到 vault（massCode 会实时同步）' : '保存失败：未能定位片段代码块' });
     }
     if (req.method === 'POST' && u.pathname === '/api/reorder') {
@@ -2090,6 +2588,39 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && u.pathname === '/api/git') {
       return send(res, 200, gitStatus());
+    }
+    if (req.method === 'GET' && u.pathname === '/api/git/diff') {
+      try { return send(res, 200, gitFileDiff(u.searchParams.get('path'))); }
+      catch (e) { return send(res, 400, { ok: false, error: String((e && e.message) || e) }); }
+    }
+    if (req.method === 'GET' && u.pathname === '/api/timeline') {
+      try {
+        const file = u.searchParams.get('file'), fragment = Number(u.searchParams.get('fragment'));
+        const snip = walkSnippets().find((item) => item.file === file);
+        if (!snip || !snip.fragments[fragment]) return send(res, 404, { ok: false, error: '片段不存在' });
+        const target = timelineTarget(file, fragment);
+        return send(res, 200, { ok: true, file: target.relative, fragment, entries: timelineEntries(target) });
+      } catch (e) { return send(res, 400, { ok: false, error: String((e && e.message) || e) }); }
+    }
+    if (req.method === 'GET' && u.pathname === '/api/timeline/item') {
+      try {
+        const file = u.searchParams.get('file'), fragment = Number(u.searchParams.get('fragment'));
+        const snip = walkSnippets().find((item) => item.file === file);
+        if (!snip || !snip.fragments[fragment]) return send(res, 404, { ok: false, error: '片段不存在' });
+        return send(res, 200, timelineItem(file, fragment, u.searchParams.get('id'), snip.fragments[fragment].code));
+      } catch (e) { return send(res, 400, { ok: false, error: String((e && e.message) || e) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/timeline/restore') {
+      const b = await readBody(req);
+      try {
+        const fragment = Number(b.fragment), snip = walkSnippets().find((item) => item.file === b.file);
+        if (!snip || !snip.fragments[fragment]) return send(res, 404, { ok: false, error: '片段不存在' });
+        const saved = timelineItem(b.file, fragment, b.id, snip.fragments[fragment].code);
+        recordTimeline(b.file, fragment, snip.fragments[fragment].code, '恢复前版本', true);
+        const written = writeBackFragment(b.file, snip.fragments[fragment], saved.code.replace(/\n+$/, ''));
+        if (!written) return send(res, 500, { ok: false, error: '恢复失败：未能定位片段代码块' });
+        return send(res, 200, { ok: true, message: '已恢复历史版本', code: saved.code });
+      } catch (e) { return send(res, 400, { ok: false, error: String((e && e.message) || e) }); }
     }
     if (req.method === 'POST' && u.pathname === '/api/fs/delete') {
       const b = await readBody(req);
@@ -2479,11 +3010,28 @@ const server = http.createServer(async (req, res) => {
         ? { ok: true, message: '已回退到 ' + hash, output: (r.stdout + r.stderr).trim(), status: gitStatus() }
         : { ok: false, error: r.error, output: (r.stdout + r.stderr).trim() });
     }
-    // ===== 远程开发：SSH 复用底部 PTY 终端；VNC 由 upgrade WebSocket 代理 =====
+    // ===== 通用工程能力 =====
+    if (req.method === 'GET' && u.pathname === '/api/project/tasks') return send(res, 200, taskCatalog());
+    if (req.method === 'POST' && u.pathname === '/api/project/tasks/run') {
+      const b = await readBody(req), catalog = taskCatalog();
+      let command = String(b.command || '').trim(), cwd = String(b.cwd || '.');
+      if (b.id) {
+        const task = catalog.tasks.find((item) => item.id === String(b.id));
+        if (!task) return send(res, 400, { ok:false, error:'构建任务不存在，请刷新后重试' });
+        command = task.command; cwd = task.cwd;
+      }
+      return send(res, 200, await runProjectCommand(command, cwd));
+    }
+    if (req.method === 'GET' && u.pathname === '/api/project/compile-db') {
+      try { return send(res, 200, compileDatabaseInfo()); }
+      catch (error) { return send(res, 200, { ok:false, error:String(error.message || error) }); }
+    }
+    if (req.method === 'GET' && u.pathname === '/api/project/health') return send(res, 200, await projectHealth());
+    // ===== 远程开发：SSH 复用底部 PTY 终端；SFTP 浏览文件；VNC 由 WebSocket 代理 =====
     if (req.method === 'GET' && u.pathname === '/api/remote/status') {
       return send(res, 200, {
         ok: true,
-        ssh: { available: !!executablePath('ssh'), path: executablePath('ssh') },
+        ssh: { available: !!executablePath('ssh'), path: executablePath('ssh'), files: true },
         vnc: { available: fs.existsSync(path.join(__dirname, 'node_modules', '@novnc', 'novnc', 'core', 'rfb.js')) },
         terminal: TERM ? { active: true, mode: TERM.mode, label: TERM.label, host: TERM.host || '', port: TERM.port || 0 } : { active: false, mode: '', label: '', host: '', port: 0 },
       });
@@ -2506,6 +3054,30 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && u.pathname === '/api/remote/ssh/disconnect') {
       stopTerm();
       return send(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/remote/files/list') {
+      try { return send(res, 200, await remoteList(await readBody(req))); }
+      catch (error) { return send(res, 200, { ok:false, error:String(error.message || error) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/remote/files/read') {
+      try { return send(res, 200, await remoteRead(await readBody(req))); }
+      catch (error) { return send(res, 200, { ok:false, error:String(error.message || error) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/remote/files/write') {
+      try { return send(res, 200, await remoteWrite(await readBody(req))); }
+      catch (error) { return send(res, 200, { ok:false, error:String(error.message || error) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/remote/files/upload-stream') {
+      await streamRemoteUpload(req, res);
+      return;
+    }
+    if (req.method === 'POST' && u.pathname === '/api/remote/files/download-stream') {
+      try { await streamRemoteDownload(res, await readBody(req)); }
+      catch (error) {
+        if (!res.headersSent) send(res, 200, { ok:false, error:String(error.message || error) });
+        else res.destroy(error);
+      }
+      return;
     }
     // ===== 底部终端（PTY shell，script 命令分配伪终端）=====
     if (req.method === 'GET' && u.pathname === '/api/term/stream') {

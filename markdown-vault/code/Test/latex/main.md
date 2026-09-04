@@ -195,8 +195,8 @@ updatedAt: 1788511095111
         \vspace{0.15em}
         \textbf{政治面貌}：中共党员
 
-        \vspace{0.15em}
-        \textbf{期望薪资}：13--17K
+        % \vspace{0.15em}
+        % \textbf{期望薪资}：13--17K
 
         \vspace{0.15em}
         \textbf{期望城市}：深圳、长沙
@@ -213,14 +213,14 @@ updatedAt: 1788511095111
     \cventry{武汉科技大学}{硕士 · 机械专业（专硕）}{2024.09 -- 2027.06}
     \begin{itemize}
         \item \textbf{研究方向}：智能机器人、控制算法、轮腿机器人、强化学习
-        \item \textbf{综合排名}：3/176，\textbf{课程均分}：83.5
+        \item \textbf{综合排名}：5/176，\textbf{课程均分}：83.5
     \end{itemize}
 
     \entrygap
     \cventry{湖南工学院}{学士 · 机械设计制造及其自动化}{2020.09 -- 2024.06}
     \begin{itemize}
         \item \textbf{主修课程}：机械工程控制原理、数电与模电、单片机应用、机械设计与机械原理
-        \item \textbf{班级排名}：1/43，\textbf{专业排名}：2/164
+        \item \textbf{班级排名}：1/43，\textbf{专业排名}：3/164
     \end{itemize}
     \end{minipage}
 \end{minipage}%
