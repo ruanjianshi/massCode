@@ -602,14 +602,22 @@
   .in-dot.on { color: var(--ok); }
   #input-box { width: 100%; min-height: 54px; background: #101216; color: var(--text); border: 1px solid var(--border); border-radius: 6px; font: 12px/1.5 var(--mono); padding: 8px; resize: vertical; outline: none; }
   #input-box:focus { border-color: var(--accent); }
-  .out-input-card { max-width:620px; margin:8px 0; padding:13px; border:1px solid #34455a; border-radius:9px; background:#111a24; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; white-space:normal; }
-  .out-input-title { display:flex; align-items:center; gap:7px; margin-bottom:4px; color:#e4ebf5; font-size:13px; font-weight:650; }
-  .out-input-desc { margin-bottom:9px; color:var(--dim); font-size:11px; line-height:1.55; }
-  .out-input-editor { width:100%; min-height:64px; resize:vertical; padding:8px 10px; border:1px solid #303f51; border-radius:7px; outline:0; background:#090f16; color:#dce6f2; font:12px/1.55 var(--mono); }
-  .out-input-editor:focus { border-color:#78a9ff; box-shadow:0 0 0 3px rgba(120,169,255,.09); }
-  .out-input-actions { display:flex; justify-content:flex-end; gap:7px; margin-top:9px; }
-  .out-input-actions button { min-height:29px; padding:4px 10px; font-size:11px; }
-  .out-input-actions .primary { border-color:#347d4d; background:#1d5e35; color:#d8f8e1; }
+  .out-input-card { display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"copy actions" "editor editor"; gap:8px 14px; width:min(760px,100%); margin:7px 0; padding:9px 0 10px 11px; border:0; border-left:2px solid #405a78; border-radius:0; background:linear-gradient(90deg,rgba(70,99,134,.09),transparent 72%); font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; white-space:normal; }
+  .out-input-copy { grid-area:copy; min-width:0; }
+  .out-input-title { display:flex; align-items:center; gap:6px; margin:0; color:#dce5f2; font-size:12px; font-weight:650; }
+  .out-input-title::before { content:''; width:6px; height:6px; flex:none; border-radius:50%; background:#7da9df; box-shadow:0 0 0 3px rgba(125,169,223,.1); }
+  .out-input-desc { margin-top:2px; color:#748297; font-size:10px; line-height:1.45; }
+  .out-input-editor { grid-area:editor; width:100%; min-height:52px; max-height:150px; resize:vertical; padding:7px 9px; border:1px solid #293748; border-radius:6px; outline:0; background:rgba(7,13,20,.72); color:#dce6f2; font:12px/1.5 var(--mono); transition:border-color .12s,background .12s,box-shadow .12s; }
+  .out-input-editor::placeholder { color:#566477; }
+  .out-input-editor:hover { border-color:#35475d; }
+  .out-input-editor:focus { border-color:#5279a8; background:#09111a; box-shadow:0 0 0 2px rgba(82,121,168,.11); }
+  .out-input-actions { grid-area:actions; display:flex; align-items:center; justify-content:flex-end; gap:6px; }
+  .out-input-actions button { min-height:27px; padding:3px 9px; border-color:#2b394a; background:transparent; color:#91a0b4; font-size:10px; }
+  .out-input-actions button:hover:not(:disabled) { border-color:#48617f; background:rgba(76,104,139,.12); color:#dbe6f4; }
+  .out-input-actions .primary { border-color:#3d6594; background:rgba(66,117,177,.18); color:#aecdff; }
+  @media (max-width:760px) {
+    .out-input-card { grid-template-columns:1fr; grid-template-areas:"copy" "editor" "actions"; }
+  }
   #code .k { color: #7db3ff; }        /* keyword */
   #code .s { color: #a5e075; }        /* string */
   #code .c { color: #6a7280; font-style: italic; } /* comment */
@@ -1030,6 +1038,10 @@
   .brand-name { white-space:nowrap; }
   .brand-edition { margin-left:-3px; color:#8ea0b8; font:600 10px/1 var(--mono); letter-spacing:.04em; }
   .brand-version { margin-left:-6px; color:#5f6d80; font:500 8px/1 var(--mono); }
+  .brand-github { display:grid; place-items:center; width:24px; height:24px; margin-left:-3px; border:1px solid transparent; border-radius:6px; color:#738299; text-decoration:none; transition:color .12s,border-color .12s,background .12s; }
+  .brand-github:hover { color:#dbe7f7; border-color:#35465b; background:#17222f; }
+  .brand-github:focus-visible { outline:2px solid #8bb7ff; outline-offset:1px; }
+  .brand-github svg { width:14px; height:14px; fill:currentColor; }
   header .sub { min-width:40px; max-width:none; color:#718096; font:10px/1.2 var(--mono); }
   button { min-height:30px; border:1px solid #303d4e; border-radius:7px; padding:5px 10px; background:var(--control); color:#cfd8e6; box-shadow:none; font-weight:500; transition:background .12s,border-color .12s,color .12s,transform .08s; }
   button:hover:not(:disabled) { background:var(--control-hover); border-color:#536985; color:#fff; }
@@ -1235,7 +1247,7 @@
 </head>
 <body>
 <header>
-  <h1 title="码境 · 工程代码工作台"><span class="brand-mark"><img src="/assets/codescope.svg" alt=""></span><span class="brand-name">码境</span><span class="brand-edition">CodeScope</span><span class="brand-version">v1.0.0</span></h1>
+  <h1 title="码境 · 工程代码工作台"><span class="brand-mark"><img src="/assets/codescope.svg" alt=""></span><span class="brand-name">码境</span><span class="brand-edition">CodeScope</span><span class="brand-version">v1.0.0</span><a class="brand-github" href="https://github.com/ruanjianshi/massCode" target="_blank" rel="noopener noreferrer" title="打开 CodeScope GitHub 远程仓库" aria-label="CodeScope GitHub 远程仓库"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .7a11.5 11.5 0 0 0-3.64 22.4c.58.1.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.38.97.1-.75.4-1.27.74-1.56-2.57-.29-5.27-1.28-5.27-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.16 1.18a10.9 10.9 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.42-2.71 5.39-5.29 5.68.42.36.79 1.07.79 2.16v3.21c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z"/></svg></a></h1>
   <div class="sub" id="vault-path">…</div>
   <div id="sysmon" aria-label="电脑实时状态">
     <button class="sm-item sm-detail-trigger offline" id="sm-cpu" title="点击查看完整电脑状态" aria-expanded="false" aria-controls="sysmon-detail"><span class="sm-label">CPU <i class="sm-open-mark" aria-hidden="true">ⓘ</i></span><b class="sm-value" id="sm-cpu-v">--%</b><span class="sm-bar"><i id="sm-cpu-b"></i></span></button>
@@ -6679,9 +6691,11 @@ function showInputInOutput(message, preserveOutput) {
   const body = $('out-body');
   if (!preserveOutput) body.innerHTML = '';
   const card = document.createElement('div'); card.className = 'out-input-card';
-  const title = document.createElement('div'); title.className = 'out-input-title'; title.textContent = '⌨ 程序需要输入';
+  const copy = document.createElement('div'); copy.className = 'out-input-copy';
+  const title = document.createElement('div'); title.className = 'out-input-title'; title.textContent = '等待程序输入';
   const desc = document.createElement('div'); desc.className = 'out-input-desc';
-  desc.textContent = message || '检测到当前代码会读取标准输入。请填写后运行，也可以选择无输入继续。';
+  desc.textContent = message || '填写标准输入后运行，也可以直接继续。';
+  copy.append(title, desc);
   const editor = document.createElement('textarea'); editor.className = 'out-input-editor';
   editor.placeholder = '每行一组输入，例如：\n3 5'; editor.value = $('input-box').value;
   editor.addEventListener('input', () => { $('input-box').value = editor.value; });
@@ -6700,7 +6714,7 @@ function showInputInOutput(message, preserveOutput) {
     if (!editor.value.trim()) { desc.textContent = '请先填写输入内容，或点击“无输入继续”。'; return; }
     doRun();
   };
-  actions.append(emptyRun, inputRun); card.append(title, desc, editor, actions); body.appendChild(card);
+  actions.append(emptyRun, inputRun); card.append(copy, editor, actions); body.appendChild(card);
   body.scrollTop = body.scrollHeight;
   setStatus('idle', '等待输入');
 }

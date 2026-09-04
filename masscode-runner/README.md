@@ -5,6 +5,8 @@
 
 当前正式版本：**v1.0.0**。版本变更见 [CHANGELOG.md](CHANGELOG.md)。
 
+远程仓库：[github.com/ruanjianshi/massCode](https://github.com/ruanjianshi/massCode)
+
 > **📦 已整体迁移到 iCloud Drive，自动云同步**（见下文「云同步」）。
 > 所在位置：`~/Library/Mobile Documents/com~apple~CloudDocs/massCode`（Finder 里就是 **iCloud Drive / massCode**）。
 

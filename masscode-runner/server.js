@@ -790,12 +790,18 @@ function normalizeMissingEntry(result) {
   };
 }
 
+// CJK OpenType 字体常见为 10–25 MB；原来的单文件 10 MB 限制会把字体静默跳过，
+// 最终只留下难以理解的 fontspec Error。允许常见字体通过，同时保留总量上限。
+const LATEX_RESOURCE_FILE_LIMIT = 32 * 1024 * 1024;
+const LATEX_RESOURCE_TOTAL_LIMIT = 96 * 1024 * 1024;
+
 // 在独立临时目录编译 LaTeX，并禁用 shell escape。额外拦截显式绝对路径/上级目录引用。
 function copyLatexResources(sourceFile, targetDir) {
-  if (!sourceFile) return;
+  const result = { copied: 0, bytes: 0, skipped: [] };
+  if (!sourceFile) return result;
   const codeRoot = path.resolve(path.join(vaultPath(), 'code'));
   const resolved = path.resolve(String(sourceFile));
-  if (!resolved.startsWith(codeRoot + path.sep) || path.extname(resolved).toLowerCase() !== '.md') return;
+  if (!resolved.startsWith(codeRoot + path.sep) || path.extname(resolved).toLowerCase() !== '.md') return result;
   const sourceDir = path.dirname(resolved);
   const allowed = new Set(['.tex', '.sty', '.cls', '.bib', '.bst', '.csv', '.png', '.jpg', '.jpeg', '.pdf', '.eps', '.otf', '.ttf', '.ttc']);
   let total = 0;
@@ -809,11 +815,15 @@ function copyLatexResources(sourceFile, targetDir) {
       if (entry.isDirectory()) { fs.mkdirSync(dst, { recursive: true }); copyDir(src, dst, depth + 1); continue; }
       if (!entry.isFile() || !allowed.has(path.extname(entry.name).toLowerCase())) continue;
       let size = 0; try { size = fs.statSync(src).size; } catch (_) { continue; }
-      if (size > 10 * 1024 * 1024 || total + size > 30 * 1024 * 1024) continue;
-      fs.copyFileSync(src, dst); total += size;
+      const relative = path.relative(sourceDir, src).split(path.sep).join('/');
+      if (size > LATEX_RESOURCE_FILE_LIMIT) { result.skipped.push(relative + '（单文件超过 32 MB）'); continue; }
+      if (total + size > LATEX_RESOURCE_TOTAL_LIMIT) { result.skipped.push(relative + '（工程资源总量超过 96 MB）'); continue; }
+      fs.copyFileSync(src, dst); total += size; result.copied++;
     }
   };
   copyDir(sourceDir, targetDir, 0);
+  result.bytes = total;
+  return result;
 }
 
 const LATEX_BIB_CACHE = new Map();
@@ -851,7 +861,7 @@ async function compileLatex(code, sourceFile) {
   const source = path.join(dir, 'main.tex');
   const pdf = path.join(dir, 'main.pdf');
   const cmd = latexCmd();
-  copyLatexResources(sourceFile, dir);
+  const copiedResources = copyLatexResources(sourceFile, dir);
   const bibKey = latexBibliographyKey(dir, sourceFile, code), cachedBbl = LATEX_BIB_CACHE.get(bibKey);
   if (cachedBbl) fs.writeFileSync(path.join(dir, 'main.bbl'), cachedBbl);
   fs.writeFileSync(source, code, 'utf8');
@@ -868,9 +878,12 @@ async function compileLatex(code, sourceFile) {
         '-cnf-line=openin_any=p', '-cnf-line=openout_any=p',
         '-file-line-error', '-synctex=0', '-output-directory=.', 'main.tex',
     ];
-    let result = await runFile(cmd, texArgs), pipeline = cmd;
+    let result = await runFile(cmd, texArgs), pipeline = cmd, texPasses = 1;
     const clean = (s) => String(s || '').split(dir).join('[临时目录]');
-    let log = clean(result.stdout + (result.stderr ? '\n' + result.stderr : '')).trim();
+    const resourceWarning = copiedResources.skipped.length
+      ? '[CodeScope] 以下 LaTeX 资源因大小限制未复制：\n- ' + copiedResources.skipped.join('\n- ') + '\n'
+      : '';
+    let log = resourceWarning + clean(result.stdout + (result.stderr ? '\n' + result.stderr : '')).trim();
     if (!result.err && fs.existsSync(path.join(dir, 'main.bcf')) && cachedBbl) {
       pipeline += ' + biber缓存';
     } else if (!result.err && fs.existsSync(path.join(dir, 'main.bcf')) && executablePath('biber')) {
@@ -881,6 +894,7 @@ async function compileLatex(code, sourceFile) {
         pipeline += ' + biber';
         for (let pass = 0; pass < 2; pass++) {
           const again = await runFile(cmd, texArgs);
+          texPasses++;
           log += '\n' + clean(again.stdout + (again.stderr ? '\n' + again.stderr : ''));
           if (again.err) { result = again; break; }
         }
@@ -895,9 +909,18 @@ async function compileLatex(code, sourceFile) {
       if (bib.err) result = bib;
       else {
         pipeline += ' + bibtex';
-        for (let pass = 0; pass < 2; pass++) { const again = await runFile(cmd, texArgs); log += '\n' + clean(again.stdout + (again.stderr ? '\n' + again.stderr : '')); if (again.err) { result = again; break; } }
+        for (let pass = 0; pass < 2; pass++) { const again = await runFile(cmd, texArgs); texPasses++; log += '\n' + clean(again.stdout + (again.stderr ? '\n' + again.stderr : '')); if (again.err) { result = again; break; } }
       }
     }
+    // 交叉引用、目录以及 TikZ remember picture 的页面坐标至少需要两遍编译。
+    // 本地编辑器通常会自动重跑；实时预览也保持相同行为，避免首遍页眉/页脚错位。
+    if (!result.err && texPasses < 2) {
+      const again = await runFile(cmd, texArgs);
+      texPasses++;
+      log += '\n' + clean(again.stdout + (again.stderr ? '\n' + again.stderr : ''));
+      result = again;
+    }
+    if (texPasses > 1) pipeline += ' × ' + texPasses + ' 遍';
     if (result.err || !fs.existsSync(pdf)) {
       const timedOut = result.err && (result.err.killed || result.err.code === 'ETIMEDOUT');
       return {

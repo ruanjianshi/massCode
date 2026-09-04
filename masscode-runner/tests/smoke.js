@@ -67,6 +67,7 @@ async function main() {
   const page = await fetch(baseUrl + '/');
   const html = await page.text();
   assert(page.ok && html.includes('码境 CodeScope · 工程代码工作台'), '主页品牌标题不正确');
+  assert(html.includes('href="https://github.com/ruanjianshi/massCode"'), 'GitHub 远程仓库入口缺失');
 
   const icon = await fetch(baseUrl + '/assets/codescope.svg');
   assert(icon.ok && (icon.headers.get('content-type') || '').includes('image/svg+xml'), '品牌图标无法加载');
@@ -83,7 +84,7 @@ async function main() {
   const invalidLatency = await requestJson(baseUrl, '/api/remote/latency?host=bad%20host&port=5900', 400);
   assert(invalidLatency.ok === false, '延迟接口未拒绝非法主机');
 
-  console.log('CodeScope smoke tests: 8 passed');
+  console.log('CodeScope smoke tests: 9 passed');
 }
 
 main().catch((error) => {
