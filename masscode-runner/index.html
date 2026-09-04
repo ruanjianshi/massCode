@@ -23,8 +23,10 @@
   header h1 { font-size: 15px; margin: 0; }
   header .sub { color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
   #sysmon { display:flex; align-items:center; gap:5px; position:relative; flex:none; }
-  .sm-item { min-width:76px; height:32px; display:grid; grid-template-columns:auto auto; grid-template-rows:1fr 3px; align-items:center; gap:2px 7px; padding:4px 7px; border-color:#2a3441; background:rgba(11,16,23,.7); border-radius:7px; }
-  .sm-item:hover { background:#17202b; }
+  .sm-item { min-width:76px; height:32px; display:grid; grid-template-columns:auto auto; grid-template-rows:1fr 3px; align-items:center; gap:2px 7px; padding:4px 7px; border:1px solid #2a3441; background:rgba(11,16,23,.7); border-radius:7px; cursor:default; }
+  .sm-detail-trigger { cursor:pointer; }
+  .sm-detail-trigger:hover { background:#17202b; border-color:#4f6580; }
+  .sm-open-mark { color:#86b4fb; font-style:normal; font-size:10px; vertical-align:1px; }
   .sm-label { color:#7f8b9d; font:10px/1 var(--mono); letter-spacing:.04em; }
   .sm-value { color:#d9e1ec; font:600 10px/1 var(--mono); text-align:right; white-space:nowrap; }
   .sm-bar { grid-column:1 / -1; height:3px; overflow:hidden; border-radius:3px; background:#26303c; }
@@ -32,13 +34,13 @@
   .sm-item.warn .sm-value { color:#eabf72; } .sm-item.warn .sm-bar > i { background:#d49a42; }
   .sm-item.crit .sm-value { color:#ff8c88; } .sm-item.crit .sm-bar > i { background:#e5534b; }
   .sm-item.offline { opacity:.5; }
-  #sysmon-detail { display:none; position:absolute; z-index:260; right:0; top:40px; width:320px; padding:12px; border:1px solid #344152; border-radius:10px; background:#111821; box-shadow:0 18px 50px rgba(0,0,0,.52); }
+  #sysmon-detail { display:none; position:absolute; z-index:260; right:0; top:40px; width:460px; max-width:calc(100vw - 24px); max-height:calc(100vh - 68px); overflow:auto; padding:13px 14px; border:1px solid #344152; border-radius:10px; background:#111821; box-shadow:0 18px 50px rgba(0,0,0,.52); }
   #sysmon-detail.open { display:block; }
   .smd-title { display:flex; align-items:center; margin-bottom:9px; font-size:12px; font-weight:650; }
   .smd-title span { margin-left:auto; color:#657286; font:10px var(--mono); font-weight:400; }
-  .smd-grid { display:grid; grid-template-columns:58px 1fr; gap:7px 10px; font-size:11px; }
+  .smd-grid { display:grid; grid-template-columns:60px minmax(0,1fr); align-items:start; gap:8px 12px; font-size:11px; }
   .smd-grid .key { color:#718096; }
-  .smd-grid .val { color:#cdd6e3; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--mono); }
+  .smd-grid .val { color:#cdd6e3; min-width:0; white-space:normal; overflow-wrap:anywhere; font-family:var(--mono); line-height:1.55; }
   button { background: var(--panel2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
   button:hover { border-color: var(--accent); }
   button:disabled { opacity: .45; cursor: not-allowed; }
@@ -590,13 +592,21 @@
   #autosave-hint { font-size: 11px; color: var(--dim); opacity: .75; }
   #autosave-hint::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); margin-right: 4px; vertical-align: 1px; animation: asave-pulse 2.2s infinite; }
   @keyframes asave-pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
-  #input-area { display: flex; flex-direction: column; border-top: 1px solid var(--border); background: var(--panel); padding: 8px 14px 10px; }
-  #input-area.hidden { display: none; }
+  /* 旧的独立 stdin 面板只保留数据容器，不再占用编辑区高度 */
+  #input-area, #input-area.hidden { display: none !important; }
   .in-head { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 12px; padding-bottom: 6px; }
   .in-dot { color: var(--dim); font-size: 11px; }
   .in-dot.on { color: var(--ok); }
   #input-box { width: 100%; min-height: 54px; background: #101216; color: var(--text); border: 1px solid var(--border); border-radius: 6px; font: 12px/1.5 var(--mono); padding: 8px; resize: vertical; outline: none; }
   #input-box:focus { border-color: var(--accent); }
+  .out-input-card { max-width:620px; margin:8px 0; padding:13px; border:1px solid #34455a; border-radius:9px; background:#111a24; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; white-space:normal; }
+  .out-input-title { display:flex; align-items:center; gap:7px; margin-bottom:4px; color:#e4ebf5; font-size:13px; font-weight:650; }
+  .out-input-desc { margin-bottom:9px; color:var(--dim); font-size:11px; line-height:1.55; }
+  .out-input-editor { width:100%; min-height:64px; resize:vertical; padding:8px 10px; border:1px solid #303f51; border-radius:7px; outline:0; background:#090f16; color:#dce6f2; font:12px/1.55 var(--mono); }
+  .out-input-editor:focus { border-color:#78a9ff; box-shadow:0 0 0 3px rgba(120,169,255,.09); }
+  .out-input-actions { display:flex; justify-content:flex-end; gap:7px; margin-top:9px; }
+  .out-input-actions button { min-height:29px; padding:4px 10px; font-size:11px; }
+  .out-input-actions .primary { border-color:#347d4d; background:#1d5e35; color:#d8f8e1; }
   #code .k { color: #7db3ff; }        /* keyword */
   #code .s { color: #a5e075; }        /* string */
   #code .c { color: #6a7280; font-style: italic; } /* comment */
@@ -941,6 +951,160 @@
   #sym-modal { backdrop-filter:blur(5px); background:rgba(4,7,11,.72); }
   #sym-modal-box { border-color:#394555; border-radius:12px; background:#141a22; box-shadow:0 24px 70px rgba(0,0,0,.55); }
   #sym-q { min-height:36px; background:#0e131a; }
+
+  /* ---- 统一工作台视觉：连续分区、清晰层级、可访问状态 ---- */
+  :root {
+    --bg:#0a0e14; --panel:#10161f; --panel2:#17202b; --border:#273241;
+    --text:#e7edf6; --dim:#93a1b4; --accent:#78a9ff; --ok:#5fd17b; --err:#ff7575;
+    --surface-hover:#1b2633; --accent-soft:rgba(120,169,255,.13);
+    --shadow:0 18px 50px rgba(0,0,0,.34); --control:#17202b; --control-hover:#202d3b;
+  }
+  html { color-scheme:dark; }
+  body { background:var(--bg); color:var(--text); font-size:13px; letter-spacing:0; }
+  header { min-height:56px; height:56px; padding:0 12px; gap:9px; background:#10161f; border-bottom:1px solid #293545; box-shadow:0 1px 8px rgba(0,0,0,.2); }
+  header h1 { display:flex; align-items:center; gap:8px; margin-right:3px; font-size:14px; font-weight:700; letter-spacing:.01em; color:#f4f7fb; }
+  .brand-mark { display:grid; place-items:center; width:27px; height:27px; border-radius:8px; background:linear-gradient(145deg,#85b5ff,#4d78d4); color:#07101f; box-shadow:0 0 0 1px rgba(255,255,255,.15) inset,0 4px 12px rgba(64,113,207,.25); font:800 15px/1 var(--mono); }
+  .brand-name { white-space:nowrap; }
+  .brand-edition { margin-left:-3px; color:#7f8da1; font:500 10px/1 var(--mono); text-transform:uppercase; letter-spacing:.08em; }
+  header .sub { min-width:40px; max-width:none; color:#718096; font:10px/1.2 var(--mono); }
+  button { min-height:30px; border:1px solid #303d4e; border-radius:7px; padding:5px 10px; background:var(--control); color:#cfd8e6; box-shadow:none; font-weight:500; transition:background .12s,border-color .12s,color .12s,transform .08s; }
+  button:hover:not(:disabled) { background:var(--control-hover); border-color:#536985; color:#fff; }
+  button:active:not(:disabled) { transform:translateY(1px); }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline:2px solid #8bb7ff; outline-offset:1px; }
+  button.on { background:rgba(120,169,255,.14); border-color:#6797df; color:#b8d3ff; }
+  .btn-run { background:#1d5e35; border-color:#347d4d; color:#d8f8e1; }
+  .btn-run:hover:not(:disabled) { background:#256c40; border-color:#5fd17b; }
+  .sm-item { min-width:72px; height:32px; padding:4px 7px; border-color:#283444; border-radius:7px; background:#0c121a; }
+  .sm-label { color:#78879b; }
+  .sm-value { color:#e4eaf2; }
+  .sync-dot { min-height:30px; padding:0 8px; border-left:1px solid var(--border); color:#9aa8ba; }
+  .sync-dot::before { width:7px; height:7px; box-shadow:0 0 8px rgba(95,209,123,.8); }
+
+  main { background:var(--bg); }
+  #side { background:#0f151d; border-right-color:#273241; }
+  #pane-tree, #pane-git, #pane-tags, #pane-draw { background:#0f151d; }
+  #pane-tree { min-height:160px; }
+  #search { min-height:36px; margin:10px 10px 7px; padding:8px 11px; border-color:#2b3747; border-radius:8px; background:#0a1017; color:#dfe7f2; font-size:12px; }
+  #search::placeholder, input::placeholder, textarea::placeholder { color:#647286; opacity:1; }
+  #search:focus { border-color:#6898df; background:#0d141d; box-shadow:0 0 0 3px rgba(120,169,255,.09); }
+  #tree-head, #git-head, #tag-head, #draw-head { min-height:36px; padding:7px 10px; border-top:1px solid #222d3a; color:#9aa8ba; background:#111821; text-transform:none; letter-spacing:.01em; }
+  #tree-head { border-top:0; border-bottom:1px solid #202a37; }
+  #tree-head .tt, #git-head > span:nth-child(2), #tag-head > span:nth-child(2), #draw-head > span:nth-child(2) { color:#c8d2df; font-weight:650; }
+  #tree-head button, #git-head button, #draw-head button { min-height:24px; padding:2px 6px; border:1px solid transparent; }
+  #tree-head #btn-new-file, #tree-head #btn-new-latex, #tree-head #btn-new-folder { color:#91b8f6; }
+  #list { padding:5px 6px 12px; }
+  .fnode { min-height:31px; margin:1px 0; padding:5px 8px; border-radius:6px; color:#cbd5e2; font-size:12px; font-weight:600; }
+  .fnode:hover { background:#18222e; }
+  .fnode .count, #tag-head .count, #git-head .count { min-width:20px; padding:1px 6px; border:1px solid #283545; background:#151e29; color:#8290a3; text-align:center; }
+  .item { margin:1px 0; padding:7px 9px 7px 11px; border-radius:6px; }
+  .item:hover { background:#17212c; }
+  .item.active { border-color:rgba(120,169,255,.36); background:linear-gradient(90deg,rgba(120,169,255,.17),rgba(120,169,255,.055)); }
+  .item.active::before { top:6px; bottom:6px; width:3px; background:#78a9ff; box-shadow:0 0 8px rgba(120,169,255,.4); }
+  .item .nm { color:#dfe7f1; font-size:12px; }
+  .item .desc { color:#7f8da1; font-size:10.5px; }
+  .resource-row { min-height:29px; padding:5px 9px; border:1px solid transparent; }
+  .resource-row:hover { background:#17212c; }
+  .resource-row.active { background:var(--accent-soft); border-color:rgba(120,169,255,.42); outline:0; }
+  #git-body { padding:6px 7px 8px; background:#0c1219; }
+  #git-log .gcommit { min-height:28px; padding:4px 5px; }
+  #git-log .gcommit:hover, #git-list .gfile:hover { background:#17212c; }
+  .git-actions { padding:7px 2px 3px; }
+  .git-actions input { min-height:31px; background:#0a1017; border-color:#2b3747; }
+  #tagbar { gap:5px; padding:8px 9px 11px; border-top:0; background:#0c1219; }
+  .tchip { min-height:25px; justify-content:space-between; border-color:#293544; border-radius:6px; padding:3px 7px; background:#131b25; color:#9daabd; font-size:11px; }
+  .tchip:hover { background:#1a2532; border-color:#4f6580; }
+  .tchip.on { background:rgba(120,169,255,.15); border-color:#6b9ce5; color:#c1d9ff; }
+  #draw-list { background:#0c1219; }
+
+  #split-v, #split-v2 { width:5px; background:#0b1017; }
+  #split-h, .hsplit { height:5px; background:#0b1017; }
+  #split-v::after, #split-v2::after { width:1px; background:#26313e; }
+  #split-h::after, .hsplit::after { height:1px; background:#26313e; }
+  #split-v:hover::after, #split-v.active::after, #split-v2:hover::after, #split-v2.active::after,
+  #split-h:hover::after, #split-h.active::after, .hsplit:hover::after, .hsplit.active::after { background:#78a9ff; box-shadow:0 0 7px rgba(120,169,255,.55); }
+
+  #main, #edit-split { background:#0b1017; }
+  #toolbar { min-height:49px; padding:8px 11px; gap:6px; border-bottom-color:#273241; background:#111821; }
+  #toolbar .title { color:#f0f4f9; font-size:14px; }
+  #snippet-desc { max-width:34%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #autosave-hint { padding:4px 7px; border-radius:6px; background:#0d141c; color:#7f8ea2; opacity:1; }
+  #tabs { min-height:39px; gap:0; padding:4px 8px 0; border-bottom-color:#273241; background:#0d141c; }
+  .tab { min-height:34px; padding:7px 12px 8px; border-radius:6px 6px 0 0; color:#8492a5; }
+  .tab:hover { background:#151e29; color:#cfd8e5; }
+  .tab.active { background:#111922; color:#eef3f9; }
+  .tab.active::after { left:9px; right:9px; height:2px; background:#78a9ff; }
+  #code-wrap, #code-wrap.latex-code { margin:0; border:0; border-radius:0; background:#0d131b; box-shadow:none; }
+  #ln { background:#0a0f16; border-right-color:#1f2935; color:#506075; }
+  #code, #code-edit { color:#dbe4ef; }
+  #md-view, #resource-viewer { margin:0; border:0; border-radius:0; background:#101720; }
+  .md-doc { max-width:980px; margin:0 auto; padding:28px 42px 64px; color:#dce5ef; font-size:14px; line-height:1.78; }
+  .md-doc .md-pre { border-color:#2a3747; background:#0a1017; }
+  #resource-head { min-height:44px; padding:7px 11px; background:#111821; }
+  #resource-body { background:#0b1017; }
+
+  #output { background:#090e14; border-top-color:#273241; }
+  #out-head { min-height:37px; padding:5px 11px; border-bottom:1px solid #202b38; background:#0e151e; }
+  #out-tabs { gap:2px; }
+  #out-tabs .otab { min-height:28px; padding:4px 9px; border-radius:6px; }
+  #out-tabs .otab.on { border-color:#425d7e; background:rgba(120,169,255,.11); color:#a9c9fa; }
+  #out-body { padding:10px 14px 16px; color:#cfd8e5; line-height:1.6; }
+  #term-box { background:#090e14; }
+
+  #outline-panel { background:#0f151d; border-left-color:#273241; }
+  #outline-actions { min-height:48px; padding:8px; gap:5px; background:#0d141c; border-bottom-color:#273241; }
+  #outline-actions button { border-radius:7px; }
+  #outline-list, #outline-list.stack-on { background:#0f151d; }
+  #sym-tabs { min-height:41px; gap:2px; padding:4px 7px 0; border-bottom:1px solid #273241; background:#0d141c; }
+  #sym-tabs button { min-height:36px; border:0; border-radius:6px 6px 0 0; background:transparent; color:#8492a5; }
+  #sym-tabs button:hover { background:#151e29; color:#cfd8e5; }
+  #sym-tabs button.on { border:0; border-bottom:2px solid #78a9ff; background:#141d28; color:#dbe8fb; }
+  #outline-head, .pane-title, .ai-title-row { min-height:37px; padding:7px 10px; border-bottom-color:#273241; background:#121a24; color:#cbd5e2; }
+  #outline-tools { padding:8px; background:#0c1219; }
+  #outline-q { min-height:32px; padding:6px 9px; border-color:#2b3747; background:#090f16; }
+  #outline-q:focus { border-color:#6898df; box-shadow:0 0 0 3px rgba(120,169,255,.08); }
+  #outline-body, .pane-body { padding:7px; }
+  .ol-group { padding:7px 8px; background:rgba(15,21,29,.96); color:#8290a3; }
+  .ol-item { min-height:29px; border-radius:6px; }
+  .ol-item:hover, .sym-row:hover, .sym-ref:hover, .symr:hover { background:#1a2532; }
+  .stack-pane { border-color:#273241; background:#0f151d; }
+  .pane-resizer { background:#0a1017; border-top-color:#273241; }
+  #outline-list.stack-on #ai-panel { background:#0f151d; border-color:#273241; }
+  .ai-actions-row, #ai-ctx, #ai-quick { border-color:#273241; background:#0c1219; }
+  #ai-msgs { padding:14px 12px 18px; gap:16px; }
+  .ai-msg .avatar { background:#18222e; border-color:#2d3a4a; box-shadow:none; }
+  .ai-msg.assistant .body { border-color:#2a3747; background:#151e29; }
+  .ai-msg.user .body { border-color:rgba(120,169,255,.38); background:rgba(120,169,255,.12); }
+  .ai-msg .body .code-wrap { border-color:#2a3747; background:#090f16; }
+
+  #env-panel { background:#101720; border-left-color:#324054; box-shadow:-18px 0 60px rgba(0,0,0,.46); }
+  #env-head { min-height:54px; border-bottom-color:#2b3747; background:#111a24; }
+  #env-body { padding:15px 16px 22px; }
+  .env-card { border-color:#2b3747; border-radius:9px; background:#151e29; }
+  .env-deploy { border-color:rgba(120,169,255,.34); background:rgba(120,169,255,.075); }
+  .tool-row { border-color:#2a3747; background:#131c26; }
+  #new-dialog, #confirm-dialog, #sym-modal { background:rgba(3,7,12,.73); backdrop-filter:blur(7px); }
+  #new-dialog .nd-panel, #confirm-dialog .nd-panel, #draw-ndialog .nd-panel, #sym-modal-box { border-color:#3a495d; border-radius:12px; background:#121a24; box-shadow:var(--shadow); }
+
+  @media (max-width:1400px) {
+    #snippet-desc { display:none; }
+    #toolbar { flex-wrap:nowrap; }
+    #toolbar .sp { min-width:0; }
+    #multi-badge { max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #btn-symbols, #btn-outline, #btn-mindmap, #btn-info { width:34px; flex:none; padding:0; font-size:0; }
+    #btn-symbols::before { content:'🔎'; font-size:12px; }
+    #btn-outline::before { content:'🧭'; font-size:12px; }
+    #btn-mindmap::before { content:'🧠'; font-size:12px; }
+    #btn-info::before { content:'📝'; font-size:12px; }
+    #btn-edit { flex:none; white-space:nowrap; }
+    #autosave-hint { width:28px; flex:none; padding:4px 6px; overflow:hidden; white-space:nowrap; font-size:0; }
+  }
+  @media (max-width:1180px) {
+    header .sub { display:none; }
+    .sm-item { min-width:60px; }
+    .sync-dot { font-size:0; padding:0 5px 0 9px; }
+    #side { width:280px; }
+    #outline-panel { width:300px; }
+  }
   @media (max-width:980px) {
     #side { width:260px; }
     #outline-panel { width:320px; }
@@ -951,12 +1115,12 @@
 </head>
 <body>
 <header>
-  <h1>⚡ massCode Runner</h1>
+  <h1><span class="brand-mark">m</span><span class="brand-name">massCode</span><span class="brand-edition">Runner</span></h1>
   <div class="sub" id="vault-path">…</div>
   <div id="sysmon" aria-label="电脑实时状态">
-    <button class="sm-item offline" id="sm-cpu" title="点击查看电脑详细状态"><span class="sm-label">CPU</span><b class="sm-value" id="sm-cpu-v">--%</b><span class="sm-bar"><i id="sm-cpu-b"></i></span></button>
-    <button class="sm-item offline" id="sm-mem" title="点击查看电脑详细状态"><span class="sm-label">内存</span><b class="sm-value" id="sm-mem-v">--%</b><span class="sm-bar"><i id="sm-mem-b"></i></span></button>
-    <button class="sm-item offline" id="sm-disk" title="点击查看电脑详细状态"><span class="sm-label">硬盘</span><b class="sm-value" id="sm-disk-v">--%</b><span class="sm-bar"><i id="sm-disk-b"></i></span></button>
+    <button class="sm-item sm-detail-trigger offline" id="sm-cpu" title="点击查看完整电脑状态" aria-expanded="false" aria-controls="sysmon-detail"><span class="sm-label">CPU <i class="sm-open-mark" aria-hidden="true">ⓘ</i></span><b class="sm-value" id="sm-cpu-v">--%</b><span class="sm-bar"><i id="sm-cpu-b"></i></span></button>
+    <div class="sm-item offline" id="sm-mem" aria-label="内存实时占用"><span class="sm-label">内存</span><b class="sm-value" id="sm-mem-v">--%</b><span class="sm-bar"><i id="sm-mem-b"></i></span></div>
+    <div class="sm-item offline" id="sm-disk" aria-label="硬盘实时占用"><span class="sm-label">硬盘</span><b class="sm-value" id="sm-disk-v">--%</b><span class="sm-bar"><i id="sm-disk-b"></i></span></div>
     <div id="sysmon-detail">
       <div class="smd-title">电脑状态 <span id="smd-time">等待采样</span></div>
       <div class="smd-grid">
@@ -1162,7 +1326,7 @@
       <button id="btn-run" class="btn-run" title="运行代码">▶</button>
       <button id="btn-check" title="语法检查">✓</button>
       <button id="btn-format" title="格式化代码">✨</button>
-      <button id="btn-input" title="stdin 输入">⌨</button>
+      <button id="btn-input" title="在输出区填写 stdin 输入">⌨</button>
       <button id="btn-preview" title="预览 HTML" style="display:none">👁</button>
       <button id="btn-md" title="Markdown 渲染 / 源码切换" style="display:none">📄 源码</button>
     </div>
@@ -1311,6 +1475,7 @@
 const $ = (id) => document.getElementById(id);
 let SNIPPETS = [], TAGS = [], FOLDERS = [], RESOURCES = [], CURRENT = null, CINDEX = 0, lastRev = null;
 let RESOURCE_CURRENT = null, RESOURCE_UPLOAD_FOLDER = '';
+let RUN_INPUT_KEY = '';
 let DRAG_IDX = null; // 标签拖拽排序：当前拖拽的片段索引
 let EDITING = true; // 默认可编辑：代码区直接可改，按钮切换只读视图
 const activeTags = new Set(); // 选中的标签 id
@@ -1381,11 +1546,15 @@ async function loadSystemStatus() {
 }
 function toggleSystemDetail(force) {
   const detail = $('sysmon-detail');
-  detail.classList.toggle('open', force === undefined ? !detail.classList.contains('open') : !!force);
+  const open = force === undefined ? !detail.classList.contains('open') : !!force;
+  detail.classList.toggle('open', open);
+  $('sm-cpu').classList.toggle('on', open);
+  $('sm-cpu').setAttribute('aria-expanded', String(open));
 }
-for (const id of ['sm-cpu', 'sm-mem', 'sm-disk']) $(id).onclick = (e) => { e.stopPropagation(); toggleSystemDetail(); loadSystemStatus(); };
+$('sm-cpu').onclick = (e) => { e.stopPropagation(); toggleSystemDetail(); loadSystemStatus(); };
 $('sysmon-detail').onclick = (e) => e.stopPropagation();
 document.addEventListener('click', () => toggleSystemDetail(false));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleSystemDetail(false); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) loadSystemStatus(); });
 setInterval(loadSystemStatus, 2000);
 loadSystemStatus();
@@ -4686,106 +4855,179 @@ function initMmTheme() {
   [...menu.querySelectorAll('button')].forEach(b => b.onclick = (e) => { e.stopPropagation(); setMmTheme(b.dataset.t); menu.classList.add('hidden'); });
   document.addEventListener('click', (e) => { if (!e.target.closest('.mm-theme-wrap')) menu.classList.add('hidden'); });
 }
-/* 导出用的 SVG 副本：平铺整张思维导图（而非当前视口），且保持当前缩放级别（所见即所得）。
-   步骤：主 zoom 层只去掉 translate、保留 scale(k)，内容在数据坐标下以 k 倍显示；
-   foreignObject 转 <text>（避免 SVG/Canvas 污染，且不依赖外部 CSS）；
-   挂载计算内容包围盒 → 设置 viewBox 包揽完整导图，width/height = 内容 × k */
-function mmSvgForExport() {
+/* 导出完整思维导图，而不是当前缩放后的视口。
+   主图层 getBBox 已包含所有子节点的 translate；导出时移除视口 zoom 变换，
+   再把外部主题样式内联，避免 SVG 在独立查看器中丢失颜色。 */
+function mmSvgForExport(flattenHtml = false) {
   const svg = $('mm-svg');
   if (!svg) return null;
+  const sourceLayer = [...svg.children].find((node) => node.tagName && node.tagName.toLowerCase() === 'g');
+  if (!sourceLayer) return null;
+  let sourceBox;
+  try { sourceBox = sourceLayer.getBBox(); } catch (_) { sourceBox = null; }
+  if (!sourceBox || !isFinite(sourceBox.x) || !isFinite(sourceBox.y) || sourceBox.width <= 0 || sourceBox.height <= 0) return null;
   const clone = svg.cloneNode(true);
-  let k = 1;
-  /* 1) 主 zoom 层（无 class 的第一个 g）：只保留缩放 scale，去掉 translate 平移 */
-  const zoomG = clone.querySelector('g[transform]:not(.markmap-node):not(.markmap-highlight)');
-  if (zoomG) {
-    const sm = /scale\(([\d.\-]+)\)/.exec(zoomG.getAttribute('transform') || '');
-    if (sm) k = parseFloat(sm[1]) || 1;
-    zoomG.setAttribute('transform', 'scale(' + k + ')');
-  }
-  clone.querySelectorAll('.markmap-foreign').forEach((fo) => {
-    const style = fo.querySelector('div') ? window.getComputedStyle(fo.querySelector('div')) : null;
-    const fs = style ? (parseFloat(style.fontSize) || 12) : 12;
-    /* foreignObject 的 x/y 是相对所属 node g 的局部坐标，必须叠加 node g 的 translate */
-    const nodeG = fo.closest('g.markmap-node');
-    let tx = 0, ty = 0;
-    if (nodeG) {
-      const m = /translate\(([\d.\-]+),\s*([\d.\-]+)\)/.exec(nodeG.getAttribute('transform') || '');
-      if (m) { tx = parseFloat(m[1]); ty = parseFloat(m[2]); }
+  const exportLayer = [...clone.children].find((node) => node.tagName && node.tagName.toLowerCase() === 'g');
+  if (!exportLayer) return null;
+  exportLayer.removeAttribute('transform');
+
+  /* 主题规则位于页面 CSS 中，必须转成 SVG 自身属性才能脱离页面独立显示。 */
+  const sourcePaint = svg.querySelectorAll('path,circle,line,rect,ellipse,polyline,polygon');
+  const clonePaint = clone.querySelectorAll('path,circle,line,rect,ellipse,polyline,polygon');
+  sourcePaint.forEach((source, index) => {
+    const target = clonePaint[index]; if (!target) return;
+    const style = window.getComputedStyle(source);
+    ['fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'opacity'].forEach((name) => {
+      const value = style.getPropertyValue(name);
+      if (value) target.setAttribute(name, value);
+    });
+  });
+
+  /* 保留 foreignObject，才能完整保留 Markdown 的多行代码、表格和行内样式。
+     补齐 XHTML 命名空间并内联关键字体属性，使序列化后的独立 SVG 和 PNG
+     Canvas 渲染不再依赖当前页面的外部 CSS。 */
+  const sourceForeign = [...svg.querySelectorAll('.markmap-foreign')];
+  const cloneForeign = [...clone.querySelectorAll('.markmap-foreign')];
+  cloneForeign.forEach((fo, index) => {
+    const original = sourceForeign[index];
+    const originalRoot = original && original.querySelector('div');
+    const exportRoot = fo.querySelector('div');
+    if (!originalRoot || !exportRoot) return;
+    const styledSource = originalRoot.querySelector('pre code') || originalRoot;
+    const rootStyle = window.getComputedStyle(originalRoot);
+    const style = window.getComputedStyle(styledSource);
+    if (flattenHtml) {
+      const fs = parseFloat(style.fontSize) || 12;
+      const lineHeight = parseFloat(style.lineHeight) || fs * 1.3;
+      const family = style.fontFamily || '-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif';
+      const weight = style.fontWeight || '400';
+      const fontStyle = style.fontStyle || 'normal';
+      /* Markmap 已按原 HTML 高度排好节点，不能在导出阶段二次折行，否则会
+         改变节点高度并和相邻分支重叠；这里只保留 HTML 自己产生的换行。 */
+      const lines = String(originalRoot.innerText || originalRoot.textContent || '')
+        .replace(/\r/g, '').split('\n').map((line) => line.replace(/\s+$/, ''));
+      while (lines.length && !lines[lines.length - 1]) lines.pop();
+      const x = parseFloat(fo.getAttribute('x')) || 8;
+      const y = parseFloat(fo.getAttribute('y')) || 0;
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('font-size', fs + 'px');
+      text.setAttribute('font-family', family);
+      text.setAttribute('font-weight', weight);
+      text.setAttribute('font-style', fontStyle);
+      text.setAttribute('fill', rootStyle.color || '#e7edf6');
+      text.setAttribute('xml:space', 'preserve');
+      (lines.length ? lines : ['']).forEach((line, lineIndex) => {
+        const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+        tspan.setAttribute('x', String(x));
+        tspan.setAttribute('y', String(y + fs * .9 + lineIndex * lineHeight));
+        tspan.textContent = line || ' ';
+        text.appendChild(tspan);
+      });
+      fo.replaceWith(text);
+      return;
     }
-    const x = tx + (parseFloat(fo.getAttribute('x')) || 8);
-    const y = ty + (parseFloat(fo.getAttribute('y')) || 0);
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', String(x));
-    text.setAttribute('y', String(y + fs * 0.8));
-    text.setAttribute('font-size', String(fs) + 'px');
-    if (style && style.fontFamily) text.setAttribute('font-family', style.fontFamily);
-    if (style && style.fontWeight) text.setAttribute('font-weight', style.fontWeight);
-    text.setAttribute('fill', (style && style.color) || '#e6edf3');
-    text.setAttribute('text-anchor', 'start');
-    text.textContent = fo.textContent || '';
-    fo.replaceWith(text);
+    exportRoot.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+    ['color', 'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'white-space'].forEach((name) => {
+      const value = style.getPropertyValue(name);
+      if (value) exportRoot.style.setProperty(name, value);
+    });
   });
-  /* 删除动画/折叠装饰，突出节点结构 */
+
   clone.querySelectorAll('.markmap-highlight, .markmap-fold').forEach((n) => n.remove());
-  /* 2) 挂载计算内容包围盒（getBBox 需要文档布局上下文；返回数据坐标，不含祖先 scale） */
-  const holder = document.createElement('div');
-  holder.style.cssText = 'position:absolute;left:-99999px;top:0;width:1px;height:1px;visibility:hidden;pointer-events:none;';
-  holder.appendChild(clone);
-  document.body.appendChild(holder);
-  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
-  clone.querySelectorAll('path,circle,line,rect,ellipse,text').forEach((el) => {
-    let b;
-    try { b = el.getBBox(); } catch (_) { return; }
-    if (!b || !isFinite(b.x) || !isFinite(b.y) || !isFinite(b.width) || !isFinite(b.height)) return;
-    if (b.width < 0.01 && b.height < 0.01) return;
-    x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y);
-    x2 = Math.max(x2, b.x + b.width); y2 = Math.max(y2, b.y + b.height);
-  });
-  document.body.removeChild(holder);
-  if (!isFinite(x1)) { x1 = 0; y1 = 0; x2 = 1600; y2 = 900; }
-  const pad = 60 / k;   /* 数据坐标留白：视觉上恒定 60px */
-  const vbw = (x2 - x1) + pad * 2, vbh = (y2 - y1) + pad * 2;
-  clone.setAttribute('viewBox', (x1 - pad) + ' ' + (y1 - pad) + ' ' + vbw + ' ' + vbh);
-  clone.setAttribute('width', String(vbw * k));
-  clone.setAttribute('height', String(vbh * k));
+  clone.querySelectorAll('.sel').forEach((node) => node.classList.remove('sel'));
+
+  /* 临时挂载导出副本并重新 getBBox，确保所有节点都落在导出画布内。 */
+  let box = sourceBox;
+  const originalId = clone.getAttribute('id');
+  clone.removeAttribute('id');
+  clone.setAttribute('width', '1'); clone.setAttribute('height', '1');
+  clone.style.cssText = 'position:fixed;left:-100000px;top:0;visibility:hidden;overflow:visible;pointer-events:none';
+  document.body.appendChild(clone);
+  try {
+    const measured = exportLayer.getBBox();
+    if (measured && isFinite(measured.x) && isFinite(measured.y) && measured.width > 0 && measured.height > 0) box = measured;
+  } catch (_) {}
+  clone.remove();
+  clone.removeAttribute('style');
+  if (originalId) clone.setAttribute('id', originalId);
+
+  const pad = 48;
+  const x = box.x - pad, y = box.y - pad;
+  const width = Math.max(1, Math.ceil(box.width + pad * 2));
+  const height = Math.max(1, Math.ceil(box.height + pad * 2));
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+  clone.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
+  clone.setAttribute('width', String(width));
+  clone.setAttribute('height', String(height));
+  clone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bg.setAttribute('x', String(x)); bg.setAttribute('y', String(y));
+  bg.setAttribute('width', String(width)); bg.setAttribute('height', String(height));
+  bg.setAttribute('fill', '#0f131a');
+  clone.insertBefore(bg, exportLayer);
+  const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+  title.textContent = ((CURRENT && CURRENT.name) || 'Mind map') + ' · massCode Runner';
+  clone.insertBefore(title, clone.firstChild);
   return clone;
 }
-function mmExportPng() {
-  const clone = mmSvgForExport();
-  if (!clone) return;
+function mmExportName(ext) {
+  const base = String((CURRENT && CURRENT.name) || 'mindmap').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'mindmap';
+  return base + '.' + ext;
+}
+function mmDownloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+async function mmExportPng() {
+  /* PNG 不能直接栅格化 foreignObject（Canvas 会被浏览器标记为 tainted），
+     因此仅 PNG 使用已保留换行的纯 SVG 文本副本。 */
+  const clone = mmSvgForExport(true);
+  if (!clone) { setStatus('err', '思维导图尚未完成渲染'); return; }
+  setStatus('idle', '正在导出 PNG…');
+  let url = '';
   try {
-    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml;charset=utf-8' }));
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone);
+    url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }));
     const img = new Image();
-    img.onload = () => {
-      const S = 3, pad = 40;   /* 3× 高清导出 */
-      const w = img.naturalWidth || 1600, h = img.naturalHeight || 900;
-      const cw = Math.round(w * S) + pad * 2, ch = Math.round(h * S) + pad * 2;
-      const canvas = document.createElement('canvas');
-      canvas.width = cw; canvas.height = ch;
-      const cx = canvas.getContext('2d');
-      cx.fillStyle = '#0f131a'; cx.fillRect(0, 0, canvas.width, canvas.height);
-      cx.drawImage(img, pad, pad, cw - pad * 2, ch - pad * 2);   /* 矢量 SVG 按目标尺寸光栅化 → 高清 */
-      const a = document.createElement('a');
-      a.href = canvas.toDataURL('image/png');
-      a.download = ((CURRENT && CURRENT.name) || 'mindmap') + '.png';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    };
-    img.onerror = () => URL.revokeObjectURL(url);
-    img.src = url;
-  } catch (e) { console.error('png export error', e); }
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error('SVG 图像加载失败')); img.src = url; });
+    const w = img.naturalWidth || Number(clone.getAttribute('width')) || 1600;
+    const h = img.naturalHeight || Number(clone.getAttribute('height')) || 900;
+    /* 默认 2×；同时限制最长边与总像素，避免超大导图超过 Canvas 上限。 */
+    const scale = Math.max(.25, Math.min(2, 12000 / w, 12000 / h, Math.sqrt(64000000 / (w * h))));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w * scale));
+    canvas.height = Math.max(1, Math.round(h * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('浏览器无法创建 Canvas');
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.fillStyle = '#0f131a'; context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const png = await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('PNG 编码失败')), 'image/png'));
+    mmDownloadBlob(png, mmExportName('png'));
+    setStatus('ok', `PNG 已导出 · ${canvas.width}×${canvas.height}`);
+  } catch (e) {
+    console.error('png export error', e);
+    setStatus('err', 'PNG 导出失败：' + (e.message || e));
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+  }
 }
 function mmExportSvg() {
   const clone = mmSvgForExport();
-  if (!clone) return;
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml;charset=utf-8' }));
-  a.download = ((CURRENT && CURRENT.name) || 'mindmap') + '.svg';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  if (!clone) { setStatus('err', '思维导图尚未完成渲染'); return; }
+  try {
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone);
+    mmDownloadBlob(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }), mmExportName('svg'));
+    setStatus('ok', 'SVG 已导出');
+  } catch (e) {
+    console.error('svg export error', e);
+    setStatus('err', 'SVG 导出失败：' + (e.message || e));
+  }
 }
 function wireMindmapEvents() {
   $('mm-zoom-in').onclick = mmZoomIn;
@@ -6174,6 +6416,13 @@ function jumpToMdHeading(line) {
 }
 
 function renderMain() {
+  const inputKey = CURRENT ? CURRENT.file + '#' + CINDEX : '';
+  if (inputKey !== RUN_INPUT_KEY) {
+    RUN_INPUT_KEY = inputKey;
+    $('input-box').value = '';
+    $('in-status').textContent = '未使用';
+    $('in-status').className = 'in-dot';
+  }
   $('resource-viewer').style.display = 'none';
   renderCode();
   $('preview').style.display = 'none';
@@ -6192,8 +6441,67 @@ function setStatus(kind, text) {
   const p = $('status'); p.className = 'pill ' + kind; p.textContent = text;
 }
 
-async function doRun() {
+function currentRunSource() {
+  if (!CURRENT) return '';
+  return CURRENT.fragments.map((fragment, index) => {
+    if (EDITING && index === CINDEX) return editText();
+    return fragment.code || '';
+  }).join('\n');
+}
+
+function codeLikelyNeedsInput() {
+  const source = currentRunSource()
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ')
+    .replace(/^\s*#[^\n]*/gm, ' ');
+  return [
+    /\b(?:std\s*::\s*)?cin\s*>>/,
+    /\b(?:scanf|fscanf|getchar|gets)\s*\(/,
+    /\bfgets\s*\([^,]+,[^,]+,\s*stdin\s*\)/,
+    /\b(?:std\s*::\s*)?getline\s*\(\s*(?:std\s*::\s*)?cin\b/,
+    /\binput\s*\(/,
+    /\bsys\.stdin\b/,
+    /\bScanner\s*\(\s*System\.in\s*\)/,
+    /\breadline\s*\(/,
+    /\bstdin\s*\(\s*\)\s*\.\s*read_line\s*\(/,
+    /\bfmt\s*\.\s*Scan(?:f|ln)?\s*\(/,
+  ].some((pattern) => pattern.test(source));
+}
+
+function showInputInOutput(message, preserveOutput) {
+  switchOutTab('out');
+  const body = $('out-body');
+  if (!preserveOutput) body.innerHTML = '';
+  const card = document.createElement('div'); card.className = 'out-input-card';
+  const title = document.createElement('div'); title.className = 'out-input-title'; title.textContent = '⌨ 程序需要输入';
+  const desc = document.createElement('div'); desc.className = 'out-input-desc';
+  desc.textContent = message || '检测到当前代码会读取标准输入。请填写后运行，也可以选择无输入继续。';
+  const editor = document.createElement('textarea'); editor.className = 'out-input-editor';
+  editor.placeholder = '每行一组输入，例如：\n3 5'; editor.value = $('input-box').value;
+  editor.addEventListener('input', () => { $('input-box').value = editor.value; });
+  editor.addEventListener('keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      if (editor.value.trim()) doRun();
+    }
+  });
+  const actions = document.createElement('div'); actions.className = 'out-input-actions';
+  const emptyRun = document.createElement('button'); emptyRun.textContent = '无输入继续';
+  emptyRun.onclick = () => { $('input-box').value = ''; doRun({ forceWithoutInput: true }); };
+  const inputRun = document.createElement('button'); inputRun.className = 'primary'; inputRun.textContent = '带输入运行';
+  inputRun.onclick = () => {
+    $('input-box').value = editor.value;
+    if (!editor.value.trim()) { desc.textContent = '请先填写输入内容，或点击“无输入继续”。'; return; }
+    doRun();
+  };
+  actions.append(emptyRun, inputRun); card.append(title, desc, editor, actions); body.appendChild(card);
+  body.scrollTop = body.scrollHeight;
+  setStatus('idle', '等待输入');
+}
+
+async function doRun(options) {
   if (!CURRENT) return;
+  const forceWithoutInput = !!(options && options.forceWithoutInput === true);
   const currentFragment = CURRENT.fragments[CINDEX];
   if (currentFragment && currentFragment.language === 'latex') {
     if (!EDITING) { EDITING = true; renderCode(); }
@@ -6204,6 +6512,10 @@ async function doRun() {
   const inp = $('input-box').value;
   $('in-status').textContent = inp ? '已传入 ' + inp.split('\n').length + ' 行' : '未使用';
   $('in-status').className = 'in-dot' + (inp ? ' on' : '');
+  if (!inp && !forceWithoutInput && codeLikelyNeedsInput()) {
+    showInputInOutput();
+    return;
+  }
   $('out-body').innerHTML = '<span class="empty">运行中…</span>';
   setStatus('idle', '运行中…');
   const t0 = performance.now();
@@ -6215,7 +6527,8 @@ async function doRun() {
   if (!r.ok) {
     if (r.timedOut) {
       setStatus('err', 'timeout');
-      showOut(r.stdout, r.stderr + (inp ? '' : '\n提示：程序可能在等待输入——点「⌨ 输入」填写内容后重试'), false);
+      showOut(r.stdout, r.stderr, false);
+      if (!inp) showInputInOutput('程序运行超时，可能正在等待标准输入。填写输入后可以直接重新运行。', true);
     } else {
       setStatus('err', '退出码 ' + (r.code ?? '?'));
       showOut(r.stdout, r.stderr, false);
@@ -6434,7 +6747,7 @@ function switchOutTab(which) {
   $('tab-out').classList.toggle('on', which === 'out');
   $('tab-term').classList.toggle('on', which === 'term');
   $('out-body').classList.toggle('hidden', which === 'term');
-  $('input-area').classList.toggle('hidden', which === 'term');
+  $('input-area').classList.add('hidden');
   $('term-wrap').classList.toggle('hidden', which !== 'term');
   if (which === 'term') {
     if (!term) initTerm();
@@ -6509,7 +6822,7 @@ document.addEventListener('keydown', (e) => {
     if (EDITING) flushSave();
   }
 });
-$('btn-input').onclick = () => { const a = $('input-area'); a.classList.toggle('hidden'); if (!a.classList.contains('hidden')) $('input-box').focus(); };
+$('btn-input').onclick = () => showInputInOutput('在这里填写标准输入，然后重新运行当前代码。');
 $('btn-md').onclick = () => {
   MD_RENDER_MODE = !MD_RENDER_MODE;
   try { localStorage.setItem('mc-md-view', MD_RENDER_MODE ? '1' : '0'); } catch (_) {}
