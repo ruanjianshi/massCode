@@ -906,6 +906,10 @@
   #outline-list.stack-on > #ai-panel.is-detached.collapsed { min-height:42px !important; height:42px !important; }
   .pane-resizer { display:none; height:6px; margin:0; cursor:ns-resize; flex:none; position:relative; background:#10161e; border-top:1px solid #26313f; transition:border-color .12s,background .12s; }
   .pane-resizer:hover, body.resizing .pane-resizer { border-top-color:var(--accent); background:rgba(79,140,255,.08); }
+  .pane-bottom-resizer { display:none; height:7px; flex:none; position:relative; cursor:ns-resize; background:#10161e; border-top:1px solid #26313f; transition:border-color .12s,background .12s; }
+  .pane-bottom-resizer::after { content:''; position:absolute; left:50%; top:2px; width:38px; height:2px; border-radius:2px; background:#46566b; transform:translateX(-50%); }
+  .pane-bottom-resizer:hover, body.resizing .pane-bottom-resizer { border-top-color:var(--accent); background:rgba(79,140,255,.08); }
+  .pane-bottom-resizer:hover::after, body.resizing .pane-bottom-resizer::after { background:var(--accent); }
   body.resizing { cursor: ns-resize; user-select: none; }
   body.pane-reordering { cursor:grabbing !important; user-select:none; }
   body.pane-reordering * { cursor:grabbing !important; }
@@ -913,6 +917,10 @@
   .pane-body { max-height: 220px; overflow: auto; padding: 6px 4px; font-size: 12px; min-height:0; }
   #outline-list.stack-on > .stack-pane { flex:none; display:flex; flex-direction:column; min-height:90px; }
   #outline-list.stack-on > .stack-pane .pane-body { flex:1; max-height:none !important; }
+  #outline-list.stack-on > #st-relation:not(.collapsed) { min-height:280px; }
+  #outline-list.stack-on > #st-relation:not(.dock-hidden):not(.collapsed) > .pane-bottom-resizer { display:block; }
+  #outline-list.stack-on > #st-relation > #pane-rel-body { display:flex; flex-direction:column; }
+  #outline-list.stack-on > #st-relation > #pane-rel-body > .rel-graph { flex:1 1 230px; }
   #outline-list.stack-on > #ai-panel { flex:none; min-height:220px; }
   #outline-list.stack-on > .stack-pane:not(.dock-hidden) > .pane-resizer,
   #outline-list.stack-on > #ai-panel.is-detached > .pane-resizer { display:block; }
@@ -1326,7 +1334,6 @@
       <button id="btn-run" class="btn-run" title="运行代码">▶</button>
       <button id="btn-check" title="语法检查">✓</button>
       <button id="btn-format" title="格式化代码">✨</button>
-      <button id="btn-input" title="在输出区填写 stdin 输入">⌨</button>
       <button id="btn-preview" title="预览 HTML" style="display:none">👁</button>
       <button id="btn-md" title="Markdown 渲染 / 源码切换" style="display:none">📄 源码</button>
     </div>
@@ -1363,6 +1370,7 @@
           <div class="pane-resizer" title="上下拖动调整相邻窗格高度"></div>
           <div class="pane-title"><span class="pt">🌳 关系</span><span class="sp"></span><span class="cnt"></span><button class="pane-fold" title="收起 / 展开">▾</button><button class="pane-merge" title="合并回横向标签栏">↩</button><span class="grip">⠿</span></div>
           <div id="pane-rel-body" class="pane-body"><span class="ol-empty">选择代码文件后显示关系树</span></div>
+          <div class="pane-bottom-resizer" title="上下拖动调整关系窗口高度" aria-label="调整关系窗口高度"></div>
         </div>
       </div>
       <div id="ai-panel" class="hidden">
@@ -1816,7 +1824,7 @@ async function openLatexResource(r) {
   $('resource-save').style.display = 'none'; $('resource-body').innerHTML = '<span class="empty">正在加载资源…</span>';
   $('resource-rename').onclick = () => renameLatexResource(r);
   $('resource-replace').onclick = () => chooseLatexResource(r.folder, r.kind);
-  $('btn-edit').disabled = $('btn-run').disabled = $('btn-check').disabled = $('btn-format').disabled = $('btn-input').disabled = $('btn-info').disabled = true;
+  $('btn-edit').disabled = $('btn-run').disabled = $('btn-check').disabled = $('btn-format').disabled = $('btn-info').disabled = true;
   const raw = latexRawUrl(r.path), ext = r.ext.toLowerCase();
   if (r.text) {
     const data = await api('/api/latex/resource?path=' + encodeURIComponent(r.path));
@@ -3555,6 +3563,7 @@ const WINDOW_STATE_KEY = 'mc-window-panels-v2';
 const WINDOW_HEIGHT_KEY = 'mc-window-heights-v3';
 const PANE_LABEL = { outline:'大纲', symbol:'符号', relation:'关系', ai:'AI' };
 let DOCKED = [], DOCK_DRAG = '', DOCK_SOURCE = '';
+function paneMinHeight(id) { return id === 'ai' ? 220 : id === 'relation' ? 280 : 90; }
 function persistDock() {
   try { localStorage.setItem(WINDOW_STATE_KEY, JSON.stringify(DOCKED)); } catch (_) {}
 }
@@ -3585,7 +3594,16 @@ function applyDockMode() {
     const detached = DOCKED.includes(id);
     el.removeAttribute('draggable');
     el.classList.toggle('dock-hidden', !detached);
-    if (detached) el.style.height = el.classList.contains('collapsed') ? '42px' : Math.max(90, Number(heights[id]) || 220) + 'px';
+    if (!detached) { el.style.height = ''; el.style.flex = ''; return; }
+    if (el.classList.contains('collapsed')) { el.style.height = '42px'; el.style.flex = 'none'; return; }
+    if (id === 'relation' && (!Number(heights[id]) || Number(heights[id]) < paneMinHeight(id))) {
+      /* 关系图默认吃掉右栏剩余空间，不再被旧版 220px 固定高度截住。 */
+      el.style.height = '';
+      el.style.flex = '1 1 320px';
+    } else {
+      el.style.flex = 'none';
+      el.style.height = Math.max(paneMinHeight(id), Number(heights[id]) || 220) + 'px';
+    }
   });
   const aiDetached = DOCKED.includes('ai');
   map.ai.classList.toggle('dock-hidden', false);
@@ -3721,8 +3739,9 @@ function initStackStrip() {
       if (collapsing) { pane.dataset.openHeight = String(pane.getBoundingClientRect().height); pane.style.height = '42px'; }
       else {
         const id = pane.dataset.pane || 'ai';
-        pane.style.height = Math.max(id === 'ai' ? 220 : 90, Number(pane.dataset.openHeight) || (id === 'ai' ? 340 : 220)) + 'px';
+        pane.style.height = Math.max(paneMinHeight(id), Number(pane.dataset.openHeight) || (id === 'ai' ? 340 : id === 'relation' ? 320 : 220)) + 'px';
       }
+      pane.style.flex = 'none';
       pane.classList.toggle('collapsed', collapsing); fold.textContent = collapsing ? '▸' : '▾'; return;
     }
   });
@@ -3770,6 +3789,14 @@ function initStackStrip() {
   });
   let resize = null;
   list.addEventListener('mousedown', (e) => {
+    const bottomBar = e.target.closest('.pane-bottom-resizer');
+    if (bottomBar && e.button === 0) {
+      const pane = bottomBar.closest('.stack-pane, #ai-panel'); const id = pane && (pane.dataset.pane || 'ai');
+      if (!pane || !DOCKED.includes(id) || pane.classList.contains('collapsed')) return;
+      e.preventDefault(); e.stopPropagation();
+      resize = { edge:true, pane, id, y:e.clientY, currentH:pane.getBoundingClientRect().height };
+      pane.style.flex = 'none'; document.body.classList.add('resizing'); return;
+    }
     const bar = e.target.closest('.pane-resizer'); if (!bar || e.button !== 0) return;
     const pane = bar.closest('.stack-pane, #ai-panel'); const id = pane && (pane.dataset.pane || 'ai');
     if (!pane || !DOCKED.includes(id) || pane.classList.contains('collapsed')) return;
@@ -3787,8 +3814,12 @@ function initStackStrip() {
   });
   document.addEventListener('mousemove', (e) => {
     if (!resize) return;
-    const prevMin = resize.prevId === 'ai' ? 220 : 90;
-    const currentMin = resize.id === 'ai' ? 220 : 90;
+    if (resize.edge) {
+      resize.pane.style.height = Math.max(paneMinHeight(resize.id), resize.currentH + e.clientY - resize.y) + 'px';
+      return;
+    }
+    const prevMin = paneMinHeight(resize.prevId);
+    const currentMin = paneMinHeight(resize.id);
     const delta = e.clientY - resize.y;
     const prevHeight = Math.max(prevMin, Math.min(resize.total - currentMin, resize.prevH + delta));
     resize.prev.style.height = prevHeight + 'px';
@@ -3798,7 +3829,7 @@ function initStackStrip() {
     if (!resize) return;
     try {
       const h = JSON.parse(localStorage.getItem(WINDOW_HEIGHT_KEY) || '{}') || {};
-      h[resize.prevId] = resize.prev.getBoundingClientRect().height;
+      if (!resize.edge) h[resize.prevId] = resize.prev.getBoundingClientRect().height;
       h[resize.id] = resize.pane.getBoundingClientRect().height;
       localStorage.setItem(WINDOW_HEIGHT_KEY, JSON.stringify(h));
     } catch (_) {}
@@ -5738,12 +5769,11 @@ function renderCode() {
     $('ln').textContent = f ? f.code.split('\n').map((_, i) => i + 1).join('\n') : '';
   }
   $('btn-edit').disabled = !f;
-  $('btn-run').disabled = $('btn-check').disabled = $('btn-format').disabled = $('btn-input').disabled = $('btn-info').disabled = !f;
+  $('btn-run').disabled = $('btn-check').disabled = $('btn-format').disabled = $('btn-info').disabled = !f;
   $('btn-run').textContent = isLatex ? '▶ PDF' : '▶';
   $('btn-run').title = isLatex ? '立即编译并刷新 PDF' : '运行代码';
   $('btn-check').title = isLatex ? '检查 LaTeX 并刷新 PDF' : '语法检查';
   $('btn-format').disabled = !f || isLatex;
-  $('btn-input').disabled = !f || isLatex;
   const isHtml = f && f.language === 'html';
   $('btn-preview').style.display = isHtml ? '' : 'none';
   $('btn-preview').disabled = !isHtml;
@@ -6468,6 +6498,17 @@ function codeLikelyNeedsInput() {
   ].some((pattern) => pattern.test(source));
 }
 
+function currentRunHasEntryPoint() {
+  const fragment = CURRENT && CURRENT.fragments[CINDEX];
+  const language = fragment && String(fragment.language || '').toLowerCase();
+  if (language !== 'c' && language !== 'c_cpp') return true;
+  const source = currentRunSource()
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ')
+    .replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, ' ');
+  return /\b(?:int|auto)\s+main\s*\([^;{}]*\)\s*(?:->\s*[\w:<>]+\s*)?\{/.test(source);
+}
+
 function showInputInOutput(message, preserveOutput) {
   switchOutTab('out');
   const body = $('out-body');
@@ -6512,7 +6553,7 @@ async function doRun(options) {
   const inp = $('input-box').value;
   $('in-status').textContent = inp ? '已传入 ' + inp.split('\n').length + ' 行' : '未使用';
   $('in-status').className = 'in-dot' + (inp ? ' on' : '');
-  if (!inp && !forceWithoutInput && codeLikelyNeedsInput()) {
+  if (!inp && !forceWithoutInput && currentRunHasEntryPoint() && codeLikelyNeedsInput()) {
     showInputInOutput();
     return;
   }
@@ -6524,6 +6565,7 @@ async function doRun(options) {
   const r = await api('/api/run', body);
   $('elapsed').textContent = ((performance.now() - t0) / 1000).toFixed(2) + 's';
   if (r.unsupported) { setStatus('err', '不支持'); showOut(r.reason, '', false); return; }
+  if (r.noEntry) { setStatus('idle', '仅编译'); showOut(r.reason, '', true); return; }
   if (!r.ok) {
     if (r.timedOut) {
       setStatus('err', 'timeout');
@@ -6822,7 +6864,6 @@ document.addEventListener('keydown', (e) => {
     if (EDITING) flushSave();
   }
 });
-$('btn-input').onclick = () => showInputInOutput('在这里填写标准输入，然后重新运行当前代码。');
 $('btn-md').onclick = () => {
   MD_RENDER_MODE = !MD_RENDER_MODE;
   try { localStorage.setItem('mc-md-view', MD_RENDER_MODE ? '1' : '0'); } catch (_) {}

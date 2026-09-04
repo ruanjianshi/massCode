@@ -769,6 +769,21 @@ function writeTemp(name, content) {
   return { dir, file: f };
 }
 
+// 库文件/驱动模块没有 main() 时，编译器会在链接阶段输出平台相关的晦涩错误。
+// 统一识别 macOS/Linux/Windows 的“缺少程序入口”，交给前端显示为仅编译结果。
+function normalizeMissingEntry(result) {
+  if (!result || result.ok) return result;
+  const message = String(result.stderr || result.error || '');
+  const missingMain = /(?:undefined symbols?[\s\S]*["'`]_main["'`]|undefined reference to\s*["'`](?:main|WinMain)["'`]|unresolved external symbol\s+(?:_?main|WinMain)|entry point[^\n]*(?:main|WinMain))/i.test(message);
+  if (!missingMain) return result;
+  return {
+    ...result,
+    noEntry: true,
+    stderr: '',
+    reason: '当前代码没有 main() 入口函数，已完成编译检查，但不会生成或运行可执行程序。若这是驱动、库或接口模块，可直接使用“语法检查”；需要运行时请新增 main.c / main.cpp 并定义 int main(void)。',
+  };
+}
+
 // 在独立临时目录编译 LaTeX，并禁用 shell escape。额外拦截显式绝对路径/上级目录引用。
 function copyLatexResources(sourceFile, targetDir) {
   if (!sourceFile) return;
@@ -1016,7 +1031,7 @@ function runnerFor(language) {
             if (bad) return bad;
             const objs = srcs.map((fn) => path.join(dir, fn + '.o'));
             return run('g++', ['-I', dir, ...objs, '-o', bin], { timeoutMs: 40000 })
-              .then((r) => r.ok ? run(bin, [], { cwd: dir, timeoutMs: 15000, input: opts.input }) : r);
+              .then((r) => r.ok ? run(bin, [], { cwd: dir, timeoutMs: 15000, input: opts.input }) : normalizeMissingEntry(r));
           });
         }),
       };
@@ -1036,7 +1051,7 @@ function runnerFor(language) {
           const bin = path.join(dir, 'a.out');
           const gargs = ['-std=c17', '-I', dir, ...srcs, '-o', bin];
           return run('gcc', gargs, { timeoutMs: 40000 })
-            .then((r) => r.ok ? run(bin, [], { cwd: dir, timeoutMs: 15000, input: opts.input }) : r);
+            .then((r) => r.ok ? run(bin, [], { cwd: dir, timeoutMs: 15000, input: opts.input }) : normalizeMissingEntry(r));
         }),
       };
     case 'java': {
