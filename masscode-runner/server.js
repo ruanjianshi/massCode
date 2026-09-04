@@ -208,8 +208,9 @@ const EXT_FOR_LANG = {
   javascript: 'js', typescript: 'ts', python: 'py', bash: 'sh', shell: 'sh',
   c_cpp: 'cpp', c: 'c', java: 'java', ruby: 'rb', swift: 'swift', go: 'go',
   json: 'json', html: 'html', css: 'css', markdown: 'md', plain_text: 'txt',
+  draw: 'draw', drawing: 'draw',
 };
-const KNOWN_EXT = /\.(c|cc|cpp|cxx|h|hh|hpp|hxx|py|js|mjs|cjs|ts|sh|go|java|rb|swift|json|html|css|yml|yaml|md|txt)$/i;
+const KNOWN_EXT = /\.(c|cc|cpp|cxx|h|hh|hpp|hxx|py|js|mjs|cjs|ts|sh|go|java|rb|swift|json|html|css|yml|yaml|md|txt|draw)$/i;
 function computeFilename(label, language, index, total) {
   const lbl = (label || '').trim();
   if (lbl && KNOWN_EXT.test(lbl)) return lbl;
@@ -296,6 +297,28 @@ function readTagRegistry() {
   } catch (_) { return { map: {}, list: [] }; }
 }
 
+/* 把 parseFrontmatter 的 {meta, body} 序列化回 massCode 格式 frontmatter + body */
+function stringifyFrontmatter(fm) {
+  const m = fm.meta || {};
+  const lines = ['---'];
+  if (Array.isArray(m.contents) && m.contents.length) {
+    lines.push('contents:');
+    for (const c of m.contents) {
+      lines.push('  - id: ' + (c.id !== undefined ? c.id : ''));
+      if (c.label !== undefined) lines.push('    label: ' + c.label);
+      if (c.language !== undefined) lines.push('    language: ' + c.language);
+    }
+  }
+  for (const k of ['createdAt', 'description', 'folderId', 'id', 'isDeleted', 'isFavorites', 'name', 'updatedAt']) {
+    if (m[k] === undefined) continue;
+    if (k === 'description') lines.push('description: ' + (m[k] ? JSON.stringify(m[k]) : '""'));
+    else lines.push(k + ': ' + m[k]);
+  }
+  lines.push('tags:');
+  for (const t of (Array.isArray(m.tags) ? m.tags : [])) lines.push('  - ' + t);
+  return lines.join('\n') + '\n---\n' + (fm.body || '');
+}
+
 function walkSnippets() {
   const vault = vaultPath();
   const codeRoot = path.join(vault, 'code');
@@ -318,7 +341,7 @@ function walkSnippets() {
           out.push({
             file: full,
             name: meta.name || path.basename(e.name, '.md'),
-            description: meta.description || '',
+            description: (meta.description && meta.description !== 'null') ? meta.description : '',
             isFavorites: meta.isFavorites === '1',
             folder: folder.replace(/^\/+/, ''),
             updatedAt: Number(meta.updatedAt) || 0,
@@ -367,6 +390,40 @@ function walkFolders() {
   walk(codeRoot, '');
   out.sort((a, b) => (a.parent === b.parent ? (a.orderIndex ?? 0) - (b.orderIndex ?? 0) || a.name.localeCompare(b.name, 'zh') : a.parent.localeCompare(b.parent)));
   return out;
+}
+
+/* massCode 元数据库 .masscode/state.json：新建/移动片段与文件夹时需要登记，保证 massCode 识别 */
+function readState() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(vaultPath(), 'code', '.masscode', 'state.json'), 'utf8'));
+  } catch (_) {
+    return { version: 3, counters: { contentId: 1, folderId: 1, snippetId: 1, tagId: 1 }, folderIdByPath: {}, folderUi: {}, snippets: [], tags: [] };
+  }
+}
+function writeState(st) {
+  const p = path.join(vaultPath(), 'code', '.masscode', 'state.json');
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(st, null, 2), 'utf8');
+}
+
+/* 按标签名解析为 id，不存在的自动新建（massCode 标签注册表） */
+function syncTags(st, names) {
+  const ids = [];
+  const byName = new Map();
+  for (const t of st.tags) byName.set(t.name, t.id);
+  for (const raw of names || []) {
+    const name = String(raw || '').trim();
+    if (!name) continue;
+    let id = byName.get(name);
+    if (id === undefined) {
+      id = ++st.counters.tagId;
+      const now = Date.now();
+      st.tags.push({ createdAt: now, id, name, updatedAt: now });
+      byName.set(name, id);
+    }
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
 }
 
 /* 版本指纹：所有片段文件的 路径+mtime+大小 的哈希，用于前端实时同步检测。
@@ -530,20 +587,35 @@ function runnerFor(language) {
     case 'c_cpp':
       return {
         supported: true,
-        check: (code, opts) => guard('gpp', () => {
+        // 按文件扩展名决定 C/C++：.c → gcc(C17)，其余 → g++(C++17)，避免 clang++ 的 "treating 'c' input as 'c++'" 告警
+        check: (code, opts) => {
           const files = (opts.files && opts.files.length) ? opts.files : [{ filename: 'check.cpp', code }];
           const dir = writeFragments(files);
-          const entry = path.join(dir, files[(opts.selIndex || 0)].filename);
-          return run('g++', ['-std=c++17', '-I', dir, '-fsyntax-only', entry], { timeoutMs: 30000 });
-        }),
+          const sel = files[(opts.selIndex || 0)] || files[0];
+          const entry = path.join(dir, sel.filename);
+          const isC = /\.c$/i.test(sel.filename);
+          return guard(isC ? 'gcc' : 'gpp', () => run(isC ? 'gcc' : 'g++', [isC ? '-std=c17' : '-std=c++17', '-I', dir, '-fsyntax-only', entry], { timeoutMs: 30000 }));
+        },
         run: (code, opts) => guard('gpp', () => {
           const files = (opts.files && opts.files.length) ? opts.files : [{ filename: 'main.cpp', code }];
           const dir = writeFragments(files);
-          const srcs = files.filter((f) => /\.(c|cc|cpp|cxx)$/i.test(f.filename)).map((f) => path.join(dir, f.filename));
+          const srcs = files.filter((f) => /\.(c|cc|cpp|cxx)$/i.test(f.filename)).map((f) => f.filename);
+          if (!srcs.length) return { ok: false, code: 1, stdout: '', stderr: '没有可编译的 C/C++ 源文件' };
           const bin = path.join(dir, 'a.out');
-          const gargs = ['-std=c++17', '-I', dir, ...srcs, '-o', bin];
-          return run('g++', gargs, { timeoutMs: 40000 })
-            .then((r) => r.ok ? run(bin, [], { cwd: dir, timeoutMs: 15000, input: opts.input }) : r);
+          // 逐个 .c 用 gcc(C)、.cpp 用 g++(C++) 编译成 .o，再统一链接
+          const steps = srcs.map((fn) => {
+            const isC = /\.c$/i.test(fn);
+            const tool = isC ? 'gcc' : 'g++';
+            const std = isC ? '-std=c17' : '-std=c++17';
+            return guard(isC ? 'gcc' : 'gpp', () => run(tool, [std, '-I', dir, '-c', path.join(dir, fn), '-o', path.join(dir, fn + '.o')], { timeoutMs: 40000 }));
+          });
+          return Promise.all(steps).then((results) => {
+            const bad = results.find((r) => !r.ok);
+            if (bad) return bad;
+            const objs = srcs.map((fn) => path.join(dir, fn + '.o'));
+            return run('g++', ['-I', dir, ...objs, '-o', bin], { timeoutMs: 40000 })
+              .then((r) => r.ok ? run(bin, [], { cwd: dir, timeoutMs: 15000, input: opts.input }) : r);
+          });
         }),
       };
     case 'c':
@@ -842,6 +914,33 @@ function reorderFragments(file, order) {
 
 /* --------------------------------- Git 面板 ---------------------------------- */
 
+/* ------------------------------- 底部终端（PTY）------------------------------- */
+
+let TERM = null;   // 当前终端会话 { child, res }
+function termSpawn() {
+  try {
+    const shell = process.env.SHELL || '/bin/bash';
+    // ptybridge.py 用 python3 pty.fork 分配真实伪终端，双向转发 stdin/stdout
+    const bridge = path.join(__dirname, 'ptybridge.py');
+    const child = spawn('python3', ['-u', bridge], { env: { ...process.env, SHELL: shell } });
+    TERM = { child, res: null };
+    child.stdout.on('data', (d) => { if (TERM && TERM.res) { try { TERM.res.write(d); } catch (_) {} } });
+    child.stderr.on('data', (d) => { if (TERM && TERM.res) { try { TERM.res.write(d); } catch (_) {} } });
+    child.on('error', () => { TERM = null; });
+    child.on('exit', () => {
+      const r = TERM && TERM.res;
+      TERM = null;
+      if (r) { try { r.end(); } catch (_) {} }
+    });
+    return true;
+  } catch (e) {
+    TERM = null;
+    return false;
+  }
+}
+
+/* --------------------------------- Git 面板 ---------------------------------- */
+
 let GIT_ROOT = null;   // 缓存仓库根（vault 所在 git 仓库，通常在其上级目录）
 function gitRoot() {
   if (GIT_ROOT) return GIT_ROOT;
@@ -888,12 +987,21 @@ function gitStatus() {
       changes.push({ status: xy.trim() || '?', idx: xy[0], wt: xy[1], path, kind });
     }
     let lastCommit = null;
+    let commits = [];
     try {
       const lg = execFileSync('git', ['log', '-1', '--format=%h%x09%s'], { cwd: root, encoding: 'utf8', timeout: 10000 }).trim();
       const sp = lg.indexOf('\t');
       lastCommit = sp >= 0 ? { hash: lg.slice(0, sp), subject: lg.slice(sp + 1) } : { hash: lg };
     } catch (_) {}
-    return { ok: true, root, branch, ahead, behind, changes, lastCommit };
+    try {
+      // 最近 10 条提交记录：短hash|主题|时间戳
+      const lout = execFileSync('git', ['log', '--pretty=format:%h|%s|%at', '-n', '10'], { cwd: root, encoding: 'utf8', timeout: 10000 }).trim();
+      if (lout) commits = lout.split('\n').map(line => {
+        const p = line.split('|');
+        return { short: p[0] || '', subject: p[1] || '', ts: +(p[2] || 0) };
+      });
+    } catch (_) {}
+    return { ok: true, root, branch, ahead, behind, changes, lastCommit, commits };
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
@@ -901,7 +1009,7 @@ function gitStatus() {
 
 /* --------------------------------- HTTP 服务 ---------------------------------- */
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.json': 'application/json; charset=utf-8' };
 
 function send(res, code, obj) {
   const body = typeof obj === 'string' ? obj : JSON.stringify(obj);
@@ -929,6 +1037,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && u.pathname.startsWith('/assets/')) {
       const assetsRoot = path.join(__dirname, 'assets');
       const rel = u.pathname.slice('/assets/'.length);
+      const p = path.resolve(assetsRoot, rel);
+      if (!p.startsWith(assetsRoot + path.sep) && p !== assetsRoot) return send(res, 403, { ok: false, error: 'forbidden' });
+      try {
+        const data = fs.readFileSync(p);
+        res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+        res.end(data);
+      } catch (_) { send(res, 404, { ok: false, error: 'not found' }); }
+      return;
+    }
+    if (req.method === 'GET' && u.pathname.startsWith('/vendor/')) {
+      const assetsRoot = path.join(__dirname, 'vendor');
+      const rel = u.pathname.slice('/vendor/'.length);
       const p = path.resolve(assetsRoot, rel);
       if (!p.startsWith(assetsRoot + path.sep) && p !== assetsRoot) return send(res, 403, { ok: false, error: 'forbidden' });
       try {
@@ -1015,7 +1135,7 @@ const server = http.createServer(async (req, res) => {
       if (!fr.ok) return send(res, 200, { ok: false, formatter: fspec.name, reason: fr.reason });
       // 编辑模式（writeBack:false）：只返回格式化结果，由前端更新编辑框，不写盘
       if (b.writeBack === false) {
-        return send(res, 200, { ok: true, formatter: fspec.name, formatted: fr.formatted, written: false, message: '已格式化（编辑模式，点「保存」后写回 vault）' });
+        return send(res, 200, { ok: true, formatter: fspec.name, formatted: fr.formatted, written: false, message: '已格式化（编辑模式，自动保存会立即写回 vault）' });
       }
       const written = writeBackFragment(b.file, frag, fr.formatted.replace(/\n+$/, ''));
       return send(res, 200, {
@@ -1044,8 +1164,601 @@ const server = http.createServer(async (req, res) => {
       const r = reorderFragments(b.file, b.order);
       return send(res, 200, { ok: r.ok, error: r.error, message: r.ok ? '片段顺序已调整（massCode 会实时同步）' : undefined });
     }
+    /* ------------------------------ 文件系统：新建/移动 ------------------------------ */
+    if (req.method === 'POST' && u.pathname === '/api/fs/mkdir') {
+      const b = await readBody(req);
+      const rel = String(b.path || '').replace(/^\/+|\/+$/g, '');
+      if (!rel || rel.split('/').some((seg) => !seg || seg === '.' || seg === '..')) return send(res, 200, { ok: false, error: '文件夹路径不合法' });
+      const defaultLanguage = String(b.defaultLanguage || 'plain_text').trim() || 'plain_text';
+      const codeRoot = path.join(vaultPath(), 'code');
+      const dir = path.join(codeRoot, rel);
+      if (dir !== codeRoot && !dir.startsWith(codeRoot + path.sep)) return send(res, 200, { ok: false, error: '路径越界' });
+      if (fs.existsSync(dir)) return send(res, 200, { ok: false, error: '文件夹已存在' });
+      fs.mkdirSync(dir, { recursive: true });
+      const st = readState();
+      const now = Date.now();
+      // 每层新建目录都写 .meta.yaml 并注册（父层级联创建时也必须有元数据，否则 id 为 null）
+      const segs = rel.split('/');
+      for (let i = 0; i < segs.length; i++) {
+        const subRel = segs.slice(0, i + 1).join('/');
+        const metaPath = path.join(codeRoot, subRel, '.meta.yaml');
+        if (fs.existsSync(metaPath)) continue;   // 已有元数据的层跳过（保留原 orderIndex 等）
+        let fid = st.folderIdByPath[subRel];
+        if (!fid) {
+          fid = ++st.counters.folderId;
+          st.folderIdByPath[subRel] = fid;
+          st.folderUi[fid] = { isOpen: 1 };
+        }
+        fs.writeFileSync(metaPath,
+          `id: ${fid}\ncreatedAt: ${now}\ndefaultLanguage: ${i === segs.length - 1 ? defaultLanguage : 'plain_text'}\nicon: null\nname: ${segs[i]}\norderIndex: 0\nupdatedAt: ${now}\n`, 'utf8');
+      }
+      writeState(st);
+      return send(res, 200, { ok: true, folder: rel, id: st.folderIdByPath[rel] });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/fs/newfile') {
+      const b = await readBody(req);
+      const folder = String(b.folder || '').replace(/^\/+|\/+$/g, '');
+      const name = String(b.name || '').trim().replace(/\.md$/i, '').replace(/[:]/g, '：');   // 冒号会破坏 frontmatter
+      if (!name || name.includes('/') || name.includes('\\')) return send(res, 200, { ok: false, error: '文件名不合法' });
+      const language = String(b.language || 'plain_text').trim() || 'plain_text';
+      const description = (b.description === undefined || b.description === null) ? '' : String(b.description).trim();
+      const tagNames = Array.isArray(b.tags) ? b.tags.map(String) : [];
+      const codeRoot = path.join(vaultPath(), 'code');
+      const dir = folder ? path.join(codeRoot, folder) : codeRoot;
+      if (dir !== codeRoot && !dir.startsWith(codeRoot + path.sep)) return send(res, 200, { ok: false, error: '路径越界' });
+      fs.mkdirSync(dir, { recursive: true });
+      const full = path.join(dir, name + '.md');
+      if (fs.existsSync(full)) return send(res, 200, { ok: false, error: '文件已存在' });
+      const st = readState();
+      let fid = st.folderIdByPath[folder] || 0;
+      if (folder && !fid) {
+        fid = ++st.counters.folderId;
+        st.folderIdByPath[folder] = fid;
+        st.folderUi[fid] = { isOpen: 1 };
+      }
+      const tagIds = syncTags(st, tagNames);
+      const sid = ++st.counters.snippetId;
+      const cid = ++st.counters.contentId;
+      const now = Date.now();
+      const filePath = folder ? folder + '/' + name + '.md' : name + '.md';
+      const md = '---\n' +
+        'contents:\n' +
+        '  - id: ' + cid + '\n' +
+        '    label: ' + name + '\n' +
+        '    language: ' + language + '\n' +
+        'createdAt: ' + now + '\n' +
+        'description: ' + (description ? JSON.stringify(description) : '""') + '\n' +
+        'folderId: ' + (fid || 0) + '\n' +
+        'id: ' + sid + '\n' +
+        'isDeleted: 0\n' +
+        'isFavorites: 0\n' +
+        'name: ' + name + '\n' +
+        (tagIds.length ? 'tags:\n' + tagIds.map((t) => '  - ' + t).join('\n') + '\n' : 'tags:\n') +
+        'updatedAt: ' + now + '\n' +
+        '---\n' +
+        '\n## Fragment: ' + name + '\n' +
+        '```' + language + '\n' +
+        '\n```\n';
+      fs.writeFileSync(full, md, 'utf8');
+      st.snippets.push({
+        filePath, id: sid,
+        meta: {
+          contents: [{ id: cid, label: name, language }],
+          createdAt: now, description: description || null, folderId: fid || 0, isDeleted: 0, isFavorites: 0,
+          mtimeMs: now, name, size: Buffer.byteLength(md), tags: tagIds, updatedAt: now,
+        },
+      });
+      writeState(st);
+      return send(res, 200, { ok: true, file: full, snippetId: sid, folder, tags: tagIds, language });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/fs/move') {
+      const b = await readBody(req);
+      const file = String(b.file || '');
+      const toFolder = String(b.toFolder || '').replace(/^\/+|\/+$/g, '');
+      if (!file || toFolder.split('/').some((seg) => seg === '.' || seg === '..')) return send(res, 200, { ok: false, error: '参数不合法' });
+      const codeRoot = path.join(vaultPath(), 'code');
+      const st = readState();
+      const snip = st.snippets.find((s) => path.resolve(codeRoot, s.filePath) === path.resolve(file));
+      if (!snip) return send(res, 200, { ok: false, error: '片段不在状态库中（可能尚未同步）' });
+      const destDir = toFolder ? path.join(codeRoot, toFolder) : codeRoot;
+      if (destDir !== codeRoot && !destDir.startsWith(codeRoot + path.sep)) return send(res, 200, { ok: false, error: '路径越界' });
+      const fname = path.basename(snip.filePath);
+      const destFull = path.join(destDir, fname);
+      if (path.resolve(file) === path.resolve(destFull)) return send(res, 200, { ok: true, file, folder: toFolder }); // 没动
+      if (fs.existsSync(destFull)) return send(res, 200, { ok: false, error: '目标位置已存在同名文件' });
+      fs.mkdirSync(destDir, { recursive: true });
+      try { fs.renameSync(file, destFull); } catch (e) { return send(res, 200, { ok: false, error: '移动失败: ' + e.message }); }
+      let fid = st.folderIdByPath[toFolder] || 0;
+      if (toFolder && !fid) {
+        fid = ++st.counters.folderId;
+        st.folderIdByPath[toFolder] = fid;
+        st.folderUi[fid] = { isOpen: 1 };
+      }
+      snip.filePath = toFolder ? toFolder + '/' + fname : fname;
+      snip.meta.folderId = fid || 0;
+      writeState(st);
+      // 同步 .md frontmatter 的 folderId
+      try {
+        const text = fs.readFileSync(destFull, 'utf8');
+        const updated = text.replace(/^folderId:\s*.*$/m, 'folderId: ' + (fid || 0));
+        if (updated !== text) fs.writeFileSync(destFull, updated, 'utf8');
+      } catch (_) {}
+      return send(res, 200, { ok: true, file: destFull, folder: toFolder });
+    }
+    // 编辑片段信息：名称/类型(语言)/标签/说明（fragmentId 指定要改语言的分片，默认第一个）
+    if (req.method === 'POST' && u.pathname === '/api/fs/update') {
+      const b = await readBody(req);
+      const codeRoot = path.join(vaultPath(), 'code');
+      const st = readState();
+      const snip = st.snippets.find((s) => path.resolve(codeRoot, s.filePath) === path.resolve(String(b.file || '')));
+      if (!snip) return send(res, 200, { ok: false, error: '片段不在状态库中（可能尚未同步）' });
+      let full = path.resolve(codeRoot, snip.filePath);
+      if (full !== codeRoot && !full.startsWith(codeRoot + path.sep)) return send(res, 200, { ok: false, error: '路径越界' });
+      let text = fs.readFileSync(full, 'utf8');
+      const fm = parseFrontmatter(text);
+      if (!fm.meta || !Array.isArray(fm.meta.contents) || !fm.meta.contents.length) return send(res, 200, { ok: false, error: 'frontmatter 解析失败' });
+      const fragId = Number(b.fragmentId);
+      const tgt = (fm.meta.contents.find((c) => String(c.id) === String(fragId)) || fm.meta.contents[0]);
+      const folderPath = path.dirname(snip.filePath) === '.' ? '' : path.dirname(snip.filePath).split(path.sep).join('/');
+      const now = Date.now();
+      // 名称（重命名）
+      if (b.name !== undefined) {
+        const newName = String(b.name).trim().replace(/\.md$/i, '').replace(/[:]/g, '：');
+        if (!newName) return send(res, 200, { ok: false, error: '文件名不能为空' });
+        const oldName = fm.meta.name || path.basename(full, '.md');
+        if (newName !== oldName) {
+          if (newName.includes('/') || newName.includes('\\')) return send(res, 200, { ok: false, error: '文件名不合法' });
+          const newFull = path.join(path.dirname(full), newName + '.md');
+          if (newFull !== full && fs.existsSync(newFull)) return send(res, 200, { ok: false, error: '目标文件已存在' });
+          if (newFull !== full) {
+            try { fs.renameSync(full, newFull); } catch (e) { return send(res, 200, { ok: false, error: '重命名失败: ' + e.message }); }
+          }
+          full = newFull;
+          snip.filePath = (folderPath ? folderPath + '/' : '') + newName + '.md';
+          fm.meta.name = newName;
+          tgt.label = newName;
+        }
+      }
+      // 类型（语言）
+      if (b.language !== undefined) {
+        const lang = String(b.language).trim() || 'plain_text';
+        tgt.language = lang;
+      }
+      // 说明
+      if (b.description !== undefined) fm.meta.description = b.description === null ? '' : String(b.description).trim();
+      // 标签（按名称，自动建新）
+      if (Array.isArray(b.tags)) fm.meta.tags = syncTags(st, b.tags.map(String));
+      // 同步正文：目标片段标题 label 与围栏语言（massCode 片段结构一致性）
+      const tgtIdx = fm.meta.contents.indexOf(tgt);
+      if (tgtIdx >= 0) {
+        const headingRe = /^##\s*Fragment:\s*(.*)$/gm;
+        const headsPos = [];
+        let hm;
+        while ((hm = headingRe.exec(fm.body))) headsPos.push({ label: hm[1].trim(), start: hm.index, len: hm[0].length });
+        if (headsPos[tgtIdx]) {
+          const h = headsPos[tgtIdx];
+          const changedHead = b.name !== undefined && tgt.label !== h.label;
+          let delta = 0;
+          if (changedHead) {
+            const newHead = '## Fragment: ' + tgt.label;
+            fm.body = fm.body.slice(0, h.start) + newHead + fm.body.slice(h.start + h.len);
+            delta = newHead.length - h.len;
+          }
+          if (b.language !== undefined) {
+            const segStart0 = h.start + h.len + fm.body.slice(h.start + h.len).indexOf('\n') + 1;
+            const segStart = segStart0 + delta;
+            const segEnd = headsPos[tgtIdx + 1] ? headsPos[tgtIdx + 1].start + delta : fm.body.length;
+            const seg = fm.body.slice(segStart, segEnd);
+            const fence = /^```[^\n]*/m.exec(seg);
+            if (fence) {
+              const abs = segStart + fence.index;
+              fm.body = fm.body.slice(0, abs) + '```' + tgt.language + fm.body.slice(abs + fence[0].length);
+            }
+          }
+        }
+      }
+      // 写回 .md
+      const newMd = stringifyFrontmatter(fm);
+      fs.writeFileSync(full, newMd, 'utf8');
+      // 同步 state.json
+      const sm = snip.meta;
+      if (b.name !== undefined && fm.meta.name) sm.name = fm.meta.name;
+      if (b.language !== undefined) { sm.language = tgt.language; }
+      const sic = sm.contents.find((c) => String(c.id) === String(fragId)) || sm.contents[0];
+      if (b.language !== undefined) sic.language = tgt.language;
+      if (b.name !== undefined && tgt.label) sic.label = tgt.label;
+      if (b.description !== undefined) sm.description = fm.meta.description ? fm.meta.description : null;
+      if (Array.isArray(b.tags)) sm.tags = fm.meta.tags;
+      sm.mtimeMs = now; sm.updatedAt = now; sm.size = Buffer.byteLength(newMd);
+      writeState(st);
+      return send(res, 200, { ok: true, file: full, name: fm.meta.name, language: tgt.language, tags: fm.meta.tags, description: fm.meta.description });
+    }
+    // 新增片段：在当前文件末尾追加一个 Fragment（正文 + frontmatter contents + state.json 同步）
+    if (req.method === 'POST' && u.pathname === '/api/fs/addfragment') {
+      const b = await readBody(req);
+      const codeRoot = path.join(vaultPath(), 'code');
+      const st = readState();
+      const snip = st.snippets.find((s) => path.resolve(codeRoot, s.filePath) === path.resolve(String(b.file || '')));
+      if (!snip) return send(res, 200, { ok: false, error: '片段不在状态库中（可能尚未同步）' });
+      const full = path.resolve(codeRoot, snip.filePath);
+      if (full !== codeRoot && !full.startsWith(codeRoot + path.sep)) return send(res, 200, { ok: false, error: '路径越界' });
+      const language = String(b.language || 'plain_text').trim() || 'plain_text';
+      const label = String(b.label || '').trim() || ('片段 ' + ((snip.meta.contents || []).length + 1));
+      const text = fs.readFileSync(full, 'utf8');
+      const fm = parseFrontmatter(text);
+      if (!fm.meta || !Array.isArray(fm.meta.contents)) return send(res, 200, { ok: false, error: 'frontmatter 解析失败' });
+      const cid = ++st.counters.contentId;
+      const now = Date.now();
+      const newItem = { id: cid, label, language };
+      fm.meta.contents.push(newItem);
+      const bodyEnd = fm.body.replace(/\s+$/, '');
+      fm.body = bodyEnd + '\n\n## Fragment: ' + label + '\n```' + language + '\n\n```\n';
+      const newMd = stringifyFrontmatter(fm);
+      fs.writeFileSync(full, newMd, 'utf8');
+      snip.meta.contents.push(newItem);
+      snip.meta.mtimeMs = now; snip.meta.updatedAt = now; snip.meta.size = Buffer.byteLength(newMd);
+      writeState(st);
+      return send(res, 200, { ok: true, file: full, fragment: newItem, index: fm.meta.contents.length - 1 });
+    }
     if (req.method === 'GET' && u.pathname === '/api/git') {
       return send(res, 200, gitStatus());
+    }
+    if (req.method === 'POST' && u.pathname === '/api/fs/delete') {
+      const b = await readBody(req);
+      const codeRoot = path.join(vaultPath(), 'code');
+      const st = readState();
+      const full = path.resolve(codeRoot, String(b.file || ''));
+      const snip = st.snippets.find((s) => path.resolve(codeRoot, s.filePath) === full);
+      if (!snip) return send(res, 200, { ok: false, error: '片段不在状态库中（可能尚未同步）' });
+      if (full !== codeRoot && !full.startsWith(codeRoot + path.sep)) return send(res, 200, { ok: false, error: '路径越界' });
+      // 从状态库移除
+      st.snippets = st.snippets.filter((s) => s !== snip);
+      // 清理不再被引用的标签
+      const used = new Set();
+      st.snippets.forEach((s) => (s.meta.tags || []).forEach((t) => used.add(t)));
+      if (Array.isArray(st.tags)) st.tags = st.tags.filter((t) => used.has(t.id));
+      writeState(st);
+      // 删除磁盘上的 .md
+      try { fs.unlinkSync(full); } catch (_) {}
+      // 若所在叶子目录已空，清理该目录的 .meta.yaml 与空目录（保留根与上层）
+      const dir = path.dirname(full);
+      if (dir !== codeRoot && fs.existsSync(dir)) {
+        const rest = fs.readdirSync(dir).filter((n) => n !== '.meta.yaml');
+        if (rest.length === 0) {
+          try { fs.unlinkSync(path.join(dir, '.meta.yaml')); } catch (_) {}
+          try { fs.rmdirSync(dir); } catch (_) {}
+          const st2 = readState();
+          const rel = path.relative(codeRoot, dir).split(path.sep).join('/');
+          const fid = st2.folderIdByPath[rel];
+          if (fid !== undefined) {
+            delete st2.folderIdByPath[rel];
+            delete st2.folderUi[fid];
+          }
+          writeState(st2);
+        }
+      }
+      return send(res, 200, { ok: true, file: full });
+    }
+    // 删除文件夹（含其下所有片段与子文件夹，双清：状态库 + 磁盘）
+    if (req.method === 'POST' && u.pathname === '/api/fs/delete-folder') {
+      const b = await readBody(req);
+      const rel = String(b.folder || '').replace(/^\/+|\/+$/g, '');
+      const segs = rel.split('/');
+      if (!rel || segs.some((s) => !s || s === '.' || s === '..')) return send(res, 200, { ok: false, error: '文件夹路径不合法' });
+      const codeRoot = path.join(vaultPath(), 'code');
+      const dir = path.join(codeRoot, rel);
+      if (dir !== codeRoot && !dir.startsWith(codeRoot + path.sep)) return send(res, 200, { ok: false, error: '路径越界' });
+      if (!fs.existsSync(dir)) return send(res, 200, { ok: false, error: '文件夹不存在' });
+      const prefix = rel + '/';
+      const st = readState();
+      const removed = st.snippets.filter((s) => s.filePath === rel || s.filePath.startsWith(prefix));
+      st.snippets = st.snippets.filter((s) => !(s.filePath === rel || s.filePath.startsWith(prefix)));
+      const delKeys = Object.keys(st.folderIdByPath || {}).filter((k) => k === rel || k.startsWith(prefix));
+      for (const k of delKeys) {
+        const fid = st.folderIdByPath[k];
+        delete st.folderIdByPath[k];
+        if (fid !== undefined && st.folderUi) delete st.folderUi[fid];
+      }
+      const used = new Set();
+      st.snippets.forEach((s) => (s.meta.tags || []).forEach((t) => used.add(t)));
+      if (Array.isArray(st.tags)) st.tags = st.tags.filter((t) => used.has(t.id));
+      writeState(st);
+      let disk = false;
+      try { fs.rmSync(dir, { recursive: true, force: true }); disk = true; } catch (_) {}
+      return send(res, 200, { ok: true, folder: rel, deletedSnippets: removed.length, removedFolders: delKeys.length, disk });
+    }
+    /* ------------------------------ 绘图（Excalidraw, .excalidraw 文件） ------------------------------ */
+    function drawingsDir() { return path.join(vaultPath(), 'drawings'); }
+    function drawingName(n) {
+      if (typeof n !== 'string') return null;
+      const base = n.split(/[\\/]/).map((s) => s.trim()).filter(Boolean).join('/');
+      if (!base) return null;
+      if (base.indexOf('\\') >= 0) return null;
+      if (/(^|\/)\.{1,2}(\/|$)|^\/|\/\/|^[A-Za-z]:/.test(base)) return null;   // 防穿越：拒绝 ..、前导 /、//、盘符
+      if (!/^[A-Za-z0-9._\-\u00a0-\uffff /]+$/.test(base)) return null;          // 每段仅合法字符（保留中文/空格，分隔符允许 /）
+      if (!/\.excalidraw$/i.test(base)) return null;
+      return base;
+    }
+    function drawingDir2(n) {   // 目录路径校验：允许 ''（根）或 'a/b'（防穿越）
+      if (typeof n !== 'string') return '';
+      const base = n.split(/[\\/]/).map((s) => s.trim()).filter(Boolean).join('/');
+      if (!base) return '';
+      if (base.indexOf('\\') >= 0) return null;
+      if (/(^|\/)\.{1,2}(\/|$)|^\/|\/\/|^[A-Za-z]:/.test(base)) return null;
+      if (!/^[A-Za-z0-9._\-\u00a0-\uffff /]+$/.test(base)) return null;
+      return base;
+    }
+    if (req.method === 'GET' && u.pathname === '/api/drawings/list') {
+      const dir = drawingsDir();
+      let out = [];
+      try {
+        if (fs.existsSync(dir)) {
+          out = fs.readdirSync(dir)
+            .filter((n) => n.toLowerCase().endsWith('.excalidraw'))
+            .map((n) => {
+              try {
+                const st = fs.statSync(path.join(dir, n));
+                return { name: n, size: st.size, updated: st.mtimeMs };
+              } catch (_) { return null; }
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.updated - a.updated);
+        }
+      } catch (_) {}
+      return send(res, 200, { ok: true, dir, drawings: out });
+    }
+    if (req.method === 'GET' && u.pathname === '/api/drawings/tree') {
+      const dir = drawingsDir();
+      const root = { type: 'folder', name: '', path: '', children: [], count: 0 };
+      const walk = (node, abs) => {
+        let entries = [];
+        try { entries = fs.readdirSync(abs, { withFileTypes: true }); } catch (_) {}
+        entries.sort((a, b) => {
+          if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+        let n = 0;
+        for (const ent of entries) {
+          if (ent.isDirectory()) {
+            const rel = node.path ? node.path + '/' + ent.name : ent.name;
+            const fnode = { type: 'folder', name: ent.name, path: rel, children: [], count: 0 };
+            node.children.push(fnode);
+            fnode.count = walk(fnode, path.join(abs, ent.name));
+            n += fnode.count;
+          } else if (drawingName(ent.name)) {
+            const rel = node.path ? node.path + '/' + ent.name : ent.name;
+            let size = 0, updated = 0;
+            try { const st = fs.statSync(path.join(abs, ent.name)); size = st.size; updated = st.mtimeMs; } catch (_) {}
+            node.children.push({ type: 'drawing', name: ent.name, path: rel, size, updated });
+            n += 1;
+          }
+        }
+        node.count = n;
+        return n;
+      };
+      walk(root, dir);
+      return send(res, 200, { ok: true, dir, root, total: root.count });
+    }
+    if (req.method === 'GET' && u.pathname === '/api/drawings/get') {
+      const name = drawingName(u.searchParams.get('name'));
+      if (!name) return send(res, 200, { ok: false, error: '文件名不合法' });
+      try {
+        const scene = JSON.parse(fs.readFileSync(path.join(drawingsDir(), name), 'utf8'));
+        return send(res, 200, { ok: true, name, ...scene });
+      } catch (_) { return send(res, 200, { ok: false, error: '读取失败（文件不存在或不是合法 Excalidraw JSON）' }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/drawings/save') {
+      const b = await readBody(req);
+      const name = drawingName(b.name);
+      if (!name) return send(res, 200, { ok: false, error: '文件名不合法' });
+      const data = b.data;
+      if (!data || typeof data !== 'object' || !Array.isArray(data.elements)) return send(res, 200, { ok: false, error: '缺少 Excalidraw 场景数据' });
+      const dir = drawingsDir();
+      const target = path.join(dir, name);          // name 可含 '/' 子路径，防穿越已校验
+      try { fs.mkdirSync(path.dirname(target), { recursive: true }); } catch (_) {}
+      const body = JSON.stringify({ type: 'excalidraw', version: 2, source: 'file://', elements: data.elements, appState: data.appState || {}, files: data.files || {} });
+      try { fs.writeFileSync(target, body); return send(res, 200, { ok: true, name, bytes: body.length }); }
+      catch (e) { return send(res, 200, { ok: false, error: '写入失败: ' + String((e && e.message) || e) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/drawings/new') {
+      const b = await readBody(req);
+      const sub = drawingDir2(b && b.dir);          // 目标目录（'' = 根）
+      if (sub === null) return send(res, 200, { ok: false, error: '目录不合法' });
+      const baseRaw = String((b && b.name) || '').replace(/\.excalidraw$/i, '').trim();
+      const base = baseRaw || 'Untitled';
+      if (!/^[A-Za-z0-9._\-\u00a0-\uffff ]+$/.test(base) || base === '.' || base === '..') return send(res, 200, { ok: false, error: '名称不合法' });
+      const dirAbs = path.join(drawingsDir(), sub || '.');
+      try { fs.mkdirSync(dirAbs, { recursive: true }); } catch (_) {}
+      let name = base + '.excalidraw', i = 2;
+      while (true) {
+        if (!fs.existsSync(path.join(dirAbs, name))) break;
+        name = base + '-' + i + '.excalidraw'; i += 1;
+        if (i > 100000) return send(res, 200, { ok: false, error: '无法分配文件名' });
+      }
+      const full = sub ? sub + '/' + name : name;
+      const scene = { type: 'excalidraw', version: 2, source: 'file://', elements: [], appState: {}, files: {} };
+      try {
+        fs.writeFileSync(path.join(dirAbs, name), JSON.stringify(scene));
+        return send(res, 200, { ok: true, name: full, dir: sub, ...scene });
+      } catch (e) { return send(res, 200, { ok: false, error: '创建失败: ' + String((e && e.message) || e) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/drawings/new-folder') {
+      const b = await readBody(req);
+      const parent = drawingDir2(b && b.dir);       // 父目录（'' = 根）
+      if (parent === null) return send(res, 200, { ok: false, error: '目录不合法' });
+      const sub = drawingDir2(b && b.name);         // 新建目录名（可含 / 嵌套）
+      if (!sub || sub === '.') return send(res, 200, { ok: false, error: '文件夹名称不合法' });
+      const full = parent ? parent + '/' + sub : sub;
+      try {
+        fs.mkdirSync(path.join(drawingsDir(), full), { recursive: true });
+        return send(res, 200, { ok: true, path: full });
+      } catch (e) { return send(res, 200, { ok: false, error: '创建失败: ' + String((e && e.message) || e) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/drawings/delete') {
+      const b = await readBody(req);
+      const name = drawingName(b.name);
+      if (!name) return send(res, 200, { ok: false, error: '文件名不合法' });
+      try {
+        fs.unlinkSync(path.join(drawingsDir(), name));
+        return send(res, 200, { ok: true, name });
+      } catch (_) { return send(res, 200, { ok: false, error: '删除失败（文件不存在或已被占用）' }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/drawings/rename') {
+      const b = await readBody(req);
+      const name = drawingName(b && b.name);
+      if (!name) return send(res, 200, { ok: false, error: '文件名不合法' });
+      const baseRaw = String((b && b.newName) || '').replace(/\.excalidraw$/i, '').trim();
+      if (!baseRaw) return send(res, 200, { ok: false, error: '名称不合法' });
+      if (!/^[A-Za-z0-9._\-\u00a0-\uffff ]+$/.test(baseRaw) || baseRaw === '.' || baseRaw === '..' || /[\\/]/.test(baseRaw)) return send(res, 200, { ok: false, error: '名称不合法（仅当前文件夹内命名）' });
+      const parts = name.split('/');
+      const dir = parts.slice(0, -1).join('/');
+      const dirAbs = dir ? path.join(drawingsDir(), dir) : drawingsDir();
+      const oldFile = parts[parts.length - 1];
+      const oldAbs = path.join(dirAbs, oldFile);
+      let target = baseRaw + '.excalidraw', i = 2;
+      while (fs.existsSync(path.join(dirAbs, target)) && path.basename(target).toLowerCase() !== oldFile.toLowerCase()) {
+        target = baseRaw + '-' + i + '.excalidraw'; i += 1;
+        if (i > 100000) return send(res, 200, { ok: false, error: '无法分配文件名' });
+      }
+      try {
+        if (target === oldFile) return send(res, 200, { ok: true, name, unchanged: true });
+        const newAbs = path.join(dirAbs, target);
+        if (target.toLowerCase() === oldFile.toLowerCase()) {
+          // 仅大小写不同（macOS 不区分大小写）：先经临时名绕行，再改回目标大小写
+          const tmp = path.join(dirAbs, '.' + Date.now() + '.tmp.excalidraw');
+          fs.renameSync(oldAbs, tmp);
+          fs.renameSync(tmp, newAbs);
+        } else {
+          fs.renameSync(oldAbs, newAbs);
+        }
+        const full = dir ? dir + '/' + target : target;
+        return send(res, 200, { ok: true, name: full });
+      } catch (_) { return send(res, 200, { ok: false, error: '重命名失败（文件不存在或已被占用）' }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/drawings/move') {
+      const b = await readBody(req);
+      const name = drawingName(b && b.name);
+      const toDir = drawingDir2(b && b.toDir);
+      if (!name || toDir === null) return send(res, 200, { ok: false, error: '路径不合法' });
+      const fromFile = name.split('/').pop();
+      const full = toDir ? toDir + '/' + fromFile : fromFile;
+      if (full === name) return send(res, 200, { ok: true, name, unchanged: true });
+      const dirAbs = path.join(drawingsDir(), toDir || '.');
+      try { fs.mkdirSync(dirAbs, { recursive: true }); } catch (_) {}
+      // 目标文件夹已有同名文件 → 自动 -2、-3 避冲突（移动不改文件名）
+      let target = fromFile, i = 2;
+      while (fs.existsSync(path.join(dirAbs, target)) && (toDir ? toDir + '/' + target : target) !== name) {
+        target = fromFile.replace(/\.excalidraw$/i, '') + '-' + i + '.excalidraw'; i += 1;
+        if (i > 100000) return send(res, 200, { ok: false, error: '无法分配文件名' });
+      }
+      try {
+        fs.renameSync(path.join(drawingsDir(), name), path.join(dirAbs, target));
+        return send(res, 200, { ok: true, name: (toDir ? toDir + '/' : '') + target });
+      } catch (_) { return send(res, 200, { ok: false, error: '移动失败（文件不存在或已被占用）' }); }
+    }
+    // ---- Libraries（Excalidraw 库：vault/libraries/*.excalidrawLibrary，文件夹管理 + 自动加载） ----
+    function libsDir() { return path.join(vaultPath(), 'libraries'); }
+    function libName(n) {
+      if (typeof n !== 'string') return null;
+      const base = n.split(/[\\/]/).pop();
+      if (!/^[A-Za-z0-9._\-\u00a0-\uffff ]+\.excalidraw(library|lib)$/i.test(base)) return null;
+      return base;
+    }
+    function readLibItems(file) {
+      try {
+        const p = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (p && Array.isArray(p.libraryItems)) return p.libraryItems;
+      } catch (_) {}
+      return null;
+    }
+    function mergeLibItems(lists) {
+      const out = [], seen = new Set();
+      for (const items of lists) {
+        if (!Array.isArray(items)) continue;
+        for (const it of items) {
+          if (it && typeof it === 'object' && it.id && !seen.has(it.id) && Array.isArray(it.elements)) { seen.add(it.id); out.push(it); }
+        }
+      }
+      return out;
+    }
+    if (req.method === 'GET' && u.pathname === '/api/libraries/list') {
+      const dir = libsDir();
+      let out = [];
+      try {
+        if (fs.existsSync(dir)) {
+          out = fs.readdirSync(dir)
+            .filter((n) => libName(n))
+            .map((n) => {
+              try { const st = fs.statSync(path.join(dir, n)); return { name: n, size: st.size, updated: st.mtimeMs }; }
+              catch (_) { return null; }
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.updated - a.updated);
+        }
+      } catch (_) {}
+      return send(res, 200, { ok: true, dir, libraries: out });
+    }
+    if (req.method === 'GET' && u.pathname === '/api/libraries/all') {
+      const dir = libsDir();
+      const lists = [], files = [];
+      try {
+        if (fs.existsSync(dir)) {
+          for (const n of fs.readdirSync(dir).filter((fn) => libName(fn))) {
+            const items = readLibItems(path.join(dir, n));
+            if (items !== null) { lists.push(items); files.push(n); }
+          }
+        }
+      } catch (_) {}
+      return send(res, 200, { ok: true, dir, files, items: mergeLibItems(lists) });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/libraries/save') {
+      const b = await readBody(req);
+      const name = libName(b.name);
+      if (!name) return send(res, 200, { ok: false, error: '文件名不合法' });
+      const data = b.data;
+      if (!data || typeof data !== 'object' || !Array.isArray(data.libraryItems)) return send(res, 200, { ok: false, error: '缺少库数据（libraryItems 数组）' });
+      const dir = libsDir();
+      try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+      const body = JSON.stringify({ type: 'excalidrawLibrary', version: 2, source: 'file://', libraryItems: data.libraryItems });
+      try { fs.writeFileSync(path.join(dir, name), body); return send(res, 200, { ok: true, name, bytes: body.length }); }
+      catch (e) { return send(res, 200, { ok: false, error: '写入失败: ' + String((e && e.message) || e) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/libraries/delete') {
+      const b = await readBody(req);
+      const name = libName(b.name);
+      if (!name) return send(res, 200, { ok: false, error: '文件名不合法' });
+      try {
+        fs.unlinkSync(path.join(libsDir(), name));
+        return send(res, 200, { ok: true, name });
+      } catch (_) { return send(res, 200, { ok: false, error: '删除失败（文件不存在或已被占用）' }); }
+    }
+    // ---- AI 助手（OpenAI 兼容代理：URL/Key/模型由前端配置，服务器只做转发） ----
+    if (req.method === 'POST' && u.pathname === '/api/ai/chat') {
+      const b = await readBody(req);
+      const url = String((b && b.url) || '').trim();
+      const key = String((b && b.key) || '').trim();
+      const model = String((b && b.model) || '').trim();
+      const messages = b && Array.isArray(b.messages) ? b.messages : null;
+      if (!/^https?:\/\//i.test(url)) return send(res, 200, { ok: false, error: 'API URL 不合法（需 http/https 开头）' });
+      if (!model) return send(res, 200, { ok: false, error: '请填写模型名称' });
+      if (!messages || !messages.length) return send(res, 200, { ok: false, error: '缺少消息内容' });
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) },
+          body: JSON.stringify({ model, messages, stream: false, temperature: 0.3 }),
+          signal: AbortSignal.timeout(120000),
+        });
+        const text = await resp.text();
+        if (!resp.ok) return send(res, 200, { ok: false, error: 'API 错误 ' + resp.status + ': ' + text.slice(0, 400) });
+        let data;
+        try { data = JSON.parse(text); } catch (_) { return send(res, 200, { ok: false, error: 'API 返回非 JSON 内容' }); }
+        const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        if (typeof content !== 'string') return send(res, 200, { ok: false, error: '无法解析响应（缺少 choices[0].message.content）' });
+        return send(res, 200, { ok: true, content, model, usage: (data && data.usage) || null });
+      } catch (e) {
+        return send(res, 200, { ok: false, error: '请求失败: ' + String((e && e.message) || e).slice(0, 300) });
+      }
     }
     if (req.method === 'POST' && u.pathname === '/api/git/commit') {
       const b = await readBody(req);
@@ -1068,6 +1781,42 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, r.ok
         ? { ok: true, message: '拉取成功', output: (r.stdout + r.stderr).trim(), status: gitStatus() }
         : { ok: false, error: r.error, output: (r.stdout + r.stderr).trim() });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/git/reset') {
+      const b = await readBody(req);
+      const hash = String(b.hash || '').trim();
+      if (!/^[0-9a-f]{4,40}$/i.test(hash)) return send(res, 200, { ok: false, error: '提交标识不合法' });
+      const r = await gitRun(['reset', '--hard', hash], 60000);
+      return send(res, 200, r.ok
+        ? { ok: true, message: '已回退到 ' + hash, output: (r.stdout + r.stderr).trim(), status: gitStatus() }
+        : { ok: false, error: r.error, output: (r.stdout + r.stderr).trim() });
+    }
+    // ===== 底部终端（PTY shell，script 命令分配伪终端）=====
+    if (req.method === 'GET' && u.pathname === '/api/term/stream') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+      if (TERM && TERM.res) { try { TERM.res.end(); } catch (_) {} }   // 同一时刻只保留一个消费方
+      if (!TERM || !TERM.child) termSpawn();
+      if (!TERM) { res.end('终端启动失败'); return; }
+      TERM.res = res;
+      req.on('close', () => {
+        if (TERM && TERM.res === res) {   // 页面关闭/刷新 → 结束会话，避免孤儿进程
+          TERM.res = null;
+          try { TERM.child.kill(); } catch (_) {}
+          TERM = null;
+        }
+      });
+      return;   // 保持连接，输出由 termSpawn 的 stdout/stderr 回调实时推送
+    }
+    if (req.method === 'POST' && u.pathname === '/api/term/input') {
+      const b = await readBody(req);
+      const data = String((b && b.data) || '');
+      if (TERM && TERM.child) { try { TERM.child.stdin.write(data); } catch (_) {} }
+      return send(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/term/stop') {
+      if (TERM && TERM.child) { try { TERM.child.kill(); } catch (_) {} }
+      TERM = null;
+      return send(res, 200, { ok: true });
     }
     send(res, 404, { ok: false, error: 'Not Found: ' + u.pathname });
   } catch (e) {

@@ -24,6 +24,8 @@ updatedAt: 1787926901090
 ```c_cpp
 #include <iostream>
 using namespace std;
+static int led_code_t = 0;
+
 // 语法情况
 int main() {
   int a, b;

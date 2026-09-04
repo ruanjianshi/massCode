@@ -1,11 +1,38 @@
 version: 2
 counters:
-  folderId: 0
-  requestId: 0
+  folderId: 1
+  requestId: 1
   environmentId: 0
   historyId: 0
-folders: []
-requests: []
+folders:
+  - createdAt: 1788419657810
+    id: 1
+    icon: null
+    isOpen: 0
+    name: 未命名文件夹 1
+    orderIndex: 0
+    parentId: null
+    updatedAt: 1788419657810
+requests:
+  - filePath: 未命名文件夹 1/Untitled request 1.md
+    id: 1
+    meta:
+      auth:
+        type: none
+      bodyType: none
+      createdAt: 1788419659947
+      description: ''
+      formData: []
+      headers: []
+      isDeleted: 0
+      isFavorites: 0
+      method: GET
+      mtimeMs: 1788419659949.1814
+      name: Untitled request 1
+      query: []
+      size: 229
+      updatedAt: 1788419659947
+      url: ''
 environments: []
 activeEnvironmentId: null
 history: []

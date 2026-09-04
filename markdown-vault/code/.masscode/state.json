@@ -1,18 +1,22 @@
 {
   "counters": {
-    "contentId": 38,
-    "folderId": 13,
-    "snippetId": 33,
+    "contentId": 43,
+    "folderId": 20,
+    "snippetId": 36,
     "tagId": 26
   },
   "folderIdByPath": {
+    "ROS端开发": 17,
     "Test": 1,
     "嵌入式开发Linux": 3,
     "嵌入式开发MCU": 2,
     "嵌入式开发规范": 12,
     "数据结构算法": 9,
+    "ROS端开发/ROS1开发(noetic)": 20,
+    "ROS端开发/ROS2开发(humble)": 19,
     "Test/多文件示例": 4,
     "Test/手搓代码": 13,
+    "Test/手搓工程": 14,
     "Test/测试代码示例": 11,
     "嵌入式开发Linux/应用层开发": 7,
     "嵌入式开发Linux/驱动层开发": 8,
@@ -59,40 +63,21 @@
     },
     "13": {
       "isOpen": 0
+    },
+    "14": {
+      "isOpen": 1
+    },
+    "17": {
+      "isOpen": 1
+    },
+    "19": {
+      "isOpen": 1
+    },
+    "20": {
+      "isOpen": 1
     }
   },
   "snippets": [
-    {
-      "filePath": "Test/测试代码示例/test.md",
-      "id": 1,
-      "meta": {
-        "contents": [
-          {
-            "id": 1,
-            "label": "片段 1",
-            "language": "c_cpp"
-          },
-          {
-            "id": 2,
-            "label": "片段 2",
-            "language": "plain_text"
-          }
-        ],
-        "createdAt": 1787907791849,
-        "description": "基于C++的STL所写的二分法排序算法",
-        "isDeleted": 0,
-        "isFavorites": 0,
-        "mtimeMs": 1787935608149.8667,
-        "name": "test",
-        "size": 544,
-        "tags": [
-          1,
-          2,
-          3
-        ],
-        "updatedAt": 1787926901090
-      }
-    },
     {
       "filePath": "嵌入式开发MCU/STM32系列/IIC通信驱动.md",
       "id": 12,
@@ -108,7 +93,7 @@
         "description": null,
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1787911438719.0083,
+        "mtimeMs": 1788436532119.1843,
         "name": "IIC通信驱动",
         "size": 281,
         "tags": [
@@ -160,9 +145,9 @@
         "description": "简单可用的 UART 驱动：统一 open/read/write/close，支持 Linux termios、STM32 HAL 中断接收和可选具名设备管理。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788275466276.1013,
+        "mtimeMs": 1788490961849.0776,
         "name": "串口通信驱动",
-        "size": 33884,
+        "size": 33880,
         "tags": [
           4,
           2,
@@ -199,7 +184,7 @@
         "description": "多文件编译示例：main.cpp + calc.hpp 一起编译运行（含 stdin 输入演示）",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1787912718378.5369,
+        "mtimeMs": 1788436532032.9668,
         "name": "多文件示例_CPP",
         "size": 803,
         "tags": [
@@ -238,9 +223,9 @@
         "description": "简单的嵌入式公共错误码和静态设备注册表，提供注册、查找与注销基本能力。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788275660596.9758,
+        "mtimeMs": 1788436532116.7092,
         "name": "通用接口管理",
-        "size": 12690,
+        "size": 12689,
         "tags": [
           4,
           2,
@@ -271,7 +256,7 @@
         "description": "常用的排序算法，手搓算法代码段。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788089043328.0283,
+        "mtimeMs": 1788436532122.3616,
         "name": "排序算法",
         "size": 407,
         "tags": [
@@ -297,7 +282,7 @@
         "description": "嵌入式工程化开发规范的入口、适用范围、强制等级与阅读顺序。",
         "isDeleted": 0,
         "isFavorites": 1,
-        "mtimeMs": 1788172862409.552,
+        "mtimeMs": 1788436532124.5725,
         "name": "00-阅读导航与适用范围",
         "size": 2400,
         "tags": [
@@ -322,7 +307,7 @@
         "description": "规范应用、中间件、驱动、Platform、Board与HAL的责任边界。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788172862410.2354,
+        "mtimeMs": 1788436532126.7368,
         "name": "01-架构分层与依赖规则",
         "size": 2706,
         "tags": [
@@ -348,7 +333,7 @@
         "description": "使用对象、ops、config/data、container_of和设备注册表设计C驱动。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788172862410.9282,
+        "mtimeMs": 1788436532128.5188,
         "name": "02-C设备模型与驱动接口",
         "size": 3144,
         "tags": [
@@ -376,7 +361,7 @@
         "description": "规范设备初始化顺序、资源对称、错误传播、降级和恢复。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788172862411.4907,
+        "mtimeMs": 1788436532130.1301,
         "name": "03-初始化生命周期与错误处理",
         "size": 2901,
         "tags": [
@@ -403,7 +388,7 @@
         "description": "约束ISR、工作线程、锁、回调上下文、超时和优先级。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788172862411.9978,
+        "mtimeMs": 1788436532132.121,
         "name": "04-中断并发与实时性",
         "size": 2824,
         "tags": [
@@ -432,7 +417,7 @@
         "description": "规范内存所有权、栈、缓冲区、DMA、D-Cache和环形缓冲区。",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788172862412.522,
+        "mtimeMs": 1788436532133.8984,
         "name": "05-内存栈DMA与Cache安全",
         "size": 3053,
         "tags": [
@@ -506,9 +491,9 @@
         "description": "最简洁、最小化实现面向对象接口化、工程化开发代码示例",
         "isDeleted": 0,
         "isFavorites": 0,
-        "mtimeMs": 1788349092283.74,
+        "mtimeMs": 1788499580835.5046,
         "name": "接口化最小代码实现",
-        "size": 4796,
+        "size": 4822,
         "tags": [
           26,
           23,
@@ -516,6 +501,74 @@
           25
         ],
         "updatedAt": 1788348037007
+      }
+    },
+    {
+      "filePath": "Test/测试代码示例/test.md",
+      "id": 1,
+      "meta": {
+        "contents": [
+          {
+            "id": 1,
+            "label": "片段 1",
+            "language": "c_cpp"
+          },
+          {
+            "id": 2,
+            "label": "片段 2",
+            "language": "plain_text"
+          }
+        ],
+        "createdAt": 1787907791849,
+        "description": "基于C++的STL所写的二分法排序算法",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788456111402.7961,
+        "name": "test",
+        "size": 572,
+        "tags": [
+          1,
+          2,
+          3
+        ],
+        "updatedAt": 1787926901090
+      }
+    },
+    {
+      "filePath": "Test/手搓工程/开发框架.md",
+      "id": 34,
+      "meta": {
+        "contents": [
+          {
+            "id": 39,
+            "label": "开发框架",
+            "language": "c_cpp"
+          },
+          {
+            "id": 41,
+            "label": "uart.h",
+            "language": "c_cpp"
+          },
+          {
+            "id": 43,
+            "label": "README",
+            "language": "markdown"
+          }
+        ],
+        "createdAt": 1788361568082,
+        "description": "手搓完整的嵌入式工程开发",
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788499425816.5413,
+        "name": "开发框架",
+        "size": 2088,
+        "tags": [
+          1,
+          2,
+          4,
+          6
+        ],
+        "updatedAt": 1788361568082
       }
     }
   ],
@@ -657,12 +710,6 @@
       "id": 23,
       "name": "接口化",
       "updatedAt": 1788275391410
-    },
-    {
-      "createdAt": 1788275401221,
-      "id": 24,
-      "name": "封装",
-      "updatedAt": 1788275401221
     },
     {
       "createdAt": 1788275416035,

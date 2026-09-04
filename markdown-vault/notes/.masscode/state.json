@@ -1,12 +1,36 @@
 {
   "counters": {
-    "folderId": 0,
-    "noteId": 0,
+    "folderId": 1,
+    "noteId": 1,
     "tagId": 0
   },
-  "folderIdByPath": {},
-  "folderUi": {},
-  "notes": [],
+  "folderIdByPath": {
+    "未命名文件夹 1": 1
+  },
+  "folderUi": {
+    "1": {
+      "isOpen": 0
+    }
+  },
+  "notes": [
+    {
+      "filePath": "未命名文件夹 1/Untitled note 1.md",
+      "id": 1,
+      "meta": {
+        "createdAt": 1788430792163,
+        "description": null,
+        "folderId": 1,
+        "isDeleted": 0,
+        "isFavorites": 0,
+        "mtimeMs": 1788430794748.0635,
+        "name": "Untitled note 1",
+        "properties": {},
+        "size": 6248,
+        "tags": [],
+        "updatedAt": 1788430794747
+      }
+    }
+  ],
   "tags": [],
   "version": 2
 }
