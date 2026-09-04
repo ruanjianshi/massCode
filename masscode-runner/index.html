@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>massCode Runner · 伴生工具</title>
+<title>码境 CodeScope · 工程代码工作台</title>
+<meta name="application-name" content="码境 CodeScope">
+<meta name="theme-color" content="#16181d">
+<link rel="icon" href="/assets/codescope.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/hljs-theme.css">
 <link rel="stylesheet" href="/assets/xterm.css">
 <script src="/assets/highlight.min.js" defer></script>
@@ -630,7 +633,7 @@
   #code-wrap.latex-code #code .tex-comment { color: #667085; }
   #code-wrap.latex-code #code-edit:focus { outline: 1px solid rgba(99,155,255,.85); box-shadow: inset 0 0 0 1px rgba(99,155,255,.12); }
   #code-wrap.latex-code #code-edit.live-hl::selection { background: rgba(82,139,255,.34); -webkit-text-fill-color: transparent; }
-  #output { border-top: 1px solid var(--border); background: #101216; height: 200px; min-height: 90px; max-height: 62vh; flex: none; display: flex; flex-direction: column; }
+  #output { border-top:1px solid var(--border); background:#101216; height:200px; min-height:120px; max-height:calc(100vh - 120px); flex:none; display:flex; flex-direction:column; }
   #out-head { display: flex; gap: 10px; align-items: center; padding: 6px 14px; color: var(--dim); font-size: 12px; }
   #out-head .sp { flex: 1; }
   #out-tabs { display: flex; gap: 4px; }
@@ -651,8 +654,16 @@
   #term-wrap.hidden { display: none; }
   #term-box { flex: 1; min-height: 0; padding: 2px 4px 0; }
   #term-box .xterm { height: 100%; }
-  #term-bar { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-top: 1px solid var(--border); font-size: 11px; color: var(--dim); }
+  #term-bar { order:-1; display:flex; align-items:center; gap:8px; min-height:34px; padding:5px 10px; border-bottom:1px solid var(--border); background:#0f1721; font-size:11px; color:var(--dim); }
+  #output.ssh-mode #term-bar { cursor:row-resize; user-select:none; touch-action:none; }
+  #output.ssh-mode #term-bar button { cursor:pointer; }
+  #term-bar .tt { max-width:45%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#b8c5d6; font-family:var(--mono); }
   #term-bar .sp { flex: 1; }
+  .remote-latency { display:none; padding:1px 6px; border:1px solid #344154; border-radius:8px; color:#8d9bae; background:#121b25; font:9px/16px var(--mono); white-space:nowrap; }
+  .remote-latency.show { display:inline-block; }
+  .remote-latency.good { border-color:rgba(80,190,115,.38); color:#6ed58d; background:rgba(44,138,76,.12); }
+  .remote-latency.medium { border-color:rgba(213,166,65,.42); color:#e4b85b; background:rgba(160,112,28,.12); }
+  .remote-latency.slow, .remote-latency.offline { border-color:rgba(232,92,92,.42); color:#ef8b87; background:rgba(164,49,49,.12); }
   #term-bar button { background: var(--panel2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 2px 9px; font-size: 11px; cursor: pointer; }
   #term-bar button:hover { border-color: var(--accent); color: var(--accent); }
   #preview { display: none; flex: 1; }
@@ -705,6 +716,49 @@
   .tool-row .info .sub { color: var(--dim); font-size: 11px; line-height:1.45; white-space:normal; word-break:normal; overflow-wrap:anywhere; }
   .tool-row .ver { grid-column:2; min-width:0; max-width:100%; color: var(--accent); font: 10px/1.4 var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.9; }
   .hint { color: var(--err); font-size: 12px; font-family: var(--mono); word-break: break-all; }
+  /* ---- SSH / VNC 远程开发 ---- */
+  #btn-remote { position:relative; padding-right:22px; }
+  #btn-remote::after { content:''; position:absolute; top:8px; right:8px; width:7px; height:7px; border-radius:50%; background:#657184; }
+  #btn-remote.remote-on::after { background:var(--ok); box-shadow:0 0 6px rgba(86,211,100,.7); }
+  #remote-panel { display:none; position:fixed; inset:0 0 0 auto; width:460px; max-width:94vw; z-index:70; flex-direction:column; background:#101720; border-left:1px solid #324054; box-shadow:-18px 0 60px rgba(0,0,0,.46); }
+  #remote-panel.open { display:flex; }
+  #remote-head { min-height:54px; display:flex; align-items:center; gap:9px; padding:10px 14px; background:#111a24; border-bottom:1px solid #2b3747; }
+  #remote-head h2 { flex:1; margin:0; font-size:14px; }
+  #remote-status { color:var(--dim); font:10px var(--mono); }
+  .remote-tabs { display:flex; gap:6px; padding:12px 14px 0; }
+  .remote-tabs button { flex:1; }
+  .remote-tabs button.on { color:var(--accent); border-color:var(--accent); background:rgba(79,140,255,.1); }
+  #remote-body { flex:1; min-height:0; overflow:auto; padding:14px; }
+  .remote-pane.hidden { display:none; }
+  .remote-intro { margin:0 0 13px; color:var(--dim); font-size:11px; line-height:1.65; }
+  .remote-form { display:grid; grid-template-columns:1fr 104px; gap:10px; }
+  .remote-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .remote-field.wide { grid-column:1 / -1; }
+  .remote-field label { color:#8b98aa; font-size:11px; }
+  .remote-field input { width:100%; height:36px; padding:7px 9px; color:var(--text); background:#0b1118; border:1px solid #2c3949; border-radius:7px; outline:none; font:12px var(--mono); }
+  .remote-field input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,140,255,.1); }
+  .remote-check { grid-column:1 / -1; display:flex; align-items:center; gap:7px; color:var(--dim); font-size:11px; }
+  .remote-actions { grid-column:1 / -1; display:flex; gap:8px; margin-top:4px; }
+  .remote-actions button { flex:1; }
+  .remote-actions .primary { color:#dceaff; border-color:#4f78af; background:#1a3d68; }
+  .remote-note { margin-top:13px; padding:10px 11px; border:1px solid #2a3747; border-radius:8px; background:#111a24; color:#7f8da0; font-size:11px; line-height:1.6; }
+  .remote-msg { min-height:20px; margin-top:10px; color:var(--dim); font-size:11px; }
+  .remote-msg.ok { color:var(--ok); } .remote-msg.err { color:#ff8c88; }
+  #vnc-workspace { display:none; position:fixed; inset:56px 0 0; z-index:65; flex-direction:column; background:#090e14; }
+  #vnc-workspace.open { display:flex; }
+  #vnc-toolbar { flex:none; display:flex; align-items:center; gap:8px; min-height:43px; padding:6px 10px; border-bottom:1px solid #2c3949; background:#111923; }
+  #vnc-toolbar .title { font-weight:650; font-size:12px; }
+  #vnc-toolbar .sp { flex:1; }
+  #vnc-toolbar .state { color:var(--dim); font:10px var(--mono); }
+  #vnc-screen { flex:1; min-height:0; overflow:hidden; background:#070a0f; }
+  #vnc-screen canvas { outline:none; }
+  #vnc-keyboard-input { position:fixed; width:2px; height:2px; padding:0; border:0; opacity:.01; pointer-events:none; resize:none; overflow:hidden; z-index:-1; }
+  #vnc-input-hint { color:#8290a3; font-size:10px; white-space:nowrap; }
+  @media (max-width:760px) {
+    #btn-remote { font-size:0; width:38px; padding:6px; }
+    #btn-remote::before { content:'🖥'; font-size:13px; }
+    #remote-panel { width:100%; max-width:none; }
+  }
   /* ---- Source Insight 阅读模式：符号面板 / 全局检索 ---- */
   #sym-tabs { display: flex; gap: 6px; padding: 6px 10px 0; }
   #sym-tabs button { flex: 1; padding: 5px 4px; font-size: 12px; }
@@ -971,9 +1025,11 @@
   body { background:var(--bg); color:var(--text); font-size:13px; letter-spacing:0; }
   header { min-height:56px; height:56px; padding:0 12px; gap:9px; background:#10161f; border-bottom:1px solid #293545; box-shadow:0 1px 8px rgba(0,0,0,.2); }
   header h1 { display:flex; align-items:center; gap:8px; margin-right:3px; font-size:14px; font-weight:700; letter-spacing:.01em; color:#f4f7fb; }
-  .brand-mark { display:grid; place-items:center; width:27px; height:27px; border-radius:8px; background:linear-gradient(145deg,#85b5ff,#4d78d4); color:#07101f; box-shadow:0 0 0 1px rgba(255,255,255,.15) inset,0 4px 12px rgba(64,113,207,.25); font:800 15px/1 var(--mono); }
+  .brand-mark { display:grid; place-items:center; width:27px; height:27px; border-radius:8px; box-shadow:0 4px 12px rgba(64,113,207,.25); overflow:hidden; }
+  .brand-mark img { display:block; width:100%; height:100%; }
   .brand-name { white-space:nowrap; }
-  .brand-edition { margin-left:-3px; color:#7f8da1; font:500 10px/1 var(--mono); text-transform:uppercase; letter-spacing:.08em; }
+  .brand-edition { margin-left:-3px; color:#8ea0b8; font:600 10px/1 var(--mono); letter-spacing:.04em; }
+  .brand-version { margin-left:-6px; color:#5f6d80; font:500 8px/1 var(--mono); }
   header .sub { min-width:40px; max-width:none; color:#718096; font:10px/1.2 var(--mono); }
   button { min-height:30px; border:1px solid #303d4e; border-radius:7px; padding:5px 10px; background:var(--control); color:#cfd8e6; box-shadow:none; font-weight:500; transition:background .12s,border-color .12s,color .12s,transform .08s; }
   button:hover:not(:disabled) { background:var(--control-hover); border-color:#536985; color:#fff; }
@@ -1024,8 +1080,64 @@
   .tchip.on { background:rgba(120,169,255,.15); border-color:#6b9ce5; color:#c1d9ff; }
   #draw-list { background:#0c1219; }
 
+  /* 树形层级：目录轨道 + 紧凑文件行，项目与绘图保持一致 */
+  #list, #draw-list { padding:6px 7px 12px; }
+  .tree-children, .draw-children {
+    position:relative; margin-left:17px; padding-left:8px;
+    border-left:1px solid #273546;
+  }
+  .tree-children:hover, .draw-children:hover { border-left-color:#3b5068; }
+  .fnode, .draw-frow {
+    position:relative; min-height:31px; margin:1px 0; padding:4px 7px; gap:6px;
+    border:1px solid transparent; border-radius:6px;
+  }
+  .fnode.open, .draw-frow.open { color:#e0e8f3; }
+  .fnode:hover, .draw-frow:hover { border-color:#27384b; background:#16212d; }
+  .fnode .arrow, .draw-frow .draw-arrow { width:12px; color:#73849a; font-size:9px; }
+  .fnode .ico, .draw-frow .draw-ic { width:18px; text-align:center; filter:saturate(.7); }
+  .fnode.open .ico, .draw-frow.open .draw-ic { filter:none; }
+  .fnode .count, .draw-frow .draw-fcount {
+    min-width:21px; margin-left:auto; padding:0 6px; border:1px solid #2b394a;
+    border-radius:9px; background:#121b25; color:#7e8da0; font:10px/17px var(--mono); text-align:center;
+  }
+  #list .item {
+    position:relative; margin:2px 0; padding:6px 8px;
+    border:1px solid transparent; border-radius:7px; cursor:grab;
+  }
+  #list .item:hover { border-color:#27384a; background:#151f2a; }
+  #list .item.active { border-color:rgba(120,169,255,.45); background:linear-gradient(90deg,rgba(120,169,255,.16),rgba(120,169,255,.045)); }
+  .item-head { display:flex; align-items:center; gap:7px; min-width:0; }
+  .item-head .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#dce5f1; font-size:12px; }
+  .file-ico {
+    flex:none; display:grid; place-items:center; width:25px; height:20px;
+    border:1px solid #34465c; border-radius:5px; background:#111b27;
+    color:#82b4ff; font:700 8px/1 var(--mono); letter-spacing:-.04em;
+  }
+  .frag-count { flex:none; color:#718198; font:9px var(--mono); }
+  #list .item .desc { margin:3px 0 0 32px; color:#78879a; font-size:10px; line-height:1.35; }
+  #list .item .langs, #list .item .tags { display:inline-flex; align-items:center; gap:4px; max-width:calc(100% - 32px); overflow:hidden; vertical-align:top; white-space:nowrap; }
+  #list .item .langs { margin:5px 0 0 32px; }
+  #list .item .tags { margin:5px 0 0 4px; }
+  #list .item .tag { flex:none; margin:0; padding:0 5px; border:1px solid rgba(94,143,211,.32); border-radius:5px; background:rgba(66,116,184,.12); font-size:9px; line-height:18px; }
+  #list .item .tag-nm { border-color:rgba(190,145,48,.3); background:rgba(181,132,29,.13); color:#d8ac4d; }
+  #list .item .tag-more { border-color:#303d4e; background:#151e29; color:#7f8da0; }
+  .resource-row { min-height:28px; margin:1px 0; padding:4px 7px; border:1px solid transparent; }
+  .resource-row .ricon { width:25px; color:#82b4ff; }
+  .resource-row:hover { border-color:#27384a; }
+  .draw-row { position:relative; min-height:29px; margin:1px 0; padding:4px 7px; border:1px solid transparent; }
+  .draw-row:hover { border-color:#27384a; background:#151f2a; }
+  .draw-row.on { border-color:rgba(120,169,255,.42); background:rgba(120,169,255,.13); }
+  .draw-file-ic { flex:none; width:18px; color:#77aaff; font-size:15px; text-align:center; }
+  .draw-row .draw-name { color:#cdd7e4; }
+  .tree-children > .fnode::before, .tree-children > .item::after, .tree-children > .resource-row::before,
+  .draw-children > .draw-frow::before, .draw-children > .draw-row::before {
+    content:''; position:absolute; left:-9px; top:15px; width:8px; border-top:1px solid #273546; pointer-events:none;
+  }
+  .resource-row { position:relative; }
+
   #split-v, #split-v2 { width:5px; background:#0b1017; }
-  #split-h, .hsplit { height:5px; background:#0b1017; }
+  #split-h { height:11px; background:#0b1017; }
+  .hsplit { height:5px; background:#0b1017; }
   #split-v::after, #split-v2::after { width:1px; background:#26313e; }
   #split-h::after, .hsplit::after { height:1px; background:#26313e; }
   #split-v:hover::after, #split-v.active::after, #split-v2:hover::after, #split-v2.active::after,
@@ -1123,7 +1235,7 @@
 </head>
 <body>
 <header>
-  <h1><span class="brand-mark">m</span><span class="brand-name">massCode</span><span class="brand-edition">Runner</span></h1>
+  <h1 title="码境 · 工程代码工作台"><span class="brand-mark"><img src="/assets/codescope.svg" alt=""></span><span class="brand-name">码境</span><span class="brand-edition">CodeScope</span><span class="brand-version">v1.0.0</span></h1>
   <div class="sub" id="vault-path">…</div>
   <div id="sysmon" aria-label="电脑实时状态">
     <button class="sm-item sm-detail-trigger offline" id="sm-cpu" title="点击查看完整电脑状态" aria-expanded="false" aria-controls="sysmon-detail"><span class="sm-label">CPU <i class="sm-open-mark" aria-hidden="true">ⓘ</i></span><b class="sm-value" id="sm-cpu-v">--%</b><span class="sm-bar"><i id="sm-cpu-b"></i></span></button>
@@ -1142,6 +1254,7 @@
     </div>
   </div>
   <span class="sync-dot" id="sync-ind" title="每 2.5s 自动检测 vault 变更">实时同步</span>
+  <button id="btn-remote" title="SSH 终端与 VNC 桌面">🖥 远程</button>
   <button id="btn-env">🔍 环境</button>
   <button id="refresh">↻ 刷新</button>
 </header>
@@ -1318,11 +1431,12 @@
       <div id="out-body"><span class="empty">选择片段并点击「运行」查看输出</span></div>
       <div id="term-wrap" class="hidden">
         <div id="term-box"></div>
-        <div id="term-bar">
-          <span class="tt">shell</span>
-          <span id="term-state" class="pill idle">未连接</span>
+        <div id="term-bar" title="拖动空白处可上下调整终端高度">
+          <span class="tt" id="term-kind">本地 shell</span>
+          <span id="term-state" class="pill idle">未连接</span><span id="term-latency" class="remote-latency" title="Runner 到 SSH 主机的网络往返延迟"></span>
           <span class="sp"></span>
           <button id="term-clear" title="清屏（不影响会话）">清屏</button>
+          <button id="term-hide" title="隐藏终端但保持会话连接">收起</button>
           <button id="term-restart" title="结束当前会话并重新启动">重启</button>
         </div>
       </div>
@@ -1478,6 +1592,48 @@
     </div>
     <div id="env-list"></div>
   </div>
+</div>
+<div id="remote-panel" aria-label="远程开发">
+  <div id="remote-head">
+    <h2>🖥 远程开发</h2>
+    <span id="remote-status">正在检测…</span>
+    <button id="btn-remote-close" title="关闭">✕</button>
+  </div>
+  <div class="remote-tabs">
+    <button id="remote-tab-ssh" class="on">⌘ SSH 终端</button>
+    <button id="remote-tab-vnc">▣ VNC 桌面</button>
+  </div>
+  <div id="remote-body">
+    <section id="remote-ssh" class="remote-pane">
+      <p class="remote-intro">连接后复用底部交互终端，可直接处理主机指纹、密码、sudo 与远程命令。只保存主机、用户和端口。</p>
+      <div class="remote-form">
+        <div class="remote-field"><label for="ssh-host">主机 / IP</label><input id="ssh-host" placeholder="10.16.0.205" spellcheck="false"></div>
+        <div class="remote-field"><label for="ssh-port">端口</label><input id="ssh-port" type="number" min="1" max="65535" value="22"></div>
+        <div class="remote-field wide"><label for="ssh-user">用户名</label><input id="ssh-user" placeholder="例如 root 或 xiaoq" spellcheck="false"></div>
+        <div class="remote-field wide"><label for="ssh-key">私钥路径（可选，不保存）</label><input id="ssh-key" placeholder="/Users/name/.ssh/id_ed25519" spellcheck="false"></div>
+        <div class="remote-actions"><button id="ssh-disconnect">断开并回到本地</button><button id="ssh-connect" class="primary">连接 SSH</button></div>
+      </div>
+      <div id="ssh-msg" class="remote-msg"></div>
+      <div class="remote-note">密码不会被网页或服务端保存；需要密码时请在底部终端提示后输入。首次连接出现主机指纹确认也属于正常现象。</div>
+    </section>
+    <section id="remote-vnc" class="remote-pane hidden">
+      <p class="remote-intro">直接在工作区查看远程桌面。目标机器需已开启 VNC/屏幕共享，并允许这台电脑访问对应端口。</p>
+      <div class="remote-form">
+        <div class="remote-field"><label for="vnc-host">主机 / IP</label><input id="vnc-host" placeholder="10.16.0.205" spellcheck="false"></div>
+        <div class="remote-field"><label for="vnc-port">端口</label><input id="vnc-port" type="number" min="1" max="65535" value="5900"></div>
+        <div class="remote-field wide"><label for="vnc-password">VNC 密码（不保存）</label><input id="vnc-password" type="password" autocomplete="new-password" placeholder="需要时填写"></div>
+        <label class="remote-check"><input id="vnc-viewonly" type="checkbox"> 只查看，不向远端发送键鼠操作</label>
+        <div class="remote-actions"><button id="vnc-disconnect">断开</button><button id="vnc-connect" class="primary">打开 VNC 桌面</button></div>
+      </div>
+      <div id="vnc-msg" class="remote-msg"></div>
+      <div class="remote-note">连接通过当前 Runner 转发，不经过第三方云服务。若 Runner 对局域网开放，请仅在可信网络使用，并配合系统防火墙限制访问。</div>
+    </section>
+  </div>
+</div>
+<div id="vnc-workspace" aria-label="VNC 远程桌面">
+  <div id="vnc-toolbar"><span class="title">▣ VNC 远程桌面</span><span id="vnc-target"></span><span class="sp"></span><span id="vnc-input-hint">点击画面后可输入</span><span id="vnc-state" class="state">未连接</span><span id="vnc-latency" class="remote-latency" title="Runner 到 VNC 主机的网络往返延迟"></span><label class="remote-check" style="grid-column:auto"><input id="vnc-toolbar-viewonly" type="checkbox"> 只读</label><button id="vnc-close">关闭</button></div>
+  <div id="vnc-screen"></div>
+  <textarea id="vnc-keyboard-input" aria-label="VNC 键盘输入" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -1661,12 +1817,16 @@ function readTreeDrag(e) {
 function itemEl(s) {
   const d = document.createElement('div');
   d.className = 'item' + (!RESOURCE_CURRENT && CURRENT && CURRENT.file === s.file ? ' active' : '');
-  d.style.marginLeft = (12 + s._level * 14) + 'px';
-  const tagChips = (s.tags && s.tags.length)
-    ? `<div class="tags">${s.tags.map(t => `<span class="tag tag-nm" data-name="${escapeHtml(t)}">#${escapeHtml(t)}</span>`).join('')}</div>` : '';
-  d.innerHTML = `<div class="nm">${escapeHtml(s.name)}${s.isFavorites ? ' ⭐' : ''}</div>` +
+  const languages = [...new Set((s.fragments || []).map(f => f.language).filter(Boolean))];
+  const shownTags = (s.tags || []).slice(0, 3);
+  const hiddenTagCount = Math.max(0, (s.tags || []).length - shownTags.length);
+  const tagChips = shownTags.length
+    ? `<div class="tags">${shownTags.map(t => `<span class="tag tag-nm" data-name="${escapeHtml(t)}">#${escapeHtml(t)}</span>`).join('')}${hiddenTagCount ? `<span class="tag tag-more" title="${escapeHtml((s.tags || []).slice(3).join('、'))}">+${hiddenTagCount}</span>` : ''}</div>` : '';
+  const fileIcon = languages.includes('markdown') ? 'M↓' : languages.includes('latex') ? 'TₑX' : '&lt;/&gt;';
+  const fragmentCount = (s.fragments || []).length > 1 ? `<span class="frag-count">${s.fragments.length} 文件</span>` : '';
+  d.innerHTML = `<div class="item-head"><span class="file-ico">${fileIcon}</span><span class="nm">${escapeHtml(s.name)}${s.isFavorites ? ' ⭐' : ''}</span>${fragmentCount}</div>` +
     (s.description ? `<div class="desc">${escapeHtml(s.description)}</div>` : '') +
-    `<div class="langs">${s.fragments.map(f => `<span class="tag">${escapeHtml(f.language)}</span>`).join('')}</div>` +
+    `<div class="langs">${languages.map(language => `<span class="tag">${escapeHtml(language)}</span>`).join('')}</div>` +
     tagChips;
   d.onclick = () => select(s);
   // 拖拽到文件夹 = 移动片段所属
@@ -1702,7 +1862,6 @@ function resourceSize(n) {
 function resourceEl(r, level) {
   const d = document.createElement('div');
   d.className = 'resource-row' + (RESOURCE_CURRENT && RESOURCE_CURRENT.path === r.path ? ' active' : '');
-  d.style.marginLeft = (12 + level * 14) + 'px';
   d.innerHTML = '<span class="ricon">' + resourceIcon(r) + '</span><span class="rname">' + escapeHtml(r.name) + '</span><span class="rsize">' + resourceSize(r.size) + '</span>';
   d.title = r.path; d.onclick = () => openLatexResource(r);
   d.draggable = true;
@@ -1719,8 +1878,7 @@ function renderTree(root, container) {
       const resourceFolder = ['data', 'figures', 'fonts'].includes(node.name) && node.path.split('/').length >= 2;
       const folderIcon = node.name === 'data' ? '🗄️' : node.name === 'figures' ? '🖼️' : node.name === 'fonts' ? '🅰️' : '📁';
       const f = document.createElement('div');
-      f.className = 'fnode' + (resourceFolder ? ' resource-folder' : '');
-      f.style.paddingLeft = (6 + (node.level - 1) * 14) + 'px';
+      f.className = 'fnode' + (isOpen ? ' open' : '') + (resourceFolder ? ' resource-folder' : '');
       f.innerHTML = `<span class="arrow">${isOpen ? '▾' : '▸'}</span><span class="ico">${folderIcon}</span><span>${escapeHtml(node.name)}</span><span class="count">${node.total}</span>${resourceFolder ? '<span class="fadd" title="上传资源">＋</span>' : ''}<span class="fdel" title="删除文件夹（双重确认）">🗑</span>`;
       f.onclick = () => { isOpen ? collapsed.add(node.path) : collapsed.delete(node.path); saveCollapsed(); renderList(); };
       if (!resourceFolder) {
@@ -1753,6 +1911,7 @@ function renderTree(root, container) {
     }
     const box = document.createElement('div');
     box.className = 'tree-children' + (node.path && collapsed.has(node.path) ? ' hidden' : '');
+    box.dataset.depth = String(node.level || 0);
     for (const s of node.snippets) { s._level = node.level; box.appendChild(itemEl(s)); }
     for (const r of node.resources) box.appendChild(resourceEl(r, node.level));
     for (const c of node.children) renderNode(c, box);
@@ -1841,7 +2000,7 @@ async function openLatexResource(r) {
   } else if (ext === '.pdf') {
     const frame = document.createElement('iframe'); frame.id = 'resource-pdf'; frame.src = raw + '#view=FitH'; frame.title = r.name; $('resource-body').replaceChildren(frame);
   } else if (r.kind === 'fonts') {
-    const family = 'MassCodeResourceFont' + Date.now();
+    const family = 'CodeScopeResourceFont' + Date.now();
     const box = document.createElement('div'); box.id = 'resource-font';
     box.innerHTML = '<div class="sample" contenteditable="true">中文字体预览 · LaTeX Font Preview</div><div class="alphabet">ABCDEFGHIJKLMNOPQRSTUVWXYZ<br>abcdefghijklmnopqrstuvwxyz<br>0123456789 !@#$%^&*()</div>';
     $('resource-body').replaceChildren(box);
@@ -2485,14 +2644,13 @@ async function renderDrawList() {
     box.appendChild(e);
     return;
   }
-  const build = (node, depth) => {
+  const build = (node, container) => {
     for (const c of node.children) {
       if (c.type === 'folder') {
         const open = DRAW_DIR_OPEN.has(c.path);
         const f = document.createElement('div');
         f.className = 'draw-frow' + (open ? ' open' : '');
         f.title = c.path + '（' + c.count + ' 个绘图）　点击展开/收起';
-        f.style.paddingLeft = (6 + depth * 14) + 'px';
         const ar = document.createElement('span'); ar.className = 'draw-arrow'; ar.textContent = open ? '▾' : '▸';
         const ic = document.createElement('span'); ic.className = 'draw-ic'; ic.textContent = open ? '📂' : '📁';
         const nm = document.createElement('span'); nm.className = 'draw-fname'; nm.textContent = c.name;
@@ -2508,13 +2666,17 @@ async function renderDrawList() {
           const df = e.dataTransfer.getData('application/x-drawing');
           if (df) moveDrawing(df, c.path);
         });
-        box.appendChild(f);
-        if (open) build(c, depth + 1);
+        container.appendChild(f);
+        if (open) {
+          const children = document.createElement('div');
+          children.className = 'draw-children';
+          build(c, children);
+          if (children.children.length) container.appendChild(children);
+        }
       } else {
         const row = document.createElement('div');
         row.className = 'draw-row' + (DRAW_FILE === c.path ? ' on' : '');
         row.title = c.path + '　点击打开（Excalidraw 编辑器，改动自动保存）；拖到文件夹行可移动';
-        row.style.paddingLeft = (6 + depth * 14 + 16) + 'px';
         row.draggable = true;
         row.addEventListener('dragstart', (e) => {
           if (e.target.closest('button')) { e.preventDefault(); return; }
@@ -2525,6 +2687,9 @@ async function renderDrawList() {
         const nm = document.createElement('span');
         nm.className = 'draw-name';
         nm.textContent = drawBase(c.path);
+        const fileIcon = document.createElement('span');
+        fileIcon.className = 'draw-file-ic';
+        fileIcon.textContent = '◇';
         const ren = document.createElement('button');
         ren.className = 'draw-ren';
         ren.textContent = '✎';
@@ -2535,13 +2700,13 @@ async function renderDrawList() {
         del.textContent = '✕';
         del.title = '删除绘图';
         del.onclick = (e) => { e.stopPropagation(); deleteDrawing(c.path); };
-        row.appendChild(nm); row.appendChild(ren); row.appendChild(del);
+        row.appendChild(fileIcon); row.appendChild(nm); row.appendChild(ren); row.appendChild(del);
         row.onclick = () => openDrawing(c.path);
-        box.appendChild(row);
+        container.appendChild(row);
       }
     }
   };
-  build(root, 0);
+  build(root, box);
 }
 
 /* ---- 左侧面板拖拽重排（项目 / Git / 标签 / 绘图 可自由换位，顺序持久化） ---- */
@@ -4999,7 +5164,7 @@ function mmSvgForExport(flattenHtml = false) {
   bg.setAttribute('fill', '#0f131a');
   clone.insertBefore(bg, exportLayer);
   const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-  title.textContent = ((CURRENT && CURRENT.name) || 'Mind map') + ' · massCode Runner';
+  title.textContent = ((CURRENT && CURRENT.name) || 'Mind map') + ' · 码境 CodeScope';
   clone.insertBefore(title, clone.firstChild);
   return clone;
 }
@@ -6061,7 +6226,7 @@ function scheduleLatexCompile(delay) {
 function latexErrorText(r) {
   const rawError = String((r && r.error) || '');
   if (/Not Found:\s*\/api\/latex\/compile/i.test(rawError)) {
-    return '当前运行的是旧版后端，尚未加载 LaTeX 编译接口。\n请停止旧的 massCode Runner，重新启动后刷新页面。';
+    return '当前运行的是旧版后端，尚未加载 LaTeX 编译接口。\n请停止旧的码境 CodeScope 服务，重新启动后刷新页面。';
   }
   const log = String((r && (r.log || r.reason)) || '');
   const lines = log.split(/\r?\n/);
@@ -6782,8 +6947,30 @@ function doPreview() {
 }
 
 /* ----------------------------- 底部终端（xterm + PTY） ----------------------------- */
-let term = null, TERM_TAB_OPEN = false, termConnecting = false;
+let term = null, TERM_TAB_OPEN = false, termConnecting = false, TERM_SIZE_TIMER = null;
 let TERM_SCAN_BUFFER = '';
+let SSH_LAYOUT_ACTIVE = false;
+function setTerminalMode(mode, label) {
+  const ssh = mode === 'ssh';
+  $('term-kind').textContent = ssh ? (label || 'SSH') : '本地 shell';
+  $('term-restart').textContent = ssh ? '断开 SSH' : '重启';
+  $('term-restart').title = ssh ? '断开远程会话并恢复本地 shell' : '结束当前会话并重新启动';
+  if (ssh && !SSH_LAYOUT_ACTIVE) {
+    SSH_LAYOUT_ACTIVE = true;
+    $('output').classList.add('ssh-mode');
+    $('output').dataset.beforeSshHeight = $('output').style.height || '';
+    // SSH 是辅助开发窗口，首次连接只占约 38% 高度，避免吞掉整个代码工作区。
+    const sshHeight = parseInt(localStorage.getItem('mc-ssh-h')) || Math.round(window.innerHeight * .38);
+    $('output').style.height = clampV(sshHeight, 160, Math.max(240, window.innerHeight - 120)) + 'px';
+  } else if (!ssh && SSH_LAYOUT_ACTIVE) {
+    SSH_LAYOUT_ACTIVE = false;
+    $('output').classList.remove('ssh-mode');
+    const previous = $('output').dataset.beforeSshHeight;
+    if (previous) $('output').style.height = previous;
+    delete $('output').dataset.beforeSshHeight;
+  }
+  requestAnimationFrame(() => { termFit(); requestAnimationFrame(termFit); });
+}
 function switchOutTab(which) {
   TERM_TAB_OPEN = which === 'term';
   $('tab-out').classList.toggle('on', which === 'out');
@@ -6803,6 +6990,8 @@ function initTerm() {
     theme: { background: '#0b0f14', foreground: '#d5dee8', cursor: '#7db9ff', selectionBackground: 'rgba(79,140,255,.35)' }
   });
   term.open($('term-box'));
+  // 调整窗口或点过工具栏后，点击终端任意位置都应立即恢复键盘输入。
+  $('term-box').addEventListener('pointerdown', () => requestAnimationFrame(() => term && term.focus()));
   term.onData((d) => {
     fetch('/api/term/input', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: d }) }).catch(() => {});
   });
@@ -6818,6 +7007,10 @@ function termFit() {
   const cols = Math.max(20, Math.floor(el.clientWidth / 7.4));
   const rows = Math.max(5, Math.floor(el.clientHeight / 15));
   try { term.resize(cols, rows); } catch (_) {}
+  clearTimeout(TERM_SIZE_TIMER);
+  TERM_SIZE_TIMER = setTimeout(() => {
+    fetch('/api/term/resize', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ cols, rows }) }).catch(() => {});
+  }, 70);
 }
 async function termConnect() {
   if (termConnecting || !TERM_TAB_OPEN || !term) return;
@@ -6827,7 +7020,10 @@ async function termConnect() {
   try {
     const resp = await fetch('/api/term/stream');
     if (!resp.ok || !resp.body) { throw new Error('stream ' + resp.status); }
+    // 服务端会重放当前会话缓存；先清空本地屏幕，避免断线重连或多标签抢流产生重复内容。
+    if (resp.headers.get('X-CodeScope-Terminal-Replay') === '1') { try { term.reset(); } catch (_) {} }
     st.textContent = '已连接'; st.className = 'pill ok';
+    requestAnimationFrame(() => { if (TERM_TAB_OPEN && term) term.focus(); });
     const reader = resp.body.getReader();
     const dec = new TextDecoder();
     while (true) {
@@ -6841,15 +7037,325 @@ async function termConnect() {
     }
   } catch (_) { st.textContent = '连接断开'; st.className = 'pill err'; }
   termConnecting = false;
+  // SSH 远端主动退出时及时把顶部状态与终端标题恢复为真实会话状态。
+  loadRemoteStatus();
   if (TERM_TAB_OPEN) setTimeout(termConnect, 800);   // 会话结束 / 服务重启后自动重连
 }
 $('tab-out').onclick = () => switchOutTab('out');
 $('tab-term').onclick = () => switchOutTab('term');
 $('term-clear').onclick = () => { if (term) term.clear(); };
+$('term-hide').onclick = () => switchOutTab('out');
 $('term-restart').onclick = () => {
   fetch('/api/term/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
   // 会话被终止 → 流结束 → termConnect 自动重连并拉起新 shell
 };
+// 焦点被浏览器或拖拽句柄拿走时，仍把当前按键直接送入终端，首个字符也不会丢。
+function fallbackTerminalKey(e) {
+  if (!TERM_TAB_OPEN || !term || $('term-wrap').classList.contains('hidden') || e.isComposing || e.metaKey) return '';
+  const active = document.activeElement;
+  if (active && (active.matches('input,textarea,select') || active.isContentEditable)) return '';
+  if (e.ctrlKey && !e.altKey && e.key && e.key.length === 1) {
+    const code = e.key.toUpperCase().charCodeAt(0);
+    if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
+  }
+  const keys = {
+    Enter:'\r', Backspace:'\x7f', Tab:e.shiftKey ? '\x1b[Z' : '\t', Escape:'\x1b',
+    ArrowUp:'\x1b[A', ArrowDown:'\x1b[B', ArrowRight:'\x1b[C', ArrowLeft:'\x1b[D',
+    Home:'\x1b[H', End:'\x1b[F', Delete:'\x1b[3~', PageUp:'\x1b[5~', PageDown:'\x1b[6~',
+  };
+  let data = keys[e.key] || (e.key && e.key.length === 1 ? e.key : '');
+  if (data && e.altKey) data = '\x1b' + data;
+  return data;
+}
+document.addEventListener('keydown', (e) => {
+  const data = fallbackTerminalKey(e);
+  if (!data) return;
+  e.preventDefault();
+  fetch('/api/term/input', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ data }) }).catch(() => {});
+  requestAnimationFrame(() => term && term.focus());
+}, true);
+document.addEventListener('paste', (e) => {
+  if (!TERM_TAB_OPEN || !term || $('term-wrap').classList.contains('hidden')) return;
+  const active = document.activeElement;
+  if (active && (active.matches('input,textarea,select') || active.isContentEditable)) return;
+  const data = e.clipboardData && e.clipboardData.getData('text/plain');
+  if (!data) return;
+  e.preventDefault();
+  fetch('/api/term/input', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ data }) }).catch(() => {});
+  requestAnimationFrame(() => term && term.focus());
+}, true);
+
+/* ----------------------------- SSH / VNC 远程开发 ----------------------------- */
+let VNC_RFB = null;
+let VNC_KEYSYMS = null;
+let VNC_COMPOSING = false;
+let VNC_CONNECTED = false;
+const REMOTE_LATENCY = {
+  ssh: { timer: null, generation: 0 },
+  vnc: { timer: null, generation: 0 },
+};
+function stopRemoteLatency(kind) {
+  const state = REMOTE_LATENCY[kind];
+  if (!state) return;
+  state.generation++;
+  if (state.timer) clearInterval(state.timer);
+  state.timer = null;
+  const el = $(kind + '-latency');
+  el.className = 'remote-latency';
+  el.textContent = '';
+}
+function startRemoteLatency(kind, host, port) {
+  stopRemoteLatency(kind);
+  if (!host || !port) return;
+  const state = REMOTE_LATENCY[kind];
+  const generation = state.generation;
+  const el = $(kind + '-latency');
+  el.className = 'remote-latency show';
+  el.textContent = '延迟 …';
+  const update = async () => {
+    try {
+      const d = await api(`/api/remote/latency?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`);
+      if (state.generation !== generation) return;
+      const ms = Number(d.latencyMs);
+      if (!d.ok || !Number.isFinite(ms)) throw new Error(d.error || 'unavailable');
+      const level = ms <= 50 ? 'good' : ms <= 150 ? 'medium' : 'slow';
+      el.className = `remote-latency show ${level}`;
+      el.textContent = `延迟 ${ms} ms`;
+      el.title = `Runner 到远端 ${host} 的网络往返延迟（${kind === 'vnc' ? 'VNC' : 'SSH'} ${port}）`;
+    } catch (_) {
+      if (state.generation !== generation) return;
+      el.className = 'remote-latency show offline';
+      el.textContent = '延迟 --';
+    }
+  };
+  update();
+  state.timer = setInterval(update, 4000);
+}
+function remoteMessage(id, message, kind = '') {
+  const el = $(id);
+  el.textContent = message || '';
+  el.className = 'remote-msg' + (kind ? ' ' + kind : '');
+}
+function remoteTab(name) {
+  const ssh = name === 'ssh';
+  $('remote-tab-ssh').classList.toggle('on', ssh);
+  $('remote-tab-vnc').classList.toggle('on', !ssh);
+  $('remote-ssh').classList.toggle('hidden', !ssh);
+  $('remote-vnc').classList.toggle('hidden', ssh);
+}
+function restoreRemoteFields() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('mc-remote-targets') || '{}'); } catch (_) {}
+  $('ssh-host').value = saved.sshHost || '';
+  $('ssh-user').value = saved.sshUser || '';
+  $('ssh-port').value = saved.sshPort || 22;
+  $('vnc-host').value = saved.vncHost || saved.sshHost || '';
+  $('vnc-port').value = saved.vncPort || 5900;
+}
+function saveRemoteFields() {
+  const saved = {
+    sshHost: $('ssh-host').value.trim(), sshUser: $('ssh-user').value.trim(), sshPort: $('ssh-port').value || '22',
+    vncHost: $('vnc-host').value.trim(), vncPort: $('vnc-port').value || '5900',
+  };
+  try { localStorage.setItem('mc-remote-targets', JSON.stringify(saved)); } catch (_) {}
+}
+async function loadRemoteStatus() {
+  try {
+    const d = await api('/api/remote/status');
+    const sshReady = !!(d.ok && d.ssh && d.ssh.available);
+    const vncReady = !!(d.ok && d.vnc && d.vnc.available);
+    $('remote-status').textContent = `SSH ${sshReady ? '就绪' : '缺失'} · VNC ${vncReady ? '就绪' : '缺失'}`;
+    $('ssh-connect').disabled = !sshReady;
+    $('vnc-connect').disabled = !vncReady;
+    const sshActive = !!(d.terminal && d.terminal.active && d.terminal.mode === 'ssh');
+    $('btn-remote').classList.toggle('remote-on', sshActive || VNC_CONNECTED);
+    setTerminalMode(sshActive ? 'ssh' : 'local', sshActive ? d.terminal.label : '');
+    if (sshActive) startRemoteLatency('ssh', d.terminal.host, d.terminal.port || 22);
+    else stopRemoteLatency('ssh');
+    if (!sshReady) remoteMessage('ssh-msg', '未找到 OpenSSH 客户端，请先在“环境”中查看安装提示。', 'err');
+    if (!vncReady) remoteMessage('vnc-msg', 'noVNC 前端资源未安装，请在 Runner 目录执行 npm install。', 'err');
+  } catch (e) {
+    $('remote-status').textContent = '检测失败';
+  }
+}
+async function connectSsh() {
+  const body = { host: $('ssh-host').value.trim(), user: $('ssh-user').value.trim(), port: Number($('ssh-port').value || 22), identityFile: $('ssh-key').value.trim() };
+  if (!body.host || !body.user) { remoteMessage('ssh-msg', '请填写主机和用户名。', 'err'); return; }
+  $('ssh-connect').disabled = true;
+  remoteMessage('ssh-msg', '正在启动 SSH 会话…');
+  try {
+    const d = await api('/api/remote/ssh/connect', body);
+    if (!d.ok) throw new Error(d.error || '连接启动失败');
+    saveRemoteFields();
+    setTerminalMode('ssh', d.label || `${body.user}@${body.host}`);
+    startRemoteLatency('ssh', d.host || body.host, d.port || body.port || 22);
+    $('btn-remote').classList.add('remote-on');
+    $('remote-panel').classList.remove('open');
+    $('output').style.display = '';
+    $('split-h').style.display = '';
+    switchOutTab('term');
+    if (term) term.focus();
+  } catch (e) {
+    remoteMessage('ssh-msg', e.message || String(e), 'err');
+  } finally {
+    $('ssh-connect').disabled = false;
+  }
+}
+async function disconnectSsh() {
+  try { await api('/api/remote/ssh/disconnect', {}); } catch (_) {}
+  setTerminalMode('local');
+  stopRemoteLatency('ssh');
+  $('btn-remote').classList.toggle('remote-on', VNC_CONNECTED);
+  remoteMessage('ssh-msg', 'SSH 已断开；再次打开终端时会启动本地 shell。', 'ok');
+}
+function closeVnc(message = '已断开') {
+  if (VNC_RFB) { try { VNC_RFB.disconnect(); } catch (_) {} }
+  VNC_RFB = null;
+  VNC_KEYSYMS = null;
+  VNC_COMPOSING = false;
+  $('vnc-keyboard-input').value = '';
+  $('vnc-keyboard-input').blur();
+  VNC_CONNECTED = false;
+  stopRemoteLatency('vnc');
+  $('vnc-workspace').classList.remove('open');
+  $('vnc-screen').replaceChildren();
+  $('vnc-state').textContent = message;
+  $('btn-remote').classList.remove('remote-on');
+  loadRemoteStatus();
+}
+function focusVncKeyboard(clientX, clientY) {
+  if (!VNC_RFB || VNC_RFB.viewOnly) return;
+  const input = $('vnc-keyboard-input');
+  if (Number.isFinite(clientX)) input.style.left = `${Math.max(0, clientX)}px`;
+  if (Number.isFinite(clientY)) input.style.top = `${Math.max(0, clientY)}px`;
+  input.value = '';
+  input.focus({ preventScroll: true });
+}
+function sendVncText(text) {
+  if (!VNC_RFB || VNC_RFB.viewOnly || !VNC_KEYSYMS || !text) return;
+  for (const char of text.replace(/\r\n?/g, '\n')) {
+    if (char === '\n') VNC_RFB.sendKey(0xff0d, 'Enter');
+    else VNC_RFB.sendKey(VNC_KEYSYMS.lookup(char.codePointAt(0)), 'Unidentified');
+  }
+}
+function forwardVncKey(event) {
+  if (!VNC_RFB || VNC_RFB.viewOnly || event.isComposing || event.keyCode === 229) return;
+  const canvas = $('vnc-screen').querySelector('canvas');
+  if (!canvas) return;
+  canvas.dispatchEvent(new KeyboardEvent(event.type, {
+    key: event.key, code: event.code, location: event.location,
+    ctrlKey: event.ctrlKey, shiftKey: event.shiftKey,
+    altKey: event.altKey, metaKey: event.metaKey,
+    repeat: event.repeat, bubbles: false, cancelable: true
+  }));
+  event.preventDefault();
+  event.stopPropagation();
+}
+async function connectVnc() {
+  const host = $('vnc-host').value.trim();
+  const port = Number($('vnc-port').value || 5900);
+  const password = $('vnc-password').value;
+  if (!host || !Number.isInteger(port) || port < 1 || port > 65535) { remoteMessage('vnc-msg', '请填写有效的主机和端口。', 'err'); return; }
+  saveRemoteFields();
+  closeVnc('正在连接…');
+  $('vnc-workspace').classList.add('open');
+  $('remote-panel').classList.remove('open');
+  $('vnc-target').textContent = `${host}:${port}`;
+  $('vnc-state').textContent = '正在连接…';
+  $('vnc-toolbar-viewonly').checked = $('vnc-viewonly').checked;
+  try {
+    const [mod, keysymMod] = await Promise.all([
+      import('/novnc/core/rfb.js'),
+      import('/novnc/core/input/keysymdef.js')
+    ]);
+    const RFB = mod.default || mod.RFB;
+    if (!RFB) throw new Error('noVNC 模块加载失败');
+    VNC_KEYSYMS = keysymMod.default;
+    const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${scheme}//${location.host}/api/vnc/ws?host=${encodeURIComponent(host)}&port=${port}`;
+    const rfb = new RFB($('vnc-screen'), url, { credentials: password ? { password } : {} });
+    VNC_RFB = rfb;
+    rfb.scaleViewport = true;
+    rfb.resizeSession = true;
+    rfb.viewOnly = $('vnc-viewonly').checked;
+    rfb.focusOnClick = false;
+    rfb.background = '#070a0f';
+    rfb.addEventListener('connect', () => {
+      if (VNC_RFB !== rfb) return;
+      VNC_CONNECTED = true;
+      $('vnc-state').textContent = '已连接';
+      $('btn-remote').classList.add('remote-on');
+      remoteMessage('vnc-msg', `已连接 ${host}:${port}`, 'ok');
+      startRemoteLatency('vnc', host, port);
+      focusVncKeyboard();
+    });
+    rfb.addEventListener('credentialsrequired', () => {
+      if (password) rfb.sendCredentials({ password });
+      else {
+        $('vnc-state').textContent = '需要密码';
+        remoteMessage('vnc-msg', '远端要求 VNC 密码，请填写后重新连接。', 'err');
+      }
+    });
+    rfb.addEventListener('securityfailure', (e) => {
+      const reason = e.detail && e.detail.reason ? e.detail.reason : '认证失败';
+      $('vnc-state').textContent = reason;
+      remoteMessage('vnc-msg', reason, 'err');
+    });
+    rfb.addEventListener('disconnect', (e) => {
+      if (VNC_RFB !== rfb) return;
+      VNC_RFB = null; VNC_CONNECTED = false;
+      stopRemoteLatency('vnc');
+      $('vnc-keyboard-input').value = '';
+      $('vnc-keyboard-input').blur();
+      const clean = !!(e.detail && e.detail.clean);
+      $('vnc-state').textContent = clean ? '已断开' : '连接失败或中断';
+      loadRemoteStatus();
+    });
+  } catch (e) {
+    closeVnc('连接失败');
+    remoteMessage('vnc-msg', e.message || String(e), 'err');
+  }
+}
+$('btn-remote').onclick = () => { $('remote-panel').classList.add('open'); loadRemoteStatus(); };
+$('btn-remote-close').onclick = () => $('remote-panel').classList.remove('open');
+$('remote-tab-ssh').onclick = () => remoteTab('ssh');
+$('remote-tab-vnc').onclick = () => remoteTab('vnc');
+$('ssh-connect').onclick = connectSsh;
+$('ssh-disconnect').onclick = disconnectSsh;
+$('vnc-connect').onclick = connectVnc;
+$('vnc-disconnect').onclick = () => closeVnc();
+$('vnc-close').onclick = () => closeVnc();
+$('vnc-toolbar-viewonly').onchange = () => {
+  $('vnc-viewonly').checked = $('vnc-toolbar-viewonly').checked;
+  if (VNC_RFB) VNC_RFB.viewOnly = $('vnc-toolbar-viewonly').checked;
+  $('vnc-input-hint').textContent = $('vnc-toolbar-viewonly').checked ? '只读模式' : '点击画面后可输入';
+  if ($('vnc-toolbar-viewonly').checked) {
+    $('vnc-keyboard-input').value = '';
+    $('vnc-keyboard-input').blur();
+  } else focusVncKeyboard();
+};
+$('vnc-screen').addEventListener('pointerdown', (event) => {
+  if (!VNC_RFB || VNC_RFB.viewOnly) return;
+  setTimeout(() => focusVncKeyboard(event.clientX, event.clientY), 0);
+});
+$('vnc-keyboard-input').addEventListener('keydown', forwardVncKey);
+$('vnc-keyboard-input').addEventListener('keyup', forwardVncKey);
+$('vnc-keyboard-input').addEventListener('compositionstart', () => { VNC_COMPOSING = true; });
+$('vnc-keyboard-input').addEventListener('compositionend', () => {
+  VNC_COMPOSING = false;
+  setTimeout(() => {
+    const input = $('vnc-keyboard-input');
+    if (input.value) { sendVncText(input.value); input.value = ''; }
+  }, 0);
+});
+$('vnc-keyboard-input').addEventListener('input', (event) => {
+  if (VNC_COMPOSING || event.isComposing) return;
+  const input = event.currentTarget;
+  sendVncText(input.value);
+  input.value = '';
+});
+restoreRemoteFields();
+loadRemoteStatus();
 
 $('btn-run').onclick = doRun;
 $('btn-check').onclick = doCheck;
@@ -6883,7 +7389,7 @@ function makeResizer(split, axis, getter, setter, flip) {
     document.body.classList.add('resizing', axis === 'v' ? 'resizing-v' : 'resizing-h');
     split.classList.add('active');
   });
-  split.addEventListener('pointermove', (e) => {
+  document.addEventListener('pointermove', (e) => {
     if (!start) return;
     // 竖向：向右拉 → 左侧变宽(+); 横向：向上拉 → 输出变高(-); flip 反向（右侧面板）
     const dv = axis === 'v' ? e.clientX - start.x : -(e.clientY - start.y);
@@ -6894,9 +7400,10 @@ function makeResizer(split, axis, getter, setter, flip) {
     start = null;
     document.body.classList.remove('resizing', 'resizing-v', 'resizing-h');
     split.classList.remove('active');
+    if (split === $('split-h') && TERM_TAB_OPEN && term) requestAnimationFrame(() => term.focus());
   };
-  split.addEventListener('pointerup', end);
-  split.addEventListener('pointercancel', end);
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
 }
 /* 水平分隔条：上下拖拽调整目标区域高度（用于左侧 项目树/Git/标签 之间） */
 function makeHResizer(handle, getter, setter) {
@@ -6927,14 +7434,48 @@ function makeHResizer(handle, getter, setter) {
     const sw = parseInt(localStorage.getItem('mc-side-w')) || 320;
     const oh = parseInt(localStorage.getItem('mc-out-h')) || 200;
     $('side').style.width = clampV(sw, 180, 700) + 'px';
-    $('output').style.height = clampV(oh, 90, Math.round(window.innerHeight * 0.62)) + 'px';
+    $('output').style.height = clampV(oh, 120, Math.max(240, window.innerHeight - 120)) + 'px';
   } catch (_) {}
   makeResizer($('split-v'), 'v',
     () => $('side').getBoundingClientRect().width,
     (v) => { $('side').style.width = clampV(v, 180, 700) + 'px'; try { localStorage.setItem('mc-side-w', String(Math.round(v))); } catch (_) {} });
   makeResizer($('split-h'), 'h',
     () => $('output').getBoundingClientRect().height,
-    (v) => { $('output').style.height = clampV(v, 90, Math.round(window.innerHeight * 0.62)) + 'px'; try { localStorage.setItem('mc-out-h', String(Math.round(v))); } catch (_) {} });
+    (v) => {
+      const h = clampV(v, 120, Math.max(240, window.innerHeight - 120));
+      $('output').style.height = h + 'px';
+      try { localStorage.setItem(SSH_LAYOUT_ACTIVE ? 'mc-ssh-h' : 'mc-out-h', String(Math.round(h))); } catch (_) {}
+      termFit();
+    });
+  // SSH 标题栏本身也是大面积拖拽把手；按钮区域不触发拖动。
+  (() => {
+    const handle = $('term-bar');
+    let start = null;
+    handle.addEventListener('pointerdown', (e) => {
+      if (!SSH_LAYOUT_ACTIVE || e.button !== 0 || e.target.closest('button,input')) return;
+      e.preventDefault();
+      start = { y:e.clientY, h:$('output').getBoundingClientRect().height };
+      document.body.classList.add('resizing', 'resizing-h');
+      handle.classList.add('active');
+    });
+    document.addEventListener('pointermove', (e) => {
+      if (!start) return;
+      const h = clampV(start.h - (e.clientY - start.y), 160, Math.max(240, window.innerHeight - 120));
+      $('output').style.height = h + 'px';
+      try { localStorage.setItem('mc-ssh-h', String(Math.round(h))); } catch (_) {}
+      termFit();
+    });
+    const end = () => {
+      if (!start) return;
+      start = null;
+      document.body.classList.remove('resizing', 'resizing-h');
+      handle.classList.remove('active');
+      termFit();
+      if (TERM_TAB_OPEN && term) requestAnimationFrame(() => term.focus());
+    };
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
+  })();
   makeResizer($('split-v2'), 'v',
     () => $('outline-panel').getBoundingClientRect().width,
     (v) => { $('outline-panel').classList.remove('collapsed'); $('outline-panel').style.width = clampV(v, 180, 640) + 'px'; try { localStorage.setItem('mc-outline-w', String(Math.round(v))); } catch (_) {} },

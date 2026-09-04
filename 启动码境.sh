@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# massCode Runner 一键启动（Linux / WSL）
+# 码境 CodeScope 一键启动（Linux / WSL）
 set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUNNER_DIR="$ROOT_DIR/masscode-runner"
-PORT="${MASSCODE_RUNNER_PORT:-4877}"
+PORT="${CODESCOPE_PORT:-${MASSCODE_RUNNER_PORT:-4877}}"
 
 if [ ! -d "$RUNNER_DIR" ]; then echo "找不到 masscode-runner 目录：$RUNNER_DIR"; exit 1; fi
 if ! command -v node >/dev/null 2>&1; then
@@ -17,7 +17,17 @@ if [ "$NODE_MAJOR" -lt 18 ]; then
   exit 1
 fi
 
-export MASSCODE_VAULT="${MASSCODE_VAULT:-$ROOT_DIR/markdown-vault}"
+cd "$RUNNER_DIR"
+if [ ! -f node_modules/@novnc/novnc/core/rfb.js ] || [ ! -d node_modules/ws ]; then
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "未找到 npm，无法安装码境的 SSH/VNC 界面依赖。"
+    exit 1
+  fi
+  echo "首次启动：正在安装 SSH/VNC 界面依赖…"
+  npm ci --omit=dev
+fi
+
+export CODESCOPE_VAULT="${CODESCOPE_VAULT:-${MASSCODE_VAULT:-$ROOT_DIR/markdown-vault}}"
 URL="http://127.0.0.1:$PORT"
 
 open_browser() {
@@ -28,14 +38,13 @@ open_browser() {
 }
 
 if command -v curl >/dev/null 2>&1 && curl --noproxy '*' -fsS "$URL/api/rev" >/dev/null 2>&1; then
-  echo "massCode Runner 已在运行：$URL"
+  echo "码境 CodeScope 已在运行：$URL"
   open_browser
   exit 0
 fi
 
-cd "$RUNNER_DIR"
-echo "启动 massCode Runner（Linux，Ctrl+C 停止）"
-echo "Vault：$MASSCODE_VAULT"
+echo "启动码境 CodeScope（Linux，Ctrl+C 停止）"
+echo "Vault：$CODESCOPE_VAULT"
 echo "页面：$URL"
 ( sleep 1; open_browser ) &
 exec node server.js

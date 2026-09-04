@@ -1,10 +1,11 @@
-# massCode Runner 环境部署器（Windows）
+# 码境 CodeScope 环境部署器（Windows）
 param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Tools)
 $ErrorActionPreference = 'Stop'
 if (-not $Tools -or $Tools.Count -eq 0) { $Tools = @('python3', 'gcc', 'gpp', 'clangformat', 'npx') }
 
 $packages = [System.Collections.Generic.HashSet[string]]::new()
 $needBlack = $false
+$needSsh = $false
 foreach ($tool in $Tools) {
   switch ($tool) {
     'node'       { [void]$packages.Add('OpenJS.NodeJS.LTS') }
@@ -23,10 +24,11 @@ foreach ($tool in $Tools) {
     'latex'      { [void]$packages.Add('MiKTeX.MiKTeX') }
     'biber'      { [void]$packages.Add('MiKTeX.MiKTeX') }
     'ctex'       { [void]$packages.Add('MiKTeX.MiKTeX') }
+    'ssh'        { $needSsh = $true }
   }
 }
 
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+if ($packages.Count -gt 0 -and -not (Get-Command winget -ErrorAction SilentlyContinue)) {
   throw '未找到 winget，请先从 Microsoft Store 安装“应用安装程序”。'
 }
 foreach ($id in $packages) {
@@ -35,5 +37,9 @@ foreach ($id in $packages) {
 if ($needBlack) {
   $py = Get-Command py -ErrorAction SilentlyContinue
   if ($py) { py -m pip install --user black } else { python -m pip install --user black }
+}
+if ($needSsh -and -not (Get-Command ssh -ErrorAction SilentlyContinue)) {
+  Write-Host '正在安装 Windows OpenSSH 客户端（可能需要管理员权限）…' -ForegroundColor Cyan
+  Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0 | Out-Null
 }
 Write-Host '部署命令执行完成。请回到环境检测面板重新检测。' -ForegroundColor Green

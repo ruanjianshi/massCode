@@ -1,14 +1,19 @@
 {
-  "name": "masscode-runner",
+  "name": "codescope",
   "version": "1.0.0",
   "private": true,
-  "description": "massCode 伴生工具：给片段库提供 运行 / 语法检查 / 格式化 能力（不改动 massCode 本体）",
+  "description": "码境 CodeScope：面向代码阅读、编辑、运行、文档与远程开发的工程工作台",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node tests/smoke.js"
   },
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@novnc/novnc": "^1.7.0",
+    "ws": "^8.21.3"
+  }
 }

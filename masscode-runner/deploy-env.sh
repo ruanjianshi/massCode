@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# massCode Runner 环境部署器（macOS / Linux）
+# 码境 CodeScope 环境部署器（macOS / Linux）
 # 用法：bash deploy-env.sh gcc gpp clangformat
 set -Eeuo pipefail
 
-KNOWN=" node python3 bash gcc gpp java ruby swift go clangformat gofmt black npx latex biber ctex "
+KNOWN=" node python3 bash gcc gpp java ruby swift go clangformat gofmt black npx latex biber ctex ssh "
 if [ "$#" -eq 0 ]; then
   set -- python3 bash gcc gpp clangformat npx
 fi
@@ -40,7 +40,7 @@ add_cask_unique() {
 }
 
 echo "========================================"
-echo " massCode Runner 环境部署"
+echo " 码境 CodeScope 环境部署"
 echo " 系统：$(uname -s) $(uname -m)"
 echo " 工具：${TOOLS[*]}"
 echo "========================================"
@@ -74,6 +74,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
       black) NEED_BLACK=1 ;;
       swift) NEED_SWIFT=1 ;;
       latex|biber|ctex) add_cask_unique mactex-no-gui ;;
+      ssh) echo "OpenSSH 客户端由 macOS 自带。" ;;
     esac
   done
   if [ "${#PACKAGES[@]}" -gt 0 ]; then brew install "${PACKAGES[@]}"; fi
@@ -101,6 +102,7 @@ else
       apt-get:latex) add_unique texlive-xetex; add_unique texlive-latex-extra; add_unique texlive-fonts-recommended; add_unique texlive-lang-chinese ;;
       apt-get:ctex) add_unique texlive-xetex; add_unique texlive-latex-extra; add_unique texlive-fonts-recommended; add_unique texlive-lang-chinese ;;
       apt-get:biber) add_unique biber ;;
+      apt-get:ssh) add_unique openssh-client ;;
       dnf:node|dnf:npx|yum:node|yum:npx) add_unique nodejs; add_unique npm ;;
       dnf:python3|yum:python3) add_unique python3; add_unique python3-pip ;;
       dnf:bash|yum:bash) add_unique bash ;;
@@ -115,6 +117,7 @@ else
       dnf:latex|yum:latex) add_unique texlive-xetex; add_unique texlive-collection-latexextra; add_unique texlive-ctex ;;
       dnf:ctex|yum:ctex) add_unique texlive-xetex; add_unique texlive-collection-latexextra; add_unique texlive-ctex ;;
       dnf:biber|yum:biber) add_unique biber ;;
+      dnf:ssh|yum:ssh) add_unique openssh-clients ;;
       pacman:node|pacman:npx) add_unique nodejs; add_unique npm ;;
       pacman:python3) add_unique python; add_unique python-pip ;;
       pacman:bash) add_unique bash ;;
@@ -125,6 +128,7 @@ else
       pacman:clangformat) add_unique clang ;;
       pacman:latex) add_unique texlive-bin; add_unique texlive-latexextra; add_unique texlive-fontsrecommended; add_unique texlive-langchinese ;;
       pacman:ctex) add_unique texlive-bin; add_unique texlive-latexextra; add_unique texlive-fontsrecommended; add_unique texlive-langchinese ;;
+      pacman:ssh) add_unique openssh ;;
       pacman:biber) add_unique biber ;;
       zypper:node|zypper:npx) add_unique nodejs; add_unique npm ;;
       zypper:python3) add_unique python3; add_unique python3-pip ;;
@@ -137,6 +141,7 @@ else
       zypper:clangformat) add_unique clang-tools ;;
       zypper:latex) add_unique texlive-xetex; add_unique texlive-latexextra; add_unique texlive-ctex ;;
       zypper:ctex) add_unique texlive-xetex; add_unique texlive-latexextra; add_unique texlive-ctex ;;
+      zypper:ssh) add_unique openssh-clients ;;
       zypper:biber) add_unique biber ;;
       apk:node|apk:npx) add_unique nodejs; add_unique npm ;;
       apk:python3) add_unique python3; add_unique py3-pip ;;
@@ -148,6 +153,7 @@ else
       apk:clangformat) add_unique clang-extra-tools ;;
       apk:latex) add_unique texlive-xetex; add_unique texmf-dist-latexextra; add_unique texmf-dist-langchinese ;;
       apk:ctex) add_unique texlive-xetex; add_unique texmf-dist-latexextra; add_unique texmf-dist-langchinese ;;
+      apk:ssh) add_unique openssh-client-default ;;
       apk:biber) add_unique biber ;;
       *:black) NEED_BLACK=1 ;;
       *:swift) NEED_SWIFT=1 ;;

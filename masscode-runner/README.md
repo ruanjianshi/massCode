@@ -1,7 +1,9 @@
-# ⚡ massCode Runner（伴生工具）
+# 码境 CodeScope v1.0.0
 
-给 [massCode](https://masscode.io/) 的代码片段增加 **运行 / 语法检查 / 格式化 / 编辑 / 代码大纲** 能力，**不改动 massCode 本体**。
-它直接读取 massCode 的 Markdown Vault（你的片段库），选一个片段就能跑、能改、能跳转。
+面向代码阅读、编辑、运行、工程文档和远程开发的一体化工作台。
+码境可以独立使用现有 Markdown Vault，同时兼容读取 [massCode](https://masscode.io/) 片段库，不修改原始数据格式。
+
+当前正式版本：**v1.0.0**。版本变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 > **📦 已整体迁移到 iCloud Drive，自动云同步**（见下文「云同步」）。
 > 所在位置：`~/Library/Mobile Documents/com~apple~CloudDocs/massCode`（Finder 里就是 **iCloud Drive / massCode**）。
@@ -11,33 +13,33 @@
 ```
 iCloud Drive/massCode/
 ├── markdown-vault/            ← massCode 的片段库（code/ notes/ 等，随 iCloud 同步）
-├── masscode-runner/           ← 伴生工具本体（纯 Node，零依赖）
+├── masscode-runner/           ← 码境程序目录（保留旧目录名以兼容已有路径）
 │   ├── server.js              ← HTTP 服务（127.0.0.1:4877）
 │   ├── index.html             ← 界面
 │   ├── assets/                ← 高亮库等静态资源（离线可用）
 │   └── README.md
-└── 启动伴生工具.command        ← macOS 一键启动（前台运行，Ctrl+C 停止）
-└── 启动伴生工具.bat            ← Windows 一键启动（前台运行，Ctrl+C 停止）
-└── 启动伴生工具.sh             ← Linux / WSL 一键启动
+└── 启动码境.command            ← macOS 一键启动（前台运行，Ctrl+C 停止）
+└── 启动码境.bat                ← Windows 一键启动（前台运行，Ctrl+C 停止）
+└── 启动码境.sh                 ← Linux / WSL 一键启动
 ```
 
 ## 快速开始
 
-**macOS**：在 Finder 打开 `iCloud Drive / massCode`，**双击「启动伴生工具.command」**
+**macOS**：在 Finder 打开 `iCloud Drive / massCode`，**双击「启动码境.command」**
 - 终端窗口保持前台运行服务，浏览器自动打开 http://127.0.0.1:4877
 - 用完直接 **`Ctrl+C`**（或关掉终端窗口）即停止
 - 已运行时再次双击 → 只打开页面，不重复启动
 
-**Windows**：打开 `iCloud Drive/massCode`（或同步下来的 `massCode` 文件夹），**双击「启动伴生工具.bat」**
+**Windows**：打开 `iCloud Drive/massCode`（或同步下来的 `massCode` 文件夹），**双击「启动码境.bat」**
 - 黑窗口前台运行服务并自动打开浏览器；用完 `Ctrl+C` 或关窗口即停止
 - 首次使用需先装 [Node.js](https://nodejs.org)（脚本会自动检查并提示）
 
 **Linux / WSL**：在终端进入项目目录后执行：
 ```bash
-chmod +x 启动伴生工具.sh
-./启动伴生工具.sh
+chmod +x 启动码境.sh
+./启动码境.sh
 ```
-- 自动定位同级 `markdown-vault`，支持 `MASSCODE_VAULT` 和 `MASSCODE_RUNNER_PORT` 覆盖。
+- 自动定位同级 `markdown-vault`，支持 `CODESCOPE_VAULT`、`CODESCOPE_PORT` 和 `CODESCOPE_HOST` 覆盖；旧的 `MASSCODE_*` 配置仍兼容。
 - 桌面 Linux 使用 `xdg-open` / `gio` 打开浏览器，WSL 安装了 `wslview` 时自动打开 Windows 浏览器。
 - Debian、Ubuntu、Fedora、RHEL、Arch、openSUSE、Alpine 均可识别对应包管理器。
 - Node.js 需要 18 或更高版本；启动脚本和环境面板都会区分“未安装”与“版本过低”。
@@ -46,6 +48,7 @@ chmod +x 启动伴生工具.sh
 ```bash
 cd ~/Library/Mobile\ Documents/com~apple~CloudDocs/massCode/masscode-runner   # macOS
 cd masscode-runner                                                             # Windows / Linux
+npm install
 node server.js
 ```
 
@@ -70,6 +73,7 @@ node server.js
 | ▶ / ✓ / ✨ / ⌨（位置） | 运行/检查/格式化/输入按钮**固定在大纲面板顶部**，与大纲排在一起；点「🧭 大纲」收起大纲列表后，仍保留一列操作按钮，随时可用 |
 | ✏ 编辑 / 💾 保存 | 只读 ↔ 可编辑切换：**Markdown / LaTeX** 编辑时左侧源码 / 右侧实时渲染并排（分割条可拖、宽度自动记忆）；**代码**编辑全宽直接改源码、**实时语法高亮**（透明编辑层叠加高亮，边打字边着色，中文输入法合成期临时显示明文）；Cmd/Ctrl+S 或点保存写回 vault（massCode 实时同步），编辑中自动同步不覆盖你的修改，原生撤销 Ctrl/⌘+Z 可用；运行/检查/格式化可直接作用于编辑框内容（未保存也生效） |
 | 🔍 环境 | 按 vault 实际语言区分“当前项目需要/可选”工具，显示版本、可执行路径、Linux 发行版和包管理器；顶部状态点持续显示是否就绪，每 60 秒自动复检，可一键在内置终端配置缺失项并在完成后自动验证 |
+| 🖥 远程 | 集成 SSH 与 VNC 远程开发：SSH 复用底部真实 PTY 终端，支持主机指纹、密码、私钥和 sudo 交互；VNC 通过 noVNC 在独立工作区显示远程桌面，支持缩放、远端分辨率适配、只读模式、连续文本/中文输入和实时网络延迟显示 |
 | 顶部电脑状态 | 每 2 秒刷新 CPU、内存、硬盘使用率，以进度条和黄/红状态提示资源压力；点击任一指标可查看处理器、系统负载、可用内存、磁盘余量、系统与运行时间。macOS 使用可回收内存、Linux 使用 `MemAvailable`，避免把文件缓存误判为内存占满 |
 
 **布局与侧栏**：
@@ -81,9 +85,18 @@ node server.js
 > - 代码区带内置语法高亮（离线可用，无需联网）。
 > - **阅读快捷键**：单击代码中的符号 → 右侧预览定义；双击 → 跳转到最佳定义（跨片段自动切换文件）；Ctrl/⌘+Shift+F → 全局符号检索。
 > - **实时同步**：每 2.5s 自动检测 vault 变更（新增/修改/删除片段都会立刻反映），无需手动刷新；编辑模式不会被同步覆盖。
-> - **环境检测**：启动时检测 16 项工具（含 LaTeX、Biber、CTeX），此后每 60 秒自动复检，并根据 vault 中实际使用的语言计算项目所需环境；顶部「🔍 环境」绿点表示就绪、红点表示缺失。
+> - **环境检测**：启动时检测 17 项工具（含 LaTeX、Biber、CTeX、OpenSSH），此后每 60 秒自动复检，并根据 vault 中实际使用的语言计算项目所需环境；顶部「🔍 环境」绿点表示就绪、红点表示缺失。
 >   缺某个工具时，运行/检查/格式化会给出明确的「缺少 xx，安装: xxx」提示，而不是晦涩报错。
 > - **一键配置**：只安装当前项目实际需要且尚未安装的工具。macOS、Linux、Windows 都会切换到底部交互终端执行，涉及系统权限时可直接输入密码；命令结束后自动复检并给出成功或缺失结果。
+> - **远程凭据**：SSH 密码只在终端内交给系统 `ssh`；VNC 密码只保存在当前网页内存，服务端不记录。浏览器只持久化主机、用户名和端口。
+
+## SSH / VNC 远程开发
+
+点击顶部「🖥 远程」：
+
+- SSH：填写主机、用户名和端口，可选填私钥绝对路径；连接后在底部终端完成指纹确认或密码输入。点“断开并回到本地”后，终端会恢复本地 shell。
+- VNC：填写远程桌面的主机、端口（默认 `5900`）和密码，随后在全屏工作区操作；可随时切换“只读”。远端必须先启用 VNC/屏幕共享。
+- 局域网访问码境时，SSH/VNC 入口也会随页面开放。只应在可信网络使用，并通过系统防火墙限制 `4877` 端口的访问来源。
 
 ## LaTeX 工程资源
 
@@ -138,18 +151,19 @@ massCode 一个片段里可以有多个 fragment。**把 fragment 标签写成�
 
 ## 配置
 
-- 端口：`MASSCODE_RUNNER_PORT`（默认 `4877`），仅绑定 `127.0.0.1`
-- 监听地址：默认 `MASSCODE_RUNNER_HOST=127.0.0.1`（仅本机）；局域网访问时设置为 `0.0.0.0`，再通过本机局域网 IP 访问，例如 `http://10.16.0.205:4877`
-- 手动指定 vault：`MASSCODE_VAULT=/path/to/markdown-vault node server.js`
+- 端口：`CODESCOPE_PORT`（默认 `4877`）
+- 监听地址：默认 `CODESCOPE_HOST=127.0.0.1`（仅本机）；局域网访问时设置为 `0.0.0.0`，再通过本机局域网 IP 访问，例如 `http://10.16.0.205:4877`
+- 手动指定 vault：`CODESCOPE_VAULT=/path/to/markdown-vault node server.js`
+- 兼容旧配置：`MASSCODE_RUNNER_PORT`、`MASSCODE_RUNNER_HOST`、`MASSCODE_VAULT` 仍然有效，但优先使用 `CODESCOPE_*`。
 - 自动从 massCode 偏好设置（`~/Library/Application Support/massCode/v2/preferences.json` 的 `storage.rootPath`）
   读取 vault 路径（vault = rootPath 下的 `markdown-vault`）；读不到时按 `~/massCode/markdown-vault` 兜底
-- 日志：`/tmp/masscode-runner.log`（不写进工具目录，避免云同步到日志）
+- 运行日志建议写到 `/tmp/codescope.log`（不写进程序目录，避免云同步到日志）
 
 ## 云同步（iCloud Drive）
 
 **当前状态：整个 `massCode` 目录已放进 iCloud Drive，片段与工具自动同步到你的所有设备。**
 
-- **同步内容**：`markdown-vault/`（片段库）、`masscode-runner/`（工具本体）、`启动伴生工具.command`。
+- **同步内容**：`markdown-vault/`（片段库）、`masscode-runner/`（码境程序）、`启动码境.command`。
   用任一台 Mac 修改片段，其他设备稍后自动同步（iCloud 后台上传/下载）。
 - **为什么能同步**：massCode 没有内置云同步，但它的片段就是普通 `.md` 文件；放进 iCloud Drive 后，
   由 iCloud 负责跨设备同步文件。本工具和 massCode 的 vault 路径都指向 iCloud 里的同一份 `markdown-vault`，
@@ -169,8 +183,8 @@ massCode 一个片段里可以有多个 fragment。**把 fragment 标签写成�
 3. 让 massCode 指向 iCloud 里的 vault：
    - 方法一（推荐）：打开新 Mac 的 `~/Library/Application Support/massCode/v2/preferences.json`，
      把 `storage.rootPath` 改成 iCloud 里的 `massCode` 路径，再启动 massCode；
-   - 方法二：给工具设环境变量 `MASSCODE_VAULT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/massCode/markdown-vault"`。
-4. 双击 `iCloud Drive/massCode/启动伴生工具.command` → 打开 http://127.0.0.1:4877 → 点「🔍 环境」检查缺什么。
+   - 方法二：给码境设置环境变量 `CODESCOPE_VAULT="$HOME/Library/Mobile Documents/com~apple~CloudDocs/massCode/markdown-vault"`。
+4. 双击 `iCloud Drive/massCode/启动码境.command` → 打开 http://127.0.0.1:4877 → 点「🔍 环境」检查缺什么。
 
 > **注意**：iCloud 为省空间可能把个别文件标记为「仅云端」（文件名带 ☁ 图标）。工具运行前会按需下载，
 > 一般无感；若某片段缺失，等它下载完即可。避免在**多台电脑同时编辑同一个片段**，以免 iCloud 版本冲突。
@@ -182,7 +196,7 @@ massCode 一个片段里可以有多个 fragment。**把 fragment 标签写成�
 
 ## 跨系统（Windows / Linux）
 
-工具是**纯 Node + 浏览器**，逻辑上跨系统通用；已针对各平台做了适配与验证：
+工具采用 **Node.js + 浏览器**，逻辑上跨系统通用；已针对各平台做了适配与验证：
 
 | 项 | 适配情况 |
 |----|---------|
@@ -214,6 +228,6 @@ massCode 一个片段里可以有多个 fragment。**把 fragment 标签写成�
 
 ## 局限
 
-- massCode 本身没有插件系统，所以这是「伴生工具」而非 app 内按钮；如需真正嵌进 app，需 fork 源码自行打包。
+- 当前以本地 Web 应用运行；浏览器页面关闭不会自动结束后端服务，需要在启动终端按 `Ctrl+C` 停止。
 - 不拦截系统调用：`rm -rf` 之类会真实执行（这就是"运行"的意义，使用时请留意）。
 - 本机没有的运行时（如 rustc/php/dotnet/perl）会提示不支持；装好后刷新环境面板即可。

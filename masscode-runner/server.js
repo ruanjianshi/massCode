@@ -1,20 +1,24 @@
 #!/usr/bin/env node
 /**
- * masscode-runner —— massCode 伴生工具
- * 读取 massCode 的 Markdown Vault，为代码片段提供 运行 / 语法检查 / 格式化。
- * 纯 Node 实现，无第三方依赖（格式化按需调用 npx prettier）。
+ * 码境 CodeScope —— 工程代码工作台
+ * 兼容读取 massCode Markdown Vault，为代码与文档提供阅读、编辑、运行和远程开发能力。
+ * Node 本地服务；代码运行/格式化调用系统工具，VNC 使用 noVNC + ws。
  */
 'use strict';
 
 const http = require('http');
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawn, execFile, execFileSync } = require('child_process');
+const { WebSocketServer } = require('ws');
+const APP_VERSION = require('./package.json').version;
 
-const PORT = Number(process.env.MASSCODE_RUNNER_PORT || 4877);
-// 默认仅本机访问；显式设置 MASSCODE_RUNNER_HOST=0.0.0.0 时允许局域网访问。
-const HOST = process.env.MASSCODE_RUNNER_HOST || '127.0.0.1';
+const PORT_VALUE = Number(process.env.CODESCOPE_PORT || process.env.MASSCODE_RUNNER_PORT || 4877);
+const PORT = Number.isInteger(PORT_VALUE) && PORT_VALUE > 0 && PORT_VALUE <= 65535 ? PORT_VALUE : 4877;
+// 默认仅本机访问；显式设置 CODESCOPE_HOST=0.0.0.0 时允许局域网访问。
+const HOST = process.env.CODESCOPE_HOST || process.env.MASSCODE_RUNNER_HOST || '127.0.0.1';
 
 /* ---------------------------------- 路径发现 ---------------------------------- */
 
@@ -57,9 +61,9 @@ function defaultVaultPath() {
 }
 
 function vaultPath() {
-  const v = process.env.MASSCODE_VAULT;
+  const v = process.env.CODESCOPE_VAULT || process.env.MASSCODE_VAULT;
   if (v) {
-    if (!fs.existsSync(v)) throw new Error('MASSCODE_VAULT 指向的目录不存在: ' + v);
+    if (!fs.existsSync(v)) throw new Error('CODESCOPE_VAULT 指向的目录不存在: ' + v);
     return v;
   }
   return defaultVaultPath();
@@ -211,6 +215,7 @@ const TOOLS = [
   { key: 'latex',      probe: () => [latexCmd(), '--version'],  label: 'LaTeX 引擎',            for: 'LaTeX 实时 PDF 编译', group: '文档工具' },
   { key: 'biber',      probe: ['biber', '--version'],           label: 'Biber',                for: 'LaTeX 参考文献', group: '文档工具' },
   { key: 'ctex',       probe: ['kpsewhich', 'ctexart.cls'],     label: 'CTeX 中文宏包',          for: 'LaTeX 中文文档', group: '文档工具' },
+  { key: 'ssh',        probe: ['ssh', '-V'],                    label: 'OpenSSH 客户端',          for: 'SSH 远程开发', group: '远程开发' },
 ];
 
 const TOOLS_BY_LANGUAGE = {
@@ -326,12 +331,12 @@ function linuxInstallHint(key) {
   if (key === 'ctex') key = 'latex';
   const pm = platformInfo().packageManager || 'apt-get';
   const packages = {
-    'apt-get': { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'build-essential', gpp:'build-essential', java:'default-jdk', ruby:'ruby', go:'golang-go', clangformat:'clang-format', gofmt:'golang-go', npx:'npm', latex:'texlive-xetex texlive-latex-extra texlive-fonts-recommended texlive-lang-chinese', biber:'biber' },
-    dnf: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-21-openjdk-devel', ruby:'ruby', go:'golang', clangformat:'clang-tools-extra', gofmt:'golang', npx:'npm', latex:'texlive-xetex texlive-collection-latexextra texlive-ctex', biber:'biber' },
-    yum: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-17-openjdk-devel', ruby:'ruby', go:'golang', clangformat:'clang', gofmt:'golang', npx:'npm', latex:'texlive-xetex texlive-collection-latexextra texlive-ctex', biber:'biber' },
-    pacman: { node:'nodejs npm', python3:'python python-pip', bash:'bash', gcc:'base-devel', gpp:'base-devel', java:'jdk-openjdk', ruby:'ruby', go:'go', clangformat:'clang', gofmt:'go', npx:'npm', latex:'texlive-bin texlive-latexextra texlive-fontsrecommended texlive-langchinese', biber:'biber' },
-    zypper: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-17-openjdk-devel', ruby:'ruby', go:'go', clangformat:'clang-tools', gofmt:'go', npx:'npm', latex:'texlive-xetex texlive-latexextra texlive-ctex', biber:'biber' },
-    apk: { node:'nodejs npm', python3:'python3 py3-pip', bash:'bash', gcc:'build-base', gpp:'build-base', java:'openjdk17', ruby:'ruby', go:'go', clangformat:'clang-extra-tools', gofmt:'go', npx:'npm', latex:'texlive-xetex texmf-dist-latexextra texmf-dist-langchinese', biber:'biber' },
+    'apt-get': { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'build-essential', gpp:'build-essential', java:'default-jdk', ruby:'ruby', go:'golang-go', clangformat:'clang-format', gofmt:'golang-go', npx:'npm', latex:'texlive-xetex texlive-latex-extra texlive-fonts-recommended texlive-lang-chinese', biber:'biber', ssh:'openssh-client' },
+    dnf: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-21-openjdk-devel', ruby:'ruby', go:'golang', clangformat:'clang-tools-extra', gofmt:'golang', npx:'npm', latex:'texlive-xetex texlive-collection-latexextra texlive-ctex', biber:'biber', ssh:'openssh-clients' },
+    yum: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-17-openjdk-devel', ruby:'ruby', go:'golang', clangformat:'clang', gofmt:'golang', npx:'npm', latex:'texlive-xetex texlive-collection-latexextra texlive-ctex', biber:'biber', ssh:'openssh-clients' },
+    pacman: { node:'nodejs npm', python3:'python python-pip', bash:'bash', gcc:'base-devel', gpp:'base-devel', java:'jdk-openjdk', ruby:'ruby', go:'go', clangformat:'clang', gofmt:'go', npx:'npm', latex:'texlive-bin texlive-latexextra texlive-fontsrecommended texlive-langchinese', biber:'biber', ssh:'openssh' },
+    zypper: { node:'nodejs npm', python3:'python3 python3-pip', bash:'bash', gcc:'gcc make', gpp:'gcc-c++ make', java:'java-17-openjdk-devel', ruby:'ruby', go:'go', clangformat:'clang-tools', gofmt:'go', npx:'npm', latex:'texlive-xetex texlive-latexextra texlive-ctex', biber:'biber', ssh:'openssh-clients' },
+    apk: { node:'nodejs npm', python3:'python3 py3-pip', bash:'bash', gcc:'build-base', gpp:'build-base', java:'openjdk17', ruby:'ruby', go:'go', clangformat:'clang-extra-tools', gofmt:'go', npx:'npm', latex:'texlive-xetex texmf-dist-latexextra texmf-dist-langchinese', biber:'biber', ssh:'openssh-client-default' },
   };
   if (key === 'swift') return '从 swift.org 安装对应 Linux 工具链';
   if (key === 'black') return 'python3 -m pip install --user black';
@@ -361,6 +366,7 @@ function installHint(key) {
     black: mac ? 'pip3 install --user black' : win ? (pythonCmd() === 'py' ? 'py -m pip install black' : 'python -m pip install black') : linuxInstallHint(key),
     npx: mac ? 'brew install node（自带 npx）' : win ? '安装 Node.js（自带 npx）' : linuxInstallHint(key),
     latex: mac ? 'brew install --cask mactex-no-gui' : win ? 'winget install MiKTeX.MiKTeX' : linuxInstallHint(key),
+    ssh: mac ? 'macOS 系统自带；缺失时安装 Xcode Command Line Tools' : win ? '设置 → 可选功能 → OpenSSH 客户端' : linuxInstallHint(key),
   };
   if (key === 'biber' || key === 'ctex') return H.latex;
   return H[key] || '请安装对应工具';
@@ -1333,31 +1339,113 @@ function reorderFragments(file, order) {
 
 /* ------------------------------- 底部终端（PTY）------------------------------- */
 
-let TERM = null;   // 当前终端会话 { child, res }
-function termSpawn() {
+let TERM = null;   // 当前终端会话 { child, clients:Set<Response>, buffer:Buffer, mode, label }
+function stopTerm() {
+  const session = TERM;
+  TERM = null;
+  if (!session) return;
+  for (const client of (session.clients || [])) { try { client.end(); } catch (_) {} }
+  if (session.clients) session.clients.clear();
+  if (session.child) { try { session.child.kill(); } catch (_) {} }
+}
+function writeTermChunk(session, data) {
+  if (TERM !== session) return;
+  const chunk = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  session.buffer = Buffer.concat([session.buffer, chunk]);
+  if (session.buffer.length > 256 * 1024) session.buffer = session.buffer.subarray(session.buffer.length - 256 * 1024);
+  for (const client of session.clients) {
+    try { client.write(chunk); } catch (_) { session.clients.delete(client); }
+  }
+}
+function termSpawn(spec = {}) {
   try {
     const shell = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || '/bin/bash');
     const py = process.platform === 'win32' ? '' : executablePath(pythonCmd());
     // Unix 优先用 ptybridge 获得真实交互终端（sudo 可输入密码）；缺 Python 时回退普通交互 shell。
     // Windows 使用 PowerShell 管道模式，至少保证环境部署命令和常规命令可执行。
     const bridge = path.join(__dirname, 'ptybridge.py');
-    const command = py ? py : shell;
-    const args = py ? ['-u', bridge] : (process.platform === 'win32' ? ['-NoLogo', '-NoProfile'] : ['-i']);
-    const child = spawn(command, args, { cwd: __dirname, env: { ...process.env, SHELL: shell } });
-    TERM = { child, res: null };
-    child.stdout.on('data', (d) => { if (TERM && TERM.res) { try { TERM.res.write(d); } catch (_) {} } });
-    child.stderr.on('data', (d) => { if (TERM && TERM.res) { try { TERM.res.write(d); } catch (_) {} } });
-    child.on('error', () => { TERM = null; });
+    const targetCommand = spec.command || shell;
+    const targetArgs = Array.isArray(spec.args) ? spec.args : (process.platform === 'win32' ? ['-NoLogo', '-NoProfile'] : ['-i']);
+    const command = py ? py : targetCommand;
+    const args = py ? ['-u', bridge, '--', targetCommand, ...targetArgs] : targetArgs;
+    const child = spawn(command, args, { cwd: __dirname, env: { ...process.env, SHELL: shell }, stdio: ['pipe', 'pipe', 'pipe', 'pipe'] });
+    const session = {
+      child, clients: new Set(), buffer: Buffer.alloc(0),
+      mode: spec.mode || 'local', label: spec.label || '本地 shell',
+      host: spec.host || '', port: spec.port || 0,
+    };
+    TERM = session;
+    child.stdout.on('data', (d) => writeTermChunk(session, d));
+    child.stderr.on('data', (d) => writeTermChunk(session, d));
+    child.on('error', () => { if (TERM === session) TERM = null; });
     child.on('exit', () => {
-      const r = TERM && TERM.res;
+      if (TERM !== session) return;
       TERM = null;
-      if (r) { try { r.end(); } catch (_) {} }
+      for (const client of session.clients) { try { client.end(); } catch (_) {} }
+      session.clients.clear();
     });
     return true;
   } catch (e) {
     TERM = null;
     return false;
   }
+}
+
+function remoteHost(value) {
+  const host = String(value || '').trim();
+  if (!host || host.length > 253 || host.startsWith('-') || !/^[A-Za-z0-9._:\[\]-]+$/.test(host)) return '';
+  return host;
+}
+function remotePort(value, fallback) {
+  const port = Number(value || fallback);
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : 0;
+}
+function measureNetworkLatency(host, timeoutMs = 3500) {
+  return new Promise((resolve) => {
+    const target = host.replace(/^\[|\]$/g, '');
+    const ipv6 = target.includes(':');
+    let command = executablePath('ping');
+    let args;
+    if (process.platform === 'win32') {
+      args = [...(ipv6 ? ['-6'] : []), '-n', '1', '-w', '2000', target];
+    } else {
+      if (ipv6) command = executablePath('ping6') || command;
+      args = process.platform === 'darwin'
+        ? ['-n', '-c', '1', '-W', '2000', target]
+        : ['-n', '-c', '1', '-W', '2', target];
+    }
+    if (!command) { resolve({ ok: false, error: '系统未安装 ping' }); return; }
+    execFile(command, args, { encoding: 'utf8', timeout: timeoutMs }, (error, stdout, stderr) => {
+      const output = String(stdout || '') + '\n' + String(stderr || '');
+      const match = /time\s*[=<]\s*([0-9.]+)\s*ms/i.exec(output);
+      if (!error && match) {
+        resolve({ ok: true, latencyMs: Math.max(1, Math.round(Number(match[1]))) });
+        return;
+      }
+      resolve({ ok: false, error: error && error.killed ? '检测超时' : '远端未响应 ping' });
+    });
+  });
+}
+function sshSessionSpec(body) {
+  const ssh = executablePath('ssh');
+  if (!ssh) return { error: '未检测到 OpenSSH 客户端，请先在“环境检测”中安装。' };
+  const host = remoteHost(body && body.host);
+  const port = remotePort(body && body.port, 22);
+  const user = String((body && body.user) || '').trim();
+  if (!host) return { error: 'SSH 主机地址不合法' };
+  if (!port) return { error: 'SSH 端口必须在 1–65535 之间' };
+  if (user && !/^[A-Za-z0-9._-]+$/.test(user)) return { error: 'SSH 用户名仅支持字母、数字、点、下划线和连字符' };
+  const args = ['-tt', '-p', String(port), '-o', 'ConnectTimeout=10', '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=3'];
+  const keyInput = String((body && body.identityFile) || '').trim();
+  if (keyInput) {
+    const keyFile = path.resolve(keyInput.startsWith('~/') ? path.join(os.homedir(), keyInput.slice(2)) : keyInput);
+    try { if (!fs.statSync(keyFile).isFile()) throw new Error('not file'); }
+    catch (_) { return { error: 'SSH 私钥文件不存在或不可读取' }; }
+    args.push('-i', keyFile);
+  }
+  const target = (user ? user + '@' : '') + host;
+  args.push(target);
+  return { command: ssh, args, mode: 'ssh', label: 'SSH · ' + target + ':' + port, host, port, user };
 }
 
 /* --------------------------------- Git 面板 ---------------------------------- */
@@ -1434,7 +1522,11 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 
 function send(res, code, obj) {
   const body = typeof obj === 'string' ? obj : JSON.stringify(obj);
-  res.writeHead(code, { 'Content-Type': typeof obj === 'string' ? 'text/plain; charset=utf-8' : 'application/json; charset=utf-8' });
+  res.writeHead(code, {
+    'Content-Type': typeof obj === 'string' ? 'text/plain; charset=utf-8' : 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+  });
   res.end(body);
 }
 
@@ -1479,6 +1571,18 @@ const server = http.createServer(async (req, res) => {
       } catch (_) { send(res, 404, { ok: false, error: 'not found' }); }
       return;
     }
+    if (req.method === 'GET' && u.pathname.startsWith('/novnc/')) {
+      const novncRoot = path.join(__dirname, 'node_modules', '@novnc', 'novnc');
+      const rel = u.pathname.slice('/novnc/'.length);
+      const p = path.resolve(novncRoot, rel);
+      if (!p.startsWith(novncRoot + path.sep) && p !== novncRoot) return send(res, 403, { ok: false, error: 'forbidden' });
+      try {
+        const data = fs.readFileSync(p);
+        res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+        res.end(data);
+      } catch (_) { send(res, 404, { ok: false, error: 'noVNC asset not found；请先运行 npm install' }); }
+      return;
+    }
     if (req.method === 'GET' && u.pathname === '/api/system/status') {
       return send(res, 200, await systemStatus());
     }
@@ -1487,8 +1591,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.method === 'GET' && u.pathname === '/api/rev') {
-      send(res, 200, { rev: computeRev() });
+      send(res, 200, { rev: computeRev(), version: APP_VERSION });
       return;
+    }
+    if (req.method === 'GET' && u.pathname === '/api/version') {
+      return send(res, 200, { ok: true, name: '码境 CodeScope', version: APP_VERSION });
     }
     if (req.method === 'GET' && u.pathname === '/api/env') {
       const force = u.searchParams.get('refresh') === '1';
@@ -1627,6 +1734,7 @@ const server = http.createServer(async (req, res) => {
       const snip = snips.find((s) => s.file === b.file);
       if (!snip) return send(res, 404, { ok: false, error: '片段不存在' });
       const frag = snip.fragments[b.fragment];
+      if (!frag) return send(res, 400, { ok: false, error: '片段索引无效' });
       const runner = runnerFor(frag.language);
       if (!runner.supported) return send(res, 200, { ok: false, unsupported: true, reason: runner.reason });
       const code = b.code != null ? b.code : frag.code;
@@ -1643,6 +1751,7 @@ const server = http.createServer(async (req, res) => {
       const snip = snips.find((s) => s.file === b.file);
       if (!snip) return send(res, 404, { ok: false, error: '片段不存在' });
       const frag = snip.fragments[b.fragment];
+      if (!frag) return send(res, 400, { ok: false, error: '片段索引无效' });
       const fspec = FORMATTERS[(frag.language || '').toLowerCase()];
       if (!fspec) {
         const supported = Object.keys(FORMATTERS).join(' / ');
@@ -2347,19 +2456,45 @@ const server = http.createServer(async (req, res) => {
         ? { ok: true, message: '已回退到 ' + hash, output: (r.stdout + r.stderr).trim(), status: gitStatus() }
         : { ok: false, error: r.error, output: (r.stdout + r.stderr).trim() });
     }
+    // ===== 远程开发：SSH 复用底部 PTY 终端；VNC 由 upgrade WebSocket 代理 =====
+    if (req.method === 'GET' && u.pathname === '/api/remote/status') {
+      return send(res, 200, {
+        ok: true,
+        ssh: { available: !!executablePath('ssh'), path: executablePath('ssh') },
+        vnc: { available: fs.existsSync(path.join(__dirname, 'node_modules', '@novnc', 'novnc', 'core', 'rfb.js')) },
+        terminal: TERM ? { active: true, mode: TERM.mode, label: TERM.label, host: TERM.host || '', port: TERM.port || 0 } : { active: false, mode: '', label: '', host: '', port: 0 },
+      });
+    }
+    if (req.method === 'GET' && u.pathname === '/api/remote/latency') {
+      const host = remoteHost(u.searchParams.get('host'));
+      const port = remotePort(u.searchParams.get('port'), 0);
+      if (!host || !port) return send(res, 400, { ok: false, error: '主机或端口不合法' });
+      const result = await measureNetworkLatency(host);
+      return send(res, result.ok ? 200 : 504, result);
+    }
+    if (req.method === 'POST' && u.pathname === '/api/remote/ssh/connect') {
+      const b = await readBody(req);
+      const spec = sshSessionSpec(b);
+      if (spec.error) return send(res, 400, { ok: false, error: spec.error });
+      stopTerm();
+      if (!termSpawn(spec)) return send(res, 500, { ok: false, error: 'SSH 终端启动失败' });
+      return send(res, 200, { ok: true, mode: 'ssh', label: spec.label, host: spec.host, port: spec.port, user: spec.user });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/remote/ssh/disconnect') {
+      stopTerm();
+      return send(res, 200, { ok: true });
+    }
     // ===== 底部终端（PTY shell，script 命令分配伪终端）=====
     if (req.method === 'GET' && u.pathname === '/api/term/stream') {
-      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
-      if (TERM && TERM.res) { try { TERM.res.end(); } catch (_) {} }   // 同一时刻只保留一个消费方
       if (!TERM || !TERM.child) termSpawn();
       if (!TERM) { res.end('终端启动失败'); return; }
-      TERM.res = res;
+      const session = TERM;
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'X-CodeScope-Terminal-Replay': '1' });
+      session.clients.add(res);
+      if (session.buffer.length) { try { res.write(session.buffer); } catch (_) {} }
       req.on('close', () => {
-        if (TERM && TERM.res === res) {   // 页面关闭/刷新 → 结束会话，避免孤儿进程
-          TERM.res = null;
-          try { TERM.child.kill(); } catch (_) {}
-          TERM = null;
-        }
+        // 页面刷新/多标签切换只移除自己的订阅，不再杀掉共享 SSH 会话。
+        session.clients.delete(res);
       });
       return;   // 保持连接，输出由 termSpawn 的 stdout/stderr 回调实时推送
     }
@@ -2370,9 +2505,18 @@ const server = http.createServer(async (req, res) => {
       try { TERM.child.stdin.write(data); return send(res, 200, { ok: true }); }
       catch (e) { return send(res, 500, { ok: false, error: String(e.message || e) }); }
     }
+    if (req.method === 'POST' && u.pathname === '/api/term/resize') {
+      const b = await readBody(req);
+      const cols = Math.max(20, Math.min(1000, Math.floor(Number(b.cols) || 0)));
+      const rows = Math.max(5, Math.min(500, Math.floor(Number(b.rows) || 0)));
+      if (!TERM || !TERM.child) return send(res, 409, { ok: false, error: '终端尚未连接' });
+      const control = TERM.child.stdio && TERM.child.stdio[3];
+      if (!control || !control.writable) return send(res, 200, { ok: true, forwarded: false });
+      try { control.write(JSON.stringify({ cols, rows }) + '\n'); return send(res, 200, { ok: true, forwarded: true }); }
+      catch (e) { return send(res, 500, { ok: false, error: String(e.message || e) }); }
+    }
     if (req.method === 'POST' && u.pathname === '/api/term/stop') {
-      if (TERM && TERM.child) { try { TERM.child.kill(); } catch (_) {} }
-      TERM = null;
+      stopTerm();
       return send(res, 200, { ok: true });
     }
     send(res, 404, { ok: false, error: 'Not Found: ' + u.pathname });
@@ -2381,8 +2525,43 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+const VNC_WSS = new WebSocketServer({ noServer: true, perMessageDeflate: false, maxPayload: 64 * 1024 * 1024 });
+server.on('upgrade', (req, socket, head) => {
+  let u;
+  try { u = new URL(req.url, 'http://' + (req.headers.host || HOST + ':' + PORT)); }
+  catch (_) { socket.destroy(); return; }
+  if (u.pathname !== '/api/vnc/ws') { socket.destroy(); return; }
+  const origin = String(req.headers.origin || '');
+  if (origin) {
+    try {
+      if (new URL(origin).host !== String(req.headers.host || '')) {
+        socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'); socket.destroy(); return;
+      }
+    } catch (_) { socket.destroy(); return; }
+  }
+  const host = remoteHost(u.searchParams.get('host'));
+  const port = remotePort(u.searchParams.get('port'), 5900);
+  if (!host || !port) {
+    socket.write('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n'); socket.destroy(); return;
+  }
+  VNC_WSS.handleUpgrade(req, socket, head, (ws) => VNC_WSS.emit('connection', ws, req, { host, port }));
+});
+VNC_WSS.on('connection', (ws, _req, target) => {
+  const tcp = net.createConnection({ host: target.host.replace(/^\[|\]$/g, ''), port: target.port });
+  tcp.setNoDelay(true);
+  tcp.setTimeout(10000, () => tcp.destroy());
+  tcp.once('connect', () => tcp.setTimeout(0));
+  ws.on('message', (data) => { if (!tcp.destroyed && tcp.writable) tcp.write(data); });
+  tcp.on('data', (data) => { if (ws.readyState === 1) ws.send(data, { binary: true }); });
+  const closeWs = () => { if (ws.readyState === 0 || ws.readyState === 1) ws.close(); };
+  tcp.on('error', closeWs);
+  tcp.on('close', closeWs);
+  ws.on('error', () => { try { tcp.destroy(); } catch (_) {} });
+  ws.on('close', () => { try { tcp.destroy(); } catch (_) {} });
+});
+
 server.listen(PORT, HOST, () => {
-  console.log('masscode-runner 已启动: http://' + HOST + ':' + PORT);
+  console.log('码境 CodeScope 已启动: http://' + HOST + ':' + PORT);
   if (HOST !== '127.0.0.1' && HOST !== 'localhost' && HOST !== '::1') {
     const addresses = [];
     for (const rows of Object.values(os.networkInterfaces())) for (const row of (rows || [])) {
