@@ -104,12 +104,21 @@ int main(void) { return 0; }
   await waitForServer(baseUrl, output);
 
   const version = await requestJson(baseUrl, '/api/version');
-  assert(version.ok && version.name === '码境 CodeScope' && version.version === '1.0.0' && version.apiRevision >= 2 && version.features.includes('project-health'), '版本接口返回异常');
+  assert(version.ok && version.name === '码境 CodeScope' && version.version === '1.1.0' && version.apiRevision >= 2 && version.features.includes('project-health') && version.features.includes('live-web-search') && version.features.includes('editor-groups'), '版本接口返回异常');
 
   const page = await fetch(baseUrl + '/');
   const html = await page.text();
   assert(page.ok && html.includes('码境 CodeScope · 工程代码工作台'), '主页品牌标题不正确');
   assert(html.includes('href="https://github.com/ruanjianshi/massCode"'), 'GitHub 远程仓库入口缺失');
+  assert(html.includes('id="theme-switcher"') && html.includes('data-app-theme="light"') && html.includes('codescope-theme'), '界面主题切换功能缺失');
+  assert(html.includes('id="editor-find"') && html.includes('replaceEditorFindAll') && html.includes("e.key==='F3'"), '编辑器快捷键查找替换功能缺失');
+  assert(html.includes('id="sym-ai-submit"') && html.includes('submitAiSearch') && html.includes('data-search-mode="symbol"'), 'AI 搜索或原项目符号检索入口缺失');
+  assert(html.includes('id="ai-search-provider"') && html.includes('id="ai-search-key"') && html.includes('/api/ai/web-search'), '实时联网搜索配置缺失');
+  assert(html.includes('id="editor-drop-overlay"') && html.includes('split-editor-group') && html.includes('initEditorGroups') && html.includes('application/x-codescope-editor'), '2 至 4 栏拖拽编辑功能缺失');
+  assert(html.includes('html[data-theme] .split-editor-input') && html.includes("classList.toggle('plain',!exact)"), '多栏编辑器高亮层遮挡修复或纯文本降级缺失');
+  assert(html.includes('withActiveSplitContext') && html.includes('activateSplitReading') && html.includes('activateOpenSplitLocation'), '右侧阅读面板未跟随多栏编辑器焦点');
+  assert(html.includes('if(multi)applySplitRatios()') && /applyMdView\(\);\s*if\(multi\)applySplitRatios/.test(html), '多栏退出后 Markdown/LaTeX 预览恢复逻辑缺失');
+  assert(html.includes('rel-link-halo') && html.includes('node-icon') && html.includes('rel-map-summary') && html.includes('no-upstream') && html.includes('wireSide'), '关系图自适应拓扑、视觉层级或主干连线优化缺失');
   assert(html.includes('id="remote-resizer-y"') && html.includes('id="remote-folder-upload"') && html.includes('id="remote-folder-download"'), '远程窗口高度拖拽或文件夹传输入口缺失');
 
   const icon = await fetch(baseUrl + '/assets/codescope.svg');
@@ -172,7 +181,10 @@ int main(void) { return 0; }
   const invalidLatency = await requestJson(baseUrl, '/api/remote/latency?host=bad%20host&port=5900', 400);
   assert(invalidLatency.ok === false, '延迟接口未拒绝非法主机');
 
-  console.log('CodeScope smoke tests: 28 passed');
+  const invalidWebSearch = await postJson(baseUrl, '/api/ai/web-search', { provider:'tavily', key:'', query:'test' }, 400);
+  assert(invalidWebSearch.ok === false && /Key/.test(invalidWebSearch.error), '联网搜索接口未拒绝缺失的 API Key');
+
+  console.log('CodeScope smoke tests: 39 passed');
 }
 
 main().catch((error) => {

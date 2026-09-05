@@ -2052,6 +2052,52 @@ function readBody(req) {
   });
 }
 
+function searchPlainText(value, maxLength) {
+  return String(value || '').replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim().slice(0, maxLength || 1200);
+}
+function normalizeWebResults(items) {
+  const out = [], seen = new Set();
+  for (const item of items || []) {
+    const rawUrl = String(item.url || '').trim();
+    let parsed;
+    try { parsed = new URL(rawUrl); } catch (_) { continue; }
+    if (!['http:', 'https:'].includes(parsed.protocol) || seen.has(parsed.href)) continue;
+    seen.add(parsed.href);
+    out.push({
+      title:searchPlainText(item.title || parsed.hostname, 240),url:parsed.href,
+      snippet:searchPlainText(item.snippet || item.content || item.description, 1800),
+      publishedAt:searchPlainText(item.publishedAt || item.published_date || item.age || '', 80),
+    });
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+async function liveWebSearch(provider, key, query) {
+  const searchedAt = new Date().toISOString();
+  if (provider === 'tavily') {
+    const response = await fetch('https://api.tavily.com/search', {
+      method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({query,topic:'general',search_depth:'advanced',max_results:6,include_answer:false,include_raw_content:false}),
+      signal:AbortSignal.timeout(25000),
+    });
+    const text=await response.text();
+    if(!response.ok) throw new Error('Tavily API '+response.status+': '+text.slice(0,300));
+    let data;try{data=JSON.parse(text);}catch(_){throw new Error('Tavily 返回了无法解析的内容');}
+    return {ok:true,provider,searchedAt,results:normalizeWebResults(data.results)};
+  }
+  if (provider === 'brave') {
+    const url=new URL('https://api.search.brave.com/res/v1/web/search');
+    url.searchParams.set('q',query);url.searchParams.set('count','6');url.searchParams.set('safesearch','moderate');url.searchParams.set('text_decorations','false');url.searchParams.set('extra_snippets','true');
+    const response=await fetch(url,{headers:{'Accept':'application/json','Accept-Encoding':'gzip','X-Subscription-Token':key},signal:AbortSignal.timeout(25000)});
+    const text=await response.text();
+    if(!response.ok) throw new Error('Brave Search API '+response.status+': '+text.slice(0,300));
+    let data;try{data=JSON.parse(text);}catch(_){throw new Error('Brave Search 返回了无法解析的内容');}
+    const rows=((data.web&&data.web.results)||[]).map((item)=>({title:item.title,url:item.url,description:[item.description].concat(item.extra_snippets||[]).filter(Boolean).join(' '),age:item.age||item.page_age||''}));
+    return {ok:true,provider,searchedAt,results:normalizeWebResults(rows)};
+  }
+  throw new Error('不支持的联网搜索服务');
+}
+
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://' + HOST + ':' + PORT);
   try {
@@ -2110,7 +2156,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && u.pathname === '/api/version') {
       return send(res, 200, { ok: true, name: '码境 CodeScope', version: APP_VERSION, apiRevision: 2,
-        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links'] });
+        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links', 'live-web-search', 'editor-groups'] });
     }
     if (req.method === 'GET' && u.pathname === '/api/env') {
       const force = u.searchParams.get('refresh') === '1';
@@ -2950,6 +2996,23 @@ const server = http.createServer(async (req, res) => {
         fs.unlinkSync(path.join(libsDir(), name));
         return send(res, 200, { ok: true, name });
       } catch (_) { return send(res, 200, { ok: false, error: '删除失败（文件不存在或已被占用）' }); }
+    }
+    // ---- 实时联网搜索（仅访问固定的 Tavily / Brave 官方 API；密钥不落盘） ----
+    if (req.method === 'POST' && u.pathname === '/api/ai/web-search') {
+      const b=await readBody(req);
+      const provider=String((b&&b.provider)||'').trim().toLowerCase();
+      const key=String((b&&b.key)||'').trim();
+      const query=String((b&&b.query)||'').trim();
+      if(!['tavily','brave'].includes(provider)) return send(res,400,{ok:false,error:'请选择 Tavily 或 Brave Search'});
+      if(!key||key.length>500) return send(res,400,{ok:false,error:'联网搜索 API Key 缺失或不合法'});
+      if(!query||query.length>800) return send(res,400,{ok:false,error:'搜索问题不能为空且不能超过 800 字'});
+      try {
+        const result=await liveWebSearch(provider,key,query);
+        if(!result.results.length) return send(res,200,{ok:false,error:'搜索服务没有返回可用网页',provider,searchedAt:result.searchedAt,results:[]});
+        return send(res,200,result);
+      } catch (error) {
+        return send(res,200,{ok:false,error:'联网搜索失败: '+String((error&&error.message)||error).slice(0,400),provider,searchedAt:new Date().toISOString(),results:[]});
+      }
     }
     // ---- AI 助手（OpenAI 兼容代理：URL/Key/模型由前端配置，服务器只做转发） ----
     if (req.method === 'POST' && u.pathname === '/api/ai/chat') {

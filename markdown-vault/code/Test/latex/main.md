@@ -3,6 +3,9 @@ contents:
   - id: 45
     label: main.tex
     language: latex
+  - id: 46
+    label: singleresume
+    language: latex
 createdAt: 1788511095111
 description: "LaTeX 工程：latex"
 folderId: 25
@@ -10,9 +13,9 @@ id: 38
 isDeleted: 0
 isFavorites: 0
 name: main
+updatedAt: 1788511095111
 tags:
   - 28
-updatedAt: 1788511095111
 ---
 
 ## Fragment: main.tex
@@ -363,7 +366,7 @@ updatedAt: 1788511095111
         \item 2.\hspace{0.3em}硬件系统：设计四层叠板架构（JetsonNano核心板+自制拓展板（供电/DC-DC/SPI转RS485/CAN）+DCU（Ether
                                         CAT转4路CANFD，5Mbps）+ BMS电源板（过/欠压保护、泄放、急停与遥控））。
         \item 3.\hspace{0.3em}底层控制：编写智元R86/R52电机ROS1驱动（MIT力位混合模式），实现EtherCAT→CANFD协议栈与IMU数据采
-                                        集（USB2USART），定义话题/服务接口。
+                                        集（USB2USART）�������������定义话题/服务接口。
         \item 4.\hspace{0.3em}强化学习与部署：基于UniLab+PPO进行步态训练并设计奖励函数，策略输出.pt→ONNX，MuJoCo做sim2sim验证
                                         完成sim2real实机迁移（输入42维→输出8维，乘action\_scale），调试PD参数、电机ID与零点校准。
     \end{itemize}
@@ -470,6 +473,258 @@ updatedAt: 1788511095111
         \item 热爱技术，无限进步
         \item \footnotesize Passion for tech. Progress without limits.
     \end{itemize}
+\end{minipage}
+
+\end{document}
+```
+
+## Fragment: singleresume
+```latex
+\documentclass[10pt]{article}
+
+\usepackage[a4paper,margin=0pt]{geometry}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\usepackage{fontawesome5}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+\setmainfont[
+    Path=fonts/,
+    Extension=.otf,
+    BoldFont=*-Bold
+]{NotoSerifSC}
+\setCJKmainfont[
+    Path=fonts/,
+    Extension=.otf,
+    BoldFont=*-Bold
+]{NotoSerifSC}
+
+\definecolor{sidebar}{HTML}{173E35}
+\definecolor{primary}{HTML}{173E35}
+\definecolor{accent}{HTML}{C8A45D}
+\definecolor{ink}{HTML}{18212A}
+\definecolor{muted}{HTML}{64717D}
+\definecolor{soft}{HTML}{EDF3F0}
+
+\hypersetup{
+    colorlinks=true,
+    urlcolor=accent,
+    linkcolor=primary
+}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\fboxsep}{0pt}
+\linespread{1.04}
+\emergencystretch=2em
+\setlist[itemize]{
+    leftmargin=1.15em,
+    itemsep=0.12em,
+    topsep=0.16em,
+    parsep=0pt,
+    label=\textcolor{accent}{\textbullet}
+}
+
+\newcommand{\sidesection}[2]{%
+    \vspace{0.75em}
+    {\normalsize\bfseries\color{white}#1\hspace{0.55em}#2}\par
+    \vspace{0.2em}
+    {\color{accent}\rule{\linewidth}{0.75pt}}\par
+    \vspace{0.35em}
+}
+\newcommand{\mainsection}[2]{%
+    \vspace{0.55em}
+    {\Large\bfseries\color{primary}#1\hspace{0.55em}#2}\par
+    \vspace{0.18em}
+    {\color{accent}\rule{\linewidth}{0.8pt}}\par
+    \vspace{0.35em}
+}
+\newcommand{\skill}[2]{%
+    {\makebox[0.78em][l]{\color{accent}\scriptsize\faAngleRight}%
+     \bfseries\color{white}#1}\par
+    \vspace{0.08em}
+    {\small\color{white!78}#2}\par
+    \vspace{0.42em}
+}
+\newcommand{\contactline}[2]{%
+    \makebox[1.55em][c]{#1}\hspace{0.45em}#2\par
+    \vspace{0.3em}
+}
+\newcommand{\awardgroup}[2]{%
+    \begingroup
+    \setlength{\fboxsep}{3pt}%
+    \colorbox{soft}{\makebox[\dimexpr\linewidth-6pt][l]{%
+        \color{primary}\small\bfseries #1\hspace{0.45em}#2}}%
+    \endgroup\par
+    \vspace{0.28em}
+}
+\newcommand{\awarditem}[1]{%
+    \makebox[0.9em][l]{\color{accent}\scriptsize\textbullet}%
+    {\small #1}\par
+    \vspace{0.05em}
+}
+\newcommand{\entryhead}[3]{%
+    {\large\bfseries\color{ink}#1}\hfill{\small\color{muted}#3}\par
+    {\small\bfseries\color{primary}#2}\par
+    \vspace{0.1em}
+}
+
+\begin{document}
+
+% 深绿色侧栏背景
+\begin{tikzpicture}[remember picture,overlay]
+    \fill[sidebar] (current page.north west)
+      rectangle ([xshift=0.305\paperwidth]current page.south west);
+    \fill[accent] ([xshift=0.305\paperwidth]current page.north west)
+      rectangle ([xshift=0.309\paperwidth]current page.south west);
+\end{tikzpicture}
+\vspace*{-\baselineskip}
+
+\noindent
+\begin{minipage}[t]{0.305\paperwidth}
+    \vspace{0.75cm}
+    \hspace*{0.038\paperwidth}%
+    \begin{minipage}[t]{0.229\paperwidth}
+        \color{white}
+        \begin{center}
+            \begin{tikzpicture}
+                \clip (0,0) circle (1.47cm);
+                \node at (0,-0.02) {\includegraphics[width=3.02cm]{figures/amater.jpg}};
+            \end{tikzpicture}
+
+            \vspace{0.2em}
+            {\small\color{white!75}嵌入式系统 · Linux · 机器人}
+        \end{center}
+
+        \sidesection{\faAddressBook}{联系方式}
+        {\small
+        \contactline{\faPhone}{15347348975}
+        \contactline{\faEnvelope}{\href{mailto:2408128687@qq.com}{2408128687@qq.com}}
+        \contactline{\faWeixin}{15096010804}
+        \contactline{\faMapMarker*}{湖南衡阳}}
+
+        \sidesection{\faGraduationCap}{教育背景}
+        {\bfseries 武汉科技大学}\hfill
+        {\scriptsize\color{white!72}2024.09 -- 2027.06}\par
+        {\small\color{white!82}机械专业硕士（专硕）\par
+        综合排名 5/176 · 均分 83.5\par}
+        \vspace{0.55em}
+        {\bfseries 湖南工学院}\hfill
+        {\scriptsize\color{white!72}2020.09 -- 2024.06}\par
+        {\small\color{white!82}机械设计制造及其自动化\par
+        班级 1/43 · 专业 3/164\par}
+
+        \sidesection{\faTools}{专业技能}
+        \skill{编程与构建}{C / C++、Python、Shell；CMake / Makefile、Git}
+        \skill{嵌入式 Linux}{系统调用、文件I/O、进程/线程、Socket；交叉编译、GDB与设备接口调试}
+        \skill{MCU 与 RTOS}{STM32、FreeRTOS / RT-Thread；中断、DMA、Bootloader与状态机}
+        \skill{通信与现场总线}{CAN / CAN FD / CANopen、EtherCAT、RS485、SPI、I\textsuperscript{2}C、UART}
+        \skill{控制与机器人}{FOC、PID、MIT、LQR、MPC、VMC；ROS1 / ROS2、PPO与sim2real}
+        \skill{仿真与硬件工具}{Isaac Gym、MuJoCo、UniLab；SolidWorks、嘉立创EDA / AD}
+
+        \sidesection{\faCertificate}{证书与身份}
+        {\small
+        中共党员\par
+        \vspace{0.25em}
+        大学英语六级（CET-6）\par
+        \vspace{0.25em}
+        大学英语四级（CET-4）\par
+        \vspace{0.25em}
+        计算机二级 · 驾驶证 C1\par}
+
+        \vspace{-0.18em}
+        \sidesection{\faQuoteLeft}{个人格言}
+        \vspace{-0.22em}
+        {\centering
+            {\small\bfseries\color{accent}热爱技术，无限进步}\par
+            \vspace{0.10em}
+            {\scriptsize\itshape\color{white!60}
+            Passion for tech.\enspace Progress without limits.}
+            \par}
+    \end{minipage}
+\end{minipage}%
+\begin{minipage}[t]{0.695\paperwidth}
+    \vspace{0.9cm}
+    \hspace*{0.038\paperwidth}%
+    \begin{minipage}[t]{0.615\paperwidth}
+        {\fontsize{27}{31}\selectfont\bfseries\color{ink}肖琦}\par
+        \vspace{0.16em}
+        {\large\color{primary}嵌入式 / Linux 开发工程师}\par
+        \vspace{0.28em}
+        {\small\color{muted}武汉科技大学 · 机械工程学院 \quad 2027届硕士}\par
+        \vspace{0.45em}
+        {\color{accent}\rule{2.5cm}{2pt}}\par
+        \vspace{0.35em}
+        {\small\color{ink}
+        聚焦嵌入式底层、Linux驱动及机器人控制，具备从硬件接口、实时固件、
+        通信协议到ROS系统集成与实机部署的完整开发经验，能够独立完成方案验证、联调与问题定位。}
+
+        \mainsection{\faBriefcase}{实习经历}
+        \entryhead{武汉格蓝若智能技术股份有限公司}
+          {嵌入式实习生 · 人形/四足机器人底层控制}
+          {2025.11 -- 2026.06}
+        {\small\textbf{技术栈：}RK3588、C++、CMake、ROS2、PCIe-to-CAN、CANopen、STM32F4、SPI ADC、EtherCAT}
+        \begin{itemize}
+            \item \textbf{Linux关节驱动：}在RK3588上以C++ / CMake实现六路CAN多线程并发控制，使用CAN分析仪完成满载抓包与回环测试，并封装ROS2话题/服务接口。
+            \item 构建CANopen对象字典，支持位置、速度、力矩、MIT和回零模式，并开放在线参数配置与故障诊断。
+            \item \textbf{六维力传感器：}基于STM32F4、SPI ADC和外部中断完成6路高精度同步采样、PGA配置、数字滤波及力矩阵解算，并通过AX58100 EtherCAT PDO实时上报。
+            \item \textbf{机器人电源板管理：}设计双电池冗余、过欠压和制动能量泄放方案，通过3路RS485、2路CAN及USART监测电量、温度、电流与电压。
+            \item 实现硬件急停、RF遥控、软件指令的三级优先级仲裁，以及“初始化--安全--就绪--上电--异常恢复”状态机。
+        \end{itemize}
+        {\footnotesize\color{muted}\faGithub\quad
+        源码：\nolinkurl{https://github.com/ruanjianshi/motor-drive_power-board_six-force}}
+
+        \mainsection{\faProjectDiagram}{项目经历}
+        \entryhead{四连杆两轮腿机器人（轮 + 足）}
+          {独立开发 · 结构 / 硬件 / 控制 / 部署}
+          {2026.01 -- 2026.09}
+        \begin{itemize}
+            \item \textbf{技术栈：}Jetson Nano、ROS1、EtherCAT、CAN FD、UniLab（PPO）、MuJoCo、智元R86 / R52。
+            \item 完成SolidWorks整机结构、URDF、STL碰撞简化和四层板卡设计，并集成7寸屏幕、雷达与RGB-D相机。
+            \item 开发Jetson Nano拓展板、EtherCAT转4路CAN FD的DCU及安全BMS，完成供电、通信、急停与保护链路联调。
+            \item 编写智元R86 / R52电机MIT模式驱动和IMU接口；完成PPO步态训练、sim2sim验证、sim2real迁移与PD参数调优。
+        \end{itemize}
+        {\footnotesize\color{muted}\faGithub\quad
+        强化学习：\nolinkurl{https://github.com/ruanjianshi/wheel_legged_RL_unilab}\par
+        \hspace*{1.45em}Jetson上层：\nolinkurl{https://github.com/ruanjianshi/Jetson_nano_X1}\par
+        \hspace*{1.45em}STM32底层：\nolinkurl{https://github.com/ruanjianshi/Wheel-leg-ros2-and-stm32-trolley}}\par
+
+        \vspace{0.6em}
+        \entryhead{STM32 / OpenMV 智能物流小车}
+          {主控代码撰写 · 运动控制 / 视觉识别}
+          {2025.08 -- 2025.09}
+        {\small\textbf{技术栈：}STM32F407、FreeRTOS、麦克纳姆轮、OpenMV4 H7 Plus、UART、超声波}
+        \begin{itemize}
+            \item 基于STM32F407 + FreeRTOS实现麦克纳姆轮底盘、执行机构和超声波避障，组织“规划--识别--抓取--搬运--释放”自动流程。
+            \item 在OpenMV4上实现红、蓝、绿、灰、黄等颜色及三角形、矩形等形状识别，通过UART与底盘双向通信，完成物料定位及自动分拣。
+            \item 完成编码电机、步进电机、舵机与视觉模块的协同调试，并预留蓝牙参数调试接口。
+        \end{itemize}
+        {\footnotesize\color{muted}\faGithub\quad
+        源码：\nolinkurl{https://github.com/ruanjianshi/Table-trolley}}\par
+
+        \mainsection{\faTrophy}{荣誉与经历}
+        \begin{minipage}[t]{0.49\linewidth}
+            \awardgroup{\faGraduationCap}{研究生阶段}
+            \awarditem{\textbf{学业奖学金一等奖} \textcolor{muted}{· 2024、2025}}
+            \awarditem{睿抗机器人开发者大赛 \textbf{国家二等奖}}
+            \awarditem{三维数字化创新设计大赛 \textbf{省一等奖}}
+            \awarditem{睿抗ROS机器人挑战赛 \textcolor{muted}{省二等奖}}
+            \awarditem{高校机器人创意大赛 \textcolor{muted}{省二、三等奖}}
+        \end{minipage}%
+        \hfill
+        \begin{minipage}[t]{0.47\linewidth}
+            \awardgroup{\faAward}{本科及组织经历}
+            \awarditem{湖南省物联网设计大赛 \textbf{省一等奖}}
+            \awarditem{湖南省机械创新设计大赛 \textcolor{muted}{省二等奖}}
+            \awarditem{工程实践与创新能力大赛 \textcolor{muted}{省三等奖}}
+            \awarditem{\textbf{国家级大创项目负责人}}
+            \awarditem{智能制造协会 \textcolor{muted}{会长}}
+            \awarditem{机械创新实验室 \textcolor{muted}{负责人}}
+        \end{minipage}
+    \end{minipage}
 \end{minipage}
 
 \end{document}
