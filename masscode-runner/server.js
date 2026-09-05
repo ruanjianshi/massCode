@@ -1903,15 +1903,30 @@ function timelineTarget(file, fragment) {
   return { full, relative, fragment: index, dir };
 }
 
-function timelineEntries(target) {
+const TIMELINE_SESSION_GAP_MS = 2 * 60 * 1000;
+
+function rawTimelineEntries(target) {
   let names = [];
   try { names = fs.readdirSync(target.dir).filter((name) => /^\d+-[a-z0-9]+\.json$/i.test(name)).sort().reverse(); } catch (_) { return []; }
-  return names.slice(0, 60).flatMap((name) => {
+  return names.slice(0, 120).flatMap((name) => {
     try {
       const value = JSON.parse(fs.readFileSync(path.join(target.dir, name), 'utf8'));
       return [{ id: name.slice(0, -5), timestamp: Number(value.timestamp || 0), size: Number(value.size || Buffer.byteLength(String(value.code || ''))), reason: String(value.reason || '自动保存'), preview: String(value.preview || '').slice(0, 120) }];
     } catch (_) { return []; }
   });
+}
+
+function timelineEntries(target) {
+  const entries = rawTimelineEntries(target);
+  // 连续自动保存属于同一次编辑会话：只展示会话开始前的那个可恢复版本。
+  // 从旧到新合并，保留组内最旧快照，避免“只改一行却出现很多条时间线”。
+  const compact = []; let previousEntry = null;
+  for (const entry of entries.slice().reverse()) {
+    const sameSession = previousEntry && previousEntry.reason === '自动保存' && entry.reason === '自动保存' && entry.timestamp - previousEntry.timestamp < TIMELINE_SESSION_GAP_MS;
+    if (!sameSession) compact.push(entry);
+    previousEntry = entry;
+  }
+  return compact.reverse().slice(0, 60);
 }
 
 function recordTimeline(file, fragment, code, reason, force) {
@@ -1920,7 +1935,7 @@ function recordTimeline(file, fragment, code, reason, force) {
     const value = String(code == null ? '' : code);
     if (Buffer.byteLength(value, 'utf8') > 1024 * 1024) return;
     fs.mkdirSync(target.dir, { recursive: true });
-    const entries = timelineEntries(target);
+    const entries = rawTimelineEntries(target);
     if (entries.length) {
       try {
         const latest = JSON.parse(fs.readFileSync(path.join(target.dir, entries[0].id + '.json'), 'utf8'));
@@ -1928,8 +1943,10 @@ function recordTimeline(file, fragment, code, reason, force) {
       } catch (_) {}
     }
     const now = Date.now();
-    // 自动保存以 15 秒为一个检查点，保留该时间段最后一次成功写入的内容。
-    const bucket = force ? now : Math.floor(now / 15000) * 15000;
+    // 两分钟内的连续自动保存视为同一次编辑会话；第一条已经保存了会话开始前的内容。
+    // 后续保存不再产生中间快照，恢复时可以直接回到真正开始修改之前。
+    if (!force && entries.length && entries[0].reason === '自动保存' && now - entries[0].timestamp < TIMELINE_SESSION_GAP_MS) return;
+    const bucket = now;
     const id = bucket + '-' + shortHash(target.relative + '#' + target.fragment);
     const firstLine = value.split(/\r?\n/).find((line) => line.trim()) || '空内容';
     fs.writeFileSync(path.join(target.dir, id + '.json'), JSON.stringify({
@@ -2218,7 +2235,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && u.pathname === '/api/version') {
       return send(res, 200, { ok: true, name: '码境 CodeScope', version: APP_VERSION, apiRevision: 2,
-        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links', 'live-web-search', 'search-history', 'editor-groups', 'drawio', 'drawio-xml', 'ai-drawio'] });
+        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links', 'live-web-search', 'search-history', 'editor-groups', 'drawio', 'drawio-xml', 'ai-drawio', 'full-text-search', 'quick-open', 'navigation-history', 'definition-peek', 'header-source-switch'] });
     }
     if (req.method === 'GET' && u.pathname === '/api/env') {
       const force = u.searchParams.get('refresh') === '1';

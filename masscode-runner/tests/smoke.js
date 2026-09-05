@@ -12,9 +12,11 @@ const projectRoot = path.resolve(__dirname, '..');
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codescope-test-'));
 const vault = path.join(tempRoot, 'vault');
 let child;
+let passed = 0;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+  passed++;
 }
 
 async function freePort() {
@@ -122,7 +124,7 @@ int main(void) { return 0; }
   await waitForServer(baseUrl, output);
 
   const version = await requestJson(baseUrl, '/api/version');
-  assert(version.ok && version.name === '码境 CodeScope' && version.version === '1.1.0' && version.apiRevision >= 2 && version.features.includes('project-health') && version.features.includes('live-web-search') && version.features.includes('search-history') && version.features.includes('editor-groups') && version.features.includes('drawio') && version.features.includes('drawio-xml') && version.features.includes('ai-drawio'), '版本接口返回异常');
+  assert(version.ok && version.name === '码境 CodeScope' && version.version === '1.2.0' && version.apiRevision >= 2 && version.features.includes('project-health') && version.features.includes('live-web-search') && version.features.includes('search-history') && version.features.includes('editor-groups') && version.features.includes('drawio') && version.features.includes('drawio-xml') && version.features.includes('ai-drawio') && version.features.includes('full-text-search') && version.features.includes('quick-open') && version.features.includes('navigation-history') && version.features.includes('definition-peek') && version.features.includes('header-source-switch'), '版本接口返回异常');
 
   const page = await fetch(baseUrl + '/');
   const html = await page.text();
@@ -133,6 +135,7 @@ int main(void) { return 0; }
   assert(html.includes('href="https://github.com/ruanjianshi/massCode"'), 'GitHub 远程仓库入口缺失');
   assert(html.includes('id="theme-switcher"') && html.includes('data-app-theme="light"') && html.includes('codescope-theme'), '界面主题切换功能缺失');
   assert(html.includes('id="editor-find"') && html.includes('replaceEditorFindAll') && html.includes("e.key==='F3'"), '编辑器快捷键查找替换功能缺失');
+  assert(html.includes("e.code === 'Space'") && html.includes('普通输入不主动弹补全'), '代码补全未限制为手动触发');
   assert(html.includes('id="sym-ai-submit"') && html.includes('submitAiSearch') && html.includes('data-search-mode="symbol"'), 'AI 搜索或原项目符号检索入口缺失');
   assert(html.includes('id="ai-search-provider"') && html.includes('id="ai-search-key"') && html.includes('/api/ai/web-search'), '实时联网搜索配置缺失');
   assert(html.includes('data-search-mode="history"') && html.includes('AI_SEARCH_HISTORY_KEY') && html.includes('renderAiSearchHistory') && html.includes('清空记录'), 'AI 搜索记录功能缺失');
@@ -143,11 +146,19 @@ int main(void) { return 0; }
   assert(html.includes('networkError:true') && html.includes('后端返回了无法解析的响应') && serverSource.includes("require('saxes')"), '全局 API 错误处理或服务端 XML 解析器缺失');
   assert((launchers.match(/node_modules[\\/]saxes/g) || []).length === 4, '启动脚本未完整检测新增运行依赖');
   assert(html.includes('id="editor-drop-overlay"') && html.includes('split-editor-group') && html.includes('initEditorGroups') && html.includes('application/x-codescope-editor'), '2 至 4 栏拖拽编辑功能缺失');
+  assert(html.includes('data-search-mode="text"') && html.includes('renderTextResults') && html.includes('id="text-regex"'), '全文搜索或正则检索功能缺失');
+  assert(html.includes('data-search-mode="file"') && html.includes('renderFileResults') && html.includes("key==='p'"), '快速打开文件功能缺失');
+  assert(html.includes('id="btn-nav-back"') && html.includes('navigateHistory') && html.includes('NAV_BACK_STACK'), '代码位置导航历史功能缺失');
+  assert(html.includes('id="definition-peek"') && html.includes('openDefinitionPeek') && html.includes('if(e.altKey)openDefinitionPeek'), '定义预览功能缺失');
+  assert(html.includes('definitionModifier') && html.includes('goToFocusedDefinition') && html.includes('updateDefinitionHover') && html.includes('未找到 “'), 'VS Code 式跳转定义交互缺失');
+  assert(html.includes('DEFINITION_HOVER_TIMER') && html.includes('editorTokenAtPoint') && html.includes('definition-hover-signature') && html.includes('},550)'), '函数与类型的延迟悬停定义卡片缺失');
+  assert(html.includes('DEFINITION_HOVER_INTERACTING') && html.includes('scheduleDefinitionHoverHide') && html.includes('overscroll-behavior:contain') && html.includes('from+120'), '悬停定义卡片缺少鼠标移入、滚动或长定义查看能力');
+  assert(html.includes('id="btn-pair-switch"') && html.includes('pairedCodeFile') && html.includes("key==='o'"), '头文件与源文件快速切换功能缺失');
   assert(html.includes('#pane-git, #pane-tags, #pane-draw { flex:0 1 auto; min-height:37px; }') && html.includes('#pane-tree { min-height:96px; }') && html.includes('#pane-draw { min-height:108px; }'), '左侧多面板在低高度窗口中缺少自适应收缩');
   assert(html.includes('html[data-theme] .split-editor-input') && html.includes("classList.toggle('plain',!exact)"), '多栏编辑器高亮层遮挡修复或纯文本降级缺失');
   assert(html.includes('withActiveSplitContext') && html.includes('activateSplitReading') && html.includes('activateOpenSplitLocation'), '右侧阅读面板未跟随多栏编辑器焦点');
   assert(html.includes('if(multi)applySplitRatios()') && /applyMdView\(\);\s*if\(multi\)applySplitRatios/.test(html), '多栏退出后 Markdown/LaTeX 预览恢复逻辑缺失');
-  assert(html.includes('rel-link-halo') && html.includes('node-icon') && html.includes('rel-map-summary') && html.includes('no-upstream') && html.includes('wireSide') && html.includes('markerUnits="userSpaceOnUse"') && html.includes(" C'+"), '关系图自适应拓扑、视觉层级或轻量曲线箭头优化缺失');
+  assert(html.includes('rel-link-halo') && html.includes('node-icon') && html.includes('rel-map-summary') && html.includes('no-upstream') && html.includes('wireSide') && html.includes('markerUnits="userSpaceOnUse"') && html.includes('M.65,.55 L4.6,2.5 L.65,4.45 Z') && html.includes('fill="var(--ok)"') && html.includes(" C'+"), '关系图自适应拓扑、视觉层级或小型实心箭头优化缺失');
   assert(html.includes('id="remote-resizer-y"') && html.includes('id="remote-folder-upload"') && html.includes('id="remote-folder-download"'), '远程窗口高度拖拽或文件夹传输入口缺失');
 
   const icon = await fetch(baseUrl + '/assets/codescope.svg');
@@ -189,12 +200,19 @@ int main(void) { return 0; }
   assert(timelineItem.ok && timelineItem.diff.includes('return 0') && timelineItem.diff.includes('return 1'), '时间线差异内容不正确');
   const unchanged = await postJson(baseUrl, '/api/save', { file: snippetFile, fragment: 0, code: changedCode });
   assert(unchanged.ok && unchanged.unchanged, '相同内容保存不应重复写入时间线');
+  const changedAgain = 'int main(void) { /* one edit session */ return 2; }';
+  const savedAgain = await postJson(baseUrl, '/api/save', { file: snippetFile, fragment: 0, code: changedAgain });
+  assert(savedAgain.ok, '连续自动保存失败');
+  const compactTimeline = await requestJson(baseUrl, '/api/timeline?file=' + encodeURIComponent(snippetFile) + '&fragment=0');
+  assert(compactTimeline.entries.length === 1 && compactTimeline.entries[0].id === timeline.entries[0].id, '一次连续编辑被错误拆成多个时间线版本');
+  const compactItem = await requestJson(baseUrl, '/api/timeline/item?file=' + encodeURIComponent(snippetFile) + '&fragment=0&id=' + encodeURIComponent(compactTimeline.entries[0].id));
+  assert(compactItem.diff.includes('return 0') && compactItem.diff.includes('return 2'), '合并后的时间线没有保留编辑会话起点');
 
   const git = await requestJson(baseUrl, '/api/git');
   const changedPath = path.relative(tempRoot, snippetFile).split(path.sep).join('/');
   assert(git.ok && git.changes.some((item) => item.path === changedPath), 'Git 状态未识别保存后的文件变化');
   const diff = await requestJson(baseUrl, '/api/git/diff?path=' + encodeURIComponent(changedPath));
-  assert(diff.ok && diff.additions === 1 && diff.deletions === 1 && diff.diff.includes('return 1'), 'Git Diff 内容不正确');
+  assert(diff.ok && diff.additions === 1 && diff.deletions === 1 && diff.diff.includes('return 2'), 'Git Diff 内容不正确');
 
   const restored = await postJson(baseUrl, '/api/timeline/restore', { file: snippetFile, fragment: 0, id: timeline.entries[0].id });
   assert(restored.ok && restored.code.includes('return 0'), '时间线恢复失败');
@@ -244,7 +262,7 @@ int main(void) { return 0; }
   const chunkedJson = await postChunkedJson(baseUrl, '/api/ai/web-search', [unicodeBody.subarray(0, unicodeAt + 1), unicodeBody.subarray(unicodeAt + 1)]);
   assert(chunkedJson.status === 400 && /Key/.test(chunkedJson.data.error), '服务端无法正确解析跨网络分片的 UTF-8 JSON');
 
-  console.log('CodeScope smoke tests: 60 passed');
+  console.log(`CodeScope smoke tests: ${passed} passed`);
 }
 
 main().catch((error) => {
