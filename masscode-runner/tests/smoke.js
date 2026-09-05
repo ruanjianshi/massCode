@@ -2,6 +2,7 @@
 'use strict';
 
 const fs = require('fs');
+const http = require('http');
 const net = require('net');
 const os = require('os');
 const path = require('path');
@@ -43,6 +44,23 @@ async function requestJson(baseUrl, pathname, expectedStatus = 200) {
   const response = await fetch(baseUrl + pathname);
   assert(response.status === expectedStatus, `${pathname} 状态码应为 ${expectedStatus}，实际为 ${response.status}`);
   return response.json();
+}
+
+function postChunkedJson(baseUrl, pathname, chunks) {
+  const target = new URL(pathname, baseUrl);
+  return new Promise((resolve, reject) => {
+    const req = http.request(target, { method:'POST', headers:{'Content-Type':'application/json'} }, (res) => {
+      const parts = [];
+      res.on('data', (chunk) => parts.push(chunk));
+      res.on('end', () => {
+        try { resolve({ status:res.statusCode, data:JSON.parse(Buffer.concat(parts).toString('utf8')) }); }
+        catch (error) { reject(error); }
+      });
+    });
+    req.on('error', reject);
+    for (const chunk of chunks) req.write(chunk);
+    req.end();
+  });
 }
 
 async function postJson(baseUrl, pathname, body, expectedStatus = 200) {
@@ -104,17 +122,28 @@ int main(void) { return 0; }
   await waitForServer(baseUrl, output);
 
   const version = await requestJson(baseUrl, '/api/version');
-  assert(version.ok && version.name === '码境 CodeScope' && version.version === '1.1.0' && version.apiRevision >= 2 && version.features.includes('project-health') && version.features.includes('live-web-search') && version.features.includes('editor-groups'), '版本接口返回异常');
+  assert(version.ok && version.name === '码境 CodeScope' && version.version === '1.1.0' && version.apiRevision >= 2 && version.features.includes('project-health') && version.features.includes('live-web-search') && version.features.includes('search-history') && version.features.includes('editor-groups') && version.features.includes('drawio') && version.features.includes('drawio-xml') && version.features.includes('ai-drawio'), '版本接口返回异常');
 
   const page = await fetch(baseUrl + '/');
   const html = await page.text();
+  const serverSource = fs.readFileSync(path.join(projectRoot, 'server.js'), 'utf8');
+  const launchers = ['start.command', '../启动码境.command', '../启动码境.sh', '../启动码境.bat']
+    .map((file) => fs.readFileSync(path.resolve(projectRoot, file), 'utf8')).join('\n');
   assert(page.ok && html.includes('码境 CodeScope · 工程代码工作台'), '主页品牌标题不正确');
   assert(html.includes('href="https://github.com/ruanjianshi/massCode"'), 'GitHub 远程仓库入口缺失');
   assert(html.includes('id="theme-switcher"') && html.includes('data-app-theme="light"') && html.includes('codescope-theme'), '界面主题切换功能缺失');
   assert(html.includes('id="editor-find"') && html.includes('replaceEditorFindAll') && html.includes("e.key==='F3'"), '编辑器快捷键查找替换功能缺失');
   assert(html.includes('id="sym-ai-submit"') && html.includes('submitAiSearch') && html.includes('data-search-mode="symbol"'), 'AI 搜索或原项目符号检索入口缺失');
   assert(html.includes('id="ai-search-provider"') && html.includes('id="ai-search-key"') && html.includes('/api/ai/web-search'), '实时联网搜索配置缺失');
+  assert(html.includes('data-search-mode="history"') && html.includes('AI_SEARCH_HISTORY_KEY') && html.includes('renderAiSearchHistory') && html.includes('清空记录'), 'AI 搜索记录功能缺失');
+  assert(html.includes('id="draw-nd-type"') && html.includes('id="drawio-root"') && html.includes('DRAWIO_ORIGIN') && html.includes('onDrawioMessage'), 'Draw.io 新建入口或嵌入编辑器缺失');
+  assert(html.includes("typeBadge.className = 'draw-type draw-type--' + kind") && html.includes("? 'Draw.io' : 'Excalidraw'"), '绘图列表缺少明确且隔离样式的类型标识');
+  assert(html.includes('id="draw-ai-btn"') && html.includes('id="draw-xml-source"') && html.includes('generateDrawioWithAi') && html.includes('validateDrawioXmlLocal'), 'Draw.io AI 绘图或 XML 编辑器缺失');
+  assert(html.includes('timeoutMs:300000') && html.includes('复杂图可能需要 1–5 分钟') && serverSource.includes('Math.min(600000') && serverSource.includes("e.name === 'TimeoutError'"), 'Draw.io AI 绘图长耗时请求或超时提示缺失');
+  assert(html.includes('networkError:true') && html.includes('后端返回了无法解析的响应') && serverSource.includes("require('saxes')"), '全局 API 错误处理或服务端 XML 解析器缺失');
+  assert((launchers.match(/node_modules[\\/]saxes/g) || []).length === 4, '启动脚本未完整检测新增运行依赖');
   assert(html.includes('id="editor-drop-overlay"') && html.includes('split-editor-group') && html.includes('initEditorGroups') && html.includes('application/x-codescope-editor'), '2 至 4 栏拖拽编辑功能缺失');
+  assert(html.includes('#pane-git, #pane-tags, #pane-draw { flex:0 1 auto; min-height:37px; }') && html.includes('#pane-tree { min-height:96px; }') && html.includes('#pane-draw { min-height:108px; }'), '左侧多面板在低高度窗口中缺少自适应收缩');
   assert(html.includes('html[data-theme] .split-editor-input') && html.includes("classList.toggle('plain',!exact)"), '多栏编辑器高亮层遮挡修复或纯文本降级缺失');
   assert(html.includes('withActiveSplitContext') && html.includes('activateSplitReading') && html.includes('activateOpenSplitLocation'), '右侧阅读面板未跟随多栏编辑器焦点');
   assert(html.includes('if(multi)applySplitRatios()') && /applyMdView\(\);\s*if\(multi\)applySplitRatios/.test(html), '多栏退出后 Markdown/LaTeX 预览恢复逻辑缺失');
@@ -126,6 +155,30 @@ int main(void) { return 0; }
 
   const snippets = await requestJson(baseUrl, '/api/snippets');
   assert(snippets.vault === vault && snippets.snippets.length === 1, '片段接口返回异常');
+
+  const newDrawio = await postJson(baseUrl, '/api/drawings/new', { name: 'Smoke Drawio', dir: '', kind: 'drawio' });
+  assert(newDrawio.ok && newDrawio.kind === 'drawio' && newDrawio.name.endsWith('.drawio') && newDrawio.xml.includes('<mxfile'), 'Draw.io 文件创建失败');
+  const openedDrawio = await requestJson(baseUrl, '/api/drawings/get?name=' + encodeURIComponent(newDrawio.name));
+  assert(openedDrawio.ok && openedDrawio.kind === 'drawio' && openedDrawio.xml.includes('<mxGraphModel'), 'Draw.io 文件读取失败');
+  const changedDrawioXml = '<mxfile host="CodeScope"><diagram id="smoke" name="Page-1"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" value="smoke" vertex="1" parent="1"/></root></mxGraphModel></diagram></mxfile>';
+  const validatedDrawio = await postJson(baseUrl, '/api/drawings/validate', { xml: changedDrawioXml });
+  assert(validatedDrawio.ok && validatedDrawio.format === 'uncompressed' && validatedDrawio.cells === 3, 'Draw.io XML 结构校验失败');
+  const invalidReferenceDrawio = await postJson(baseUrl, '/api/drawings/validate', { xml:'<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="2" edge="1" parent="1" source="missing"/></root></mxGraphModel>' });
+  assert(!invalidReferenceDrawio.ok && /不存在/.test(invalidReferenceDrawio.error), 'Draw.io XML 校验未识别失效引用');
+  const savedDrawio = await postJson(baseUrl, '/api/drawings/save', { name: newDrawio.name, data: { xml: changedDrawioXml } });
+  assert(savedDrawio.ok && savedDrawio.bytes === changedDrawioXml.length, 'Draw.io XML 保存失败');
+  const reopenedDrawio = await requestJson(baseUrl, '/api/drawings/get?name=' + encodeURIComponent(newDrawio.name));
+  assert(reopenedDrawio.ok && reopenedDrawio.xml === changedDrawioXml, 'Draw.io XML 保存后读取不一致');
+  const drawingTree = await requestJson(baseUrl, '/api/drawings/tree');
+  assert(drawingTree.ok && drawingTree.total === 1 && drawingTree.root.children.some((item) => item.path === newDrawio.name), '绘图树未包含 Draw.io 文件');
+  const badDrawio = await postJson(baseUrl, '/api/drawings/save', { name: newDrawio.name, data: { xml: '<invalid/>' } });
+  assert(!badDrawio.ok, 'Draw.io 保存接口未拒绝无效 XML');
+  const malformedDrawio = await postJson(baseUrl, '/api/drawings/validate', { xml:'<mxfile><diagram><mxGraphModel></diagram></mxfile>' });
+  assert(!malformedDrawio.ok && /语法错误/.test(malformedDrawio.error), 'Draw.io XML 校验未拒绝标签结构损坏的文档');
+  const nestedRootDrawio = await postJson(baseUrl, '/api/drawings/validate', { xml:'<wrapper><mxfile><diagram/></mxfile></wrapper>' });
+  assert(!nestedRootDrawio.ok && /根节点/.test(nestedRootDrawio.error), 'Draw.io XML 校验未拒绝错误根节点');
+  const deletedDrawio = await postJson(baseUrl, '/api/drawings/delete', { name: newDrawio.name });
+  assert(deletedDrawio.ok, 'Draw.io 文件删除失败');
 
   const changedCode = 'int main(void) { return 1; }';
   const saved = await postJson(baseUrl, '/api/save', { file: snippetFile, fragment: 0, code: changedCode });
@@ -183,8 +236,15 @@ int main(void) { return 0; }
 
   const invalidWebSearch = await postJson(baseUrl, '/api/ai/web-search', { provider:'tavily', key:'', query:'test' }, 400);
   assert(invalidWebSearch.ok === false && /Key/.test(invalidWebSearch.error), '联网搜索接口未拒绝缺失的 API Key');
+  const malformedJsonResponse = await fetch(baseUrl + '/api/ai/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{' });
+  const malformedJson = await malformedJsonResponse.json();
+  assert(malformedJsonResponse.status === 400 && !malformedJson.ok && /JSON/.test(malformedJson.error), '服务端未明确拒绝损坏的 JSON 请求');
+  const unicodeBody = Buffer.from(JSON.stringify({ provider:'tavily', key:'', query:'中文检索' }));
+  const unicodeAt = unicodeBody.indexOf(Buffer.from('中'));
+  const chunkedJson = await postChunkedJson(baseUrl, '/api/ai/web-search', [unicodeBody.subarray(0, unicodeAt + 1), unicodeBody.subarray(unicodeAt + 1)]);
+  assert(chunkedJson.status === 400 && /Key/.test(chunkedJson.data.error), '服务端无法正确解析跨网络分片的 UTF-8 JSON');
 
-  console.log('CodeScope smoke tests: 39 passed');
+  console.log('CodeScope smoke tests: 60 passed');
 }
 
 main().catch((error) => {

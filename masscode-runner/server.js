@@ -11,10 +11,12 @@ const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { StringDecoder } = require('string_decoder');
 const { spawn, execFile, execFileSync } = require('child_process');
 const { pipeline } = require('stream/promises');
 const { WebSocketServer } = require('ws');
 const { Client: SshClient } = require('ssh2');
+const { SaxesParser } = require('saxes');
 const APP_VERSION = require('./package.json').version;
 
 const PORT_VALUE = Number(process.env.CODESCOPE_PORT || process.env.MASSCODE_RUNNER_PORT || 4877);
@@ -218,6 +220,7 @@ const TOOLS = [
   { key: 'biber',      probe: ['biber', '--version'],           label: 'Biber',                for: 'LaTeX 参考文献', group: '文档工具' },
   { key: 'ctex',       probe: ['kpsewhich', 'ctexart.cls'],     label: 'CTeX 中文宏包',          for: 'LaTeX 中文文档', group: '文档工具' },
   { key: 'ssh',        probe: ['ssh', '-V'],                    label: 'OpenSSH 客户端',          for: 'SSH 远程开发', group: '远程开发' },
+  { key: 'drawio',     probeUrl: 'https://embed.diagrams.net/?embed=1&proto=json', label: 'Draw.io 在线编辑器', for: 'Draw.io 编辑与 AI XML 绘图', group: '绘图工具', installable: false },
 ];
 
 const TOOLS_BY_LANGUAGE = {
@@ -241,6 +244,16 @@ function projectToolKeys() {
       for (const key of (TOOLS_BY_LANGUAGE[lang] || [])) keys.add(key);
     }
   } catch (_) { /* vault 尚未就绪时至少检测 Node */ }
+  try {
+    const pending = [path.join(vaultPath(), 'drawings')];
+    while (pending.length) {
+      const dir = pending.pop();
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) pending.push(path.join(dir, entry.name));
+        else if (/\.drawio$/i.test(entry.name)) { keys.add('drawio'); pending.length = 0; break; }
+      }
+    }
+  } catch (_) { /* 绘图目录可能尚未创建 */ }
   return { keys, languages: [...languages].sort() };
 }
 
@@ -283,7 +296,10 @@ function platformInfo() {
 function shellQuote(value) { return "'" + String(value).replace(/'/g, "'\\''") + "'"; }
 
 function deploymentInfo(env, requiredKeys) {
-  const missing = [...requiredKeys].filter((key) => env[key] && !env[key].available);
+  const missing = [...requiredKeys].filter((key) => {
+    const tool = TOOLS.find((item) => item.key === key);
+    return env[key] && !env[key].available && (!tool || tool.installable !== false);
+  });
   const script = process.platform === 'win32' ? path.join(__dirname, 'deploy-env.ps1') : path.join(__dirname, 'deploy-env.sh');
   const supported = fs.existsSync(script) && (process.platform === 'darwin' || process.platform === 'linux' || process.platform === 'win32');
   let command = '';
@@ -298,9 +314,30 @@ function deploymentInfo(env, requiredKeys) {
 let envCache = null;
 async function detectEnv() {
   const project = projectToolKeys();
-  const results = await Promise.all(TOOLS.map((t) => new Promise((resolve) => {
-    const cmd = typeof t.probe === 'function' ? t.probe() : t.probe;
+  const results = await Promise.all(TOOLS.map(async (t) => {
     const started = Date.now();
+    if (t.probeUrl) {
+      try {
+        const response = await fetch(t.probeUrl, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(8000) });
+        try { if (response.body) await response.body.cancel(); } catch (_) {}
+        const available = response.ok;
+        return {
+          key:t.key, label:t.label, for:t.for, group:t.group, available, installed:available,
+          required:project.keys.has(t.key), version:available ? '在线 · HTTP ' + response.status : 'HTTP ' + response.status,
+          minVersion:'', issue:available ? '' : '在线服务返回 HTTP ' + response.status,
+          path:t.probeUrl, elapsedMs:Date.now()-started, installable:false,
+        };
+      } catch (error) {
+        return {
+          key:t.key, label:t.label, for:t.for, group:t.group, available:false, installed:false,
+          required:project.keys.has(t.key), version:'', minVersion:'',
+          issue:'无法连接 embed.diagrams.net：' + String((error && error.message) || error).slice(0, 100),
+          path:t.probeUrl, elapsedMs:Date.now()-started, installable:false,
+        };
+      }
+    }
+    return new Promise((resolve) => {
+    const cmd = typeof t.probe === 'function' ? t.probe() : t.probe;
     execFile(cmd[0], cmd.slice(1), { timeout: 15000 }, (err, stdout, stderr) => {
       const rawVersion = !err ? String(stdout || stderr || '').split(/\r?\n/)[0].trim().slice(0, 80) : '';
       const majorMatch = rawVersion.match(/\d+/);
@@ -318,7 +355,8 @@ async function detectEnv() {
         elapsedMs: Date.now() - started,
       });
     });
-  })));
+    });
+  }));
   const map = {};
   for (const r of results) map[r.key] = r;
   return { tools: map, project };
@@ -369,6 +407,7 @@ function installHint(key) {
     npx: mac ? 'brew install node（自带 npx）' : win ? '安装 Node.js（自带 npx）' : linuxInstallHint(key),
     latex: mac ? 'brew install --cask mactex-no-gui' : win ? 'winget install MiKTeX.MiKTeX' : linuxInstallHint(key),
     ssh: mac ? 'macOS 系统自带；缺失时安装 Xcode Command Line Tools' : win ? '设置 → 可选功能 → OpenSSH 客户端' : linuxInstallHint(key),
+    drawio: '无需安装；请检查网络、代理或防火墙能否访问 embed.diagrams.net',
   };
   if (key === 'biber' || key === 'ctex') return H.latex;
   return H[key] || '请安装对应工具';
@@ -2035,6 +2074,7 @@ async function projectHealth() {
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf', '.otf': 'font/otf', '.ttf': 'font/ttf', '.ttc': 'font/collection', '.woff': 'font/woff', '.woff2': 'font/woff2', '.bib': 'text/plain; charset=utf-8', '.csv': 'text/csv; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 
 function send(res, code, obj) {
+  if (res.writableEnded || res.destroyed) return false;
   const body = typeof obj === 'string' ? obj : JSON.stringify(obj);
   res.writeHead(code, {
     'Content-Type': typeof obj === 'string' ? 'text/plain; charset=utf-8' : 'application/json; charset=utf-8',
@@ -2042,13 +2082,35 @@ function send(res, code, obj) {
     'X-Content-Type-Options': 'nosniff',
   });
   res.end(body);
+  return true;
 }
 
-function readBody(req) {
-  return new Promise((resolve) => {
+function requestError(message, statusCode) {
+  const error = new Error(message);
+  error.statusCode = statusCode || 400;
+  return error;
+}
+
+function readBody(req, maxBytes = 45e6) {
+  return new Promise((resolve, reject) => {
     let data = '';
-    req.on('data', (c) => { data += c; if (data.length > 45e6) req.destroy(); });
-    req.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve({}); } });
+    let bytes = 0;
+    let tooLarge = false;
+    const decoder = new StringDecoder('utf8');
+    req.on('data', (chunk) => {
+      bytes += chunk.length;
+      if (bytes > maxBytes) { tooLarge = true; data = ''; return; }
+      if (!tooLarge) data += decoder.write(chunk);
+    });
+    req.once('end', () => {
+      if (tooLarge) return reject(requestError('请求内容超过 ' + Math.round(maxBytes / 1e6) + ' MB', 413));
+      data += decoder.end();
+      if (!data.trim()) return resolve({});
+      try { resolve(JSON.parse(data)); }
+      catch (_) { reject(requestError('请求 JSON 格式错误', 400)); }
+    });
+    req.once('aborted', () => reject(requestError('请求在传输完成前已中止', 400)));
+    req.once('error', reject);
   });
 }
 
@@ -2156,7 +2218,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && u.pathname === '/api/version') {
       return send(res, 200, { ok: true, name: '码境 CodeScope', version: APP_VERSION, apiRevision: 2,
-        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links', 'live-web-search', 'editor-groups'] });
+        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links', 'live-web-search', 'search-history', 'editor-groups', 'drawio', 'drawio-xml', 'ai-drawio'] });
     }
     if (req.method === 'GET' && u.pathname === '/api/env') {
       const force = u.searchParams.get('refresh') === '1';
@@ -2732,7 +2794,7 @@ const server = http.createServer(async (req, res) => {
       try { fs.rmSync(dir, { recursive: true, force: true }); disk = true; } catch (_) {}
       return send(res, 200, { ok: true, folder: rel, deletedSnippets: removed.length, removedFolders: delKeys.length, disk });
     }
-    /* ------------------------------ 绘图（Excalidraw, .excalidraw 文件） ------------------------------ */
+    /* ------------------------------ 绘图（Excalidraw / Draw.io） ------------------------------ */
     function drawingsDir() { return path.join(vaultPath(), 'drawings'); }
     function drawingName(n) {
       if (typeof n !== 'string') return null;
@@ -2741,8 +2803,39 @@ const server = http.createServer(async (req, res) => {
       if (base.indexOf('\\') >= 0) return null;
       if (/(^|\/)\.{1,2}(\/|$)|^\/|\/\/|^[A-Za-z]:/.test(base)) return null;   // 防穿越：拒绝 ..、前导 /、//、盘符
       if (!/^[A-Za-z0-9._\-\u00a0-\uffff /]+$/.test(base)) return null;          // 每段仅合法字符（保留中文/空格，分隔符允许 /）
-      if (!/\.excalidraw$/i.test(base)) return null;
+      if (!/\.(?:excalidraw|drawio)$/i.test(base)) return null;
       return base;
+    }
+    function drawingKind(name) { return /\.drawio$/i.test(String(name || '')) ? 'drawio' : 'excalidraw'; }
+    function inspectDrawioXml(value) {
+      const xml = String(value || '').trim();
+      if (!xml || xml.length > 40e6) return { ok:false, error:'Draw.io XML 为空或超过 40 MB' };
+      if (/<!DOCTYPE|<!ENTITY/i.test(xml)) return { ok:false, error:'Draw.io XML 不允许包含 DOCTYPE 或外部实体' };
+      if (xml[0] !== '<') return { ok:false, error:'不是 XML 文档' };
+      let rootName = '', pages = 0;
+      const ids = [], idSet = new Set(), refs = [];
+      const parser = new SaxesParser({ xmlns:false });
+      parser.on('opentag', (node) => {
+        if (!rootName) rootName = node.name;
+        if (node.name === 'diagram') pages += 1;
+        if (node.name !== 'mxCell') return;
+        const id = String(node.attributes.id || '');
+        if (!id) throw new Error('存在缺少 id 的 mxCell');
+        if (idSet.has(id)) throw new Error('存在重复的 mxCell id：' + id);
+        idSet.add(id); ids.push(id);
+        for (const name of ['parent', 'source', 'target']) {
+          const ref = node.attributes[name];
+          if (ref != null && String(ref)) refs.push({ id, name, value:String(ref) });
+        }
+      });
+      try { parser.write(xml).close(); }
+      catch (error) { return { ok:false, error:'Draw.io XML 语法错误：' + String(error.message || error).replace(/^\d+:\d+:\s*/, '').slice(0, 220) }; }
+      if (!['mxfile', 'mxGraphModel'].includes(rootName)) return { ok:false, error:'根节点必须是 mxfile 或 mxGraphModel' };
+      if (ids.length) {
+        if (!idSet.has('0') || !idSet.has('1')) return { ok:false, error:'未找到 Draw.io 必需的根单元 id=0 和默认层 id=1' };
+        for (const ref of refs) if (!idSet.has(ref.value)) return { ok:false, error:'mxCell ' + ref.id + ' 的 ' + ref.name + ' 引用了不存在的 id：' + ref.value };
+      }
+      return { ok:true, format:ids.length ? 'uncompressed' : 'compressed', cells:ids.length, pages:rootName === 'mxGraphModel' ? 1 : pages, bytes:Buffer.byteLength(xml, 'utf8') };
     }
     function drawingDir2(n) {   // 目录路径校验：允许 ''（根）或 'a/b'（防穿越）
       if (typeof n !== 'string') return '';
@@ -2759,7 +2852,7 @@ const server = http.createServer(async (req, res) => {
       try {
         if (fs.existsSync(dir)) {
           out = fs.readdirSync(dir)
-            .filter((n) => n.toLowerCase().endsWith('.excalidraw'))
+            .filter((n) => drawingName(n))
             .map((n) => {
               try {
                 const st = fs.statSync(path.join(dir, n));
@@ -2808,43 +2901,60 @@ const server = http.createServer(async (req, res) => {
       const name = drawingName(u.searchParams.get('name'));
       if (!name) return send(res, 200, { ok: false, error: '文件名不合法' });
       try {
-        const scene = JSON.parse(fs.readFileSync(path.join(drawingsDir(), name), 'utf8'));
-        return send(res, 200, { ok: true, name, ...scene });
-      } catch (_) { return send(res, 200, { ok: false, error: '读取失败（文件不存在或不是合法 Excalidraw JSON）' }); }
+        const raw = fs.readFileSync(path.join(drawingsDir(), name), 'utf8');
+        if (drawingKind(name) === 'drawio') return send(res, 200, { ok: true, name, kind: 'drawio', xml: raw });
+        const scene = JSON.parse(raw);
+        return send(res, 200, { ok: true, name, kind: 'excalidraw', ...scene });
+      } catch (_) { return send(res, 200, { ok: false, error: '读取失败（文件不存在或绘图格式无效）' }); }
     }
     if (req.method === 'POST' && u.pathname === '/api/drawings/save') {
       const b = await readBody(req);
       const name = drawingName(b.name);
       if (!name) return send(res, 200, { ok: false, error: '文件名不合法' });
       const data = b.data;
-      if (!data || typeof data !== 'object' || !Array.isArray(data.elements)) return send(res, 200, { ok: false, error: '缺少 Excalidraw 场景数据' });
       const dir = drawingsDir();
       const target = path.join(dir, name);          // name 可含 '/' 子路径，防穿越已校验
       try { fs.mkdirSync(path.dirname(target), { recursive: true }); } catch (_) {}
-      const body = JSON.stringify({ type: 'excalidraw', version: 2, source: 'file://', elements: data.elements, appState: data.appState || {}, files: data.files || {} });
+      let body;
+      if (drawingKind(name) === 'drawio') {
+        body = data && typeof data.xml === 'string' ? data.xml : '';
+        const inspection = inspectDrawioXml(body);
+        if (!inspection.ok) return send(res, 200, inspection);
+      } else {
+        if (!data || typeof data !== 'object' || !Array.isArray(data.elements)) return send(res, 200, { ok: false, error: '缺少 Excalidraw 场景数据' });
+        body = JSON.stringify({ type: 'excalidraw', version: 2, source: 'file://', elements: data.elements, appState: data.appState || {}, files: data.files || {} });
+      }
       try { fs.writeFileSync(target, body); return send(res, 200, { ok: true, name, bytes: body.length }); }
       catch (e) { return send(res, 200, { ok: false, error: '写入失败: ' + String((e && e.message) || e) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/drawings/validate') {
+      const b = await readBody(req);
+      return send(res, 200, inspectDrawioXml(b && b.xml));
     }
     if (req.method === 'POST' && u.pathname === '/api/drawings/new') {
       const b = await readBody(req);
       const sub = drawingDir2(b && b.dir);          // 目标目录（'' = 根）
       if (sub === null) return send(res, 200, { ok: false, error: '目录不合法' });
-      const baseRaw = String((b && b.name) || '').replace(/\.excalidraw$/i, '').trim();
+      const kind = b && b.kind === 'drawio' ? 'drawio' : 'excalidraw';
+      const ext = kind === 'drawio' ? '.drawio' : '.excalidraw';
+      const baseRaw = String((b && b.name) || '').replace(/\.(?:excalidraw|drawio)$/i, '').trim();
       const base = baseRaw || 'Untitled';
       if (!/^[A-Za-z0-9._\-\u00a0-\uffff ]+$/.test(base) || base === '.' || base === '..') return send(res, 200, { ok: false, error: '名称不合法' });
       const dirAbs = path.join(drawingsDir(), sub || '.');
       try { fs.mkdirSync(dirAbs, { recursive: true }); } catch (_) {}
-      let name = base + '.excalidraw', i = 2;
+      let name = base + ext, i = 2;
       while (true) {
         if (!fs.existsSync(path.join(dirAbs, name))) break;
-        name = base + '-' + i + '.excalidraw'; i += 1;
+        name = base + '-' + i + ext; i += 1;
         if (i > 100000) return send(res, 200, { ok: false, error: '无法分配文件名' });
       }
       const full = sub ? sub + '/' + name : name;
-      const scene = { type: 'excalidraw', version: 2, source: 'file://', elements: [], appState: {}, files: {} };
+      const scene = kind === 'drawio'
+        ? '<mxfile host="CodeScope"><diagram id="page-1" name="Page-1"><mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0"><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel></diagram></mxfile>'
+        : { type: 'excalidraw', version: 2, source: 'file://', elements: [], appState: {}, files: {} };
       try {
-        fs.writeFileSync(path.join(dirAbs, name), JSON.stringify(scene));
-        return send(res, 200, { ok: true, name: full, dir: sub, ...scene });
+        fs.writeFileSync(path.join(dirAbs, name), kind === 'drawio' ? scene : JSON.stringify(scene));
+        return send(res, 200, kind === 'drawio' ? { ok: true, name: full, dir: sub, kind, xml: scene } : { ok: true, name: full, dir: sub, kind, ...scene });
       } catch (e) { return send(res, 200, { ok: false, error: '创建失败: ' + String((e && e.message) || e) }); }
     }
     if (req.method === 'POST' && u.pathname === '/api/drawings/new-folder') {
@@ -2872,7 +2982,8 @@ const server = http.createServer(async (req, res) => {
       const b = await readBody(req);
       const name = drawingName(b && b.name);
       if (!name) return send(res, 200, { ok: false, error: '文件名不合法' });
-      const baseRaw = String((b && b.newName) || '').replace(/\.excalidraw$/i, '').trim();
+      const ext = drawingKind(name) === 'drawio' ? '.drawio' : '.excalidraw';
+      const baseRaw = String((b && b.newName) || '').replace(/\.(?:excalidraw|drawio)$/i, '').trim();
       if (!baseRaw) return send(res, 200, { ok: false, error: '名称不合法' });
       if (!/^[A-Za-z0-9._\-\u00a0-\uffff ]+$/.test(baseRaw) || baseRaw === '.' || baseRaw === '..' || /[\\/]/.test(baseRaw)) return send(res, 200, { ok: false, error: '名称不合法（仅当前文件夹内命名）' });
       const parts = name.split('/');
@@ -2880,9 +2991,9 @@ const server = http.createServer(async (req, res) => {
       const dirAbs = dir ? path.join(drawingsDir(), dir) : drawingsDir();
       const oldFile = parts[parts.length - 1];
       const oldAbs = path.join(dirAbs, oldFile);
-      let target = baseRaw + '.excalidraw', i = 2;
+      let target = baseRaw + ext, i = 2;
       while (fs.existsSync(path.join(dirAbs, target)) && path.basename(target).toLowerCase() !== oldFile.toLowerCase()) {
-        target = baseRaw + '-' + i + '.excalidraw'; i += 1;
+        target = baseRaw + '-' + i + ext; i += 1;
         if (i > 100000) return send(res, 200, { ok: false, error: '无法分配文件名' });
       }
       try {
@@ -2890,7 +3001,7 @@ const server = http.createServer(async (req, res) => {
         const newAbs = path.join(dirAbs, target);
         if (target.toLowerCase() === oldFile.toLowerCase()) {
           // 仅大小写不同（macOS 不区分大小写）：先经临时名绕行，再改回目标大小写
-          const tmp = path.join(dirAbs, '.' + Date.now() + '.tmp.excalidraw');
+          const tmp = path.join(dirAbs, '.' + Date.now() + '.tmp' + ext);
           fs.renameSync(oldAbs, tmp);
           fs.renameSync(tmp, newAbs);
         } else {
@@ -2913,7 +3024,8 @@ const server = http.createServer(async (req, res) => {
       // 目标文件夹已有同名文件 → 自动 -2、-3 避冲突（移动不改文件名）
       let target = fromFile, i = 2;
       while (fs.existsSync(path.join(dirAbs, target)) && (toDir ? toDir + '/' + target : target) !== name) {
-        target = fromFile.replace(/\.excalidraw$/i, '') + '-' + i + '.excalidraw'; i += 1;
+        const ext = drawingKind(fromFile) === 'drawio' ? '.drawio' : '.excalidraw';
+        target = fromFile.replace(/\.(?:excalidraw|drawio)$/i, '') + '-' + i + ext; i += 1;
         if (i > 100000) return send(res, 200, { ok: false, error: '无法分配文件名' });
       }
       try {
@@ -3020,18 +3132,41 @@ const server = http.createServer(async (req, res) => {
       const url = String((b && b.url) || '').trim();
       const key = String((b && b.key) || '').trim();
       const model = String((b && b.model) || '').trim();
-      const messages = b && Array.isArray(b.messages) ? b.messages : null;
-      if (!/^https?:\/\//i.test(url)) return send(res, 200, { ok: false, error: 'API URL 不合法（需 http/https 开头）' });
-      if (!model) return send(res, 200, { ok: false, error: '请填写模型名称' });
-      if (!messages || !messages.length) return send(res, 200, { ok: false, error: '缺少消息内容' });
+      const rawMessages = b && Array.isArray(b.messages) ? b.messages : null;
+      const requestedTimeoutMs = Number(b && b.timeoutMs);
+      const timeoutMs = Number.isFinite(requestedTimeoutMs)
+        ? Math.max(30000, Math.min(600000, Math.round(requestedTimeoutMs)))
+        : 120000;
+      let endpoint;
+      try { endpoint = new URL(url); } catch (_) { return send(res, 400, { ok:false, error:'API URL 不合法（需 http/https 开头）' }); }
+      if (!['http:', 'https:'].includes(endpoint.protocol) || endpoint.username || endpoint.password || url.length > 2048) return send(res, 400, { ok:false, error:'API URL 不合法（仅支持不含账号密码的 http/https 地址）' });
+      if (!model || model.length > 200) return send(res, 400, { ok:false, error:'请填写有效的模型名称' });
+      if (key.length > 10000) return send(res, 400, { ok:false, error:'API Key 长度不合法' });
+      if (!rawMessages || !rawMessages.length || rawMessages.length > 100) return send(res, 400, { ok:false, error:'消息数量必须在 1–100 条之间' });
+      const messages = [];
+      let messageBytes = 0;
+      for (const item of rawMessages) {
+        const role = String(item && item.role || '');
+        const content = item && typeof item.content === 'string' ? item.content : '';
+        if (!['system', 'user', 'assistant'].includes(role) || !content) return send(res, 400, { ok:false, error:'消息格式不正确' });
+        messageBytes += Buffer.byteLength(content, 'utf8');
+        messages.push({ role, content });
+      }
+      if (messageBytes > 600000) return send(res, 413, { ok:false, error:'AI 上下文超过 600 KB，请缩小项目或当前图上下文' });
       try {
-        const resp = await fetch(url, {
+        const resp = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: 'Bearer ' + key } : {}) },
           body: JSON.stringify({ model, messages, stream: false, temperature: 0.3 }),
-          signal: AbortSignal.timeout(120000),
+          signal: AbortSignal.timeout(timeoutMs),
         });
+        const responseBytes = Number(resp.headers.get('content-length') || 0);
+        if (Number.isFinite(responseBytes) && responseBytes > 12 * 1024 * 1024) {
+          try { if (resp.body) await resp.body.cancel(); } catch (_) {}
+          return send(res, 200, { ok:false, error:'AI 返回内容超过 12 MB，已停止读取' });
+        }
         const text = await resp.text();
+        if (Buffer.byteLength(text, 'utf8') > 12 * 1024 * 1024) return send(res, 200, { ok:false, error:'AI 返回内容超过 12 MB' });
         if (!resp.ok) return send(res, 200, { ok: false, error: 'API 错误 ' + resp.status + ': ' + text.slice(0, 400) });
         let data;
         try { data = JSON.parse(text); } catch (_) { return send(res, 200, { ok: false, error: 'API 返回非 JSON 内容' }); }
@@ -3039,7 +3174,11 @@ const server = http.createServer(async (req, res) => {
         if (typeof content !== 'string') return send(res, 200, { ok: false, error: '无法解析响应（缺少 choices[0].message.content）' });
         return send(res, 200, { ok: true, content, model, usage: (data && data.usage) || null });
       } catch (e) {
-        return send(res, 200, { ok: false, error: '请求失败: ' + String((e && e.message) || e).slice(0, 300) });
+        const detail = String((e && e.message) || e);
+        const timedOut = (e && e.name === 'TimeoutError') || /aborted due to timeout|timed?\s*out/i.test(detail);
+        return send(res, 200, { ok: false, timeout: timedOut, error: timedOut
+          ? `请求超时：AI 服务在 ${Math.round(timeoutMs / 1000)} 秒内未完成响应。请重试，或改用响应更快的模型。`
+          : '请求失败: ' + detail.slice(0, 300) });
       }
     }
     if (req.method === 'POST' && u.pathname === '/api/git/commit') {
@@ -3179,7 +3318,10 @@ const server = http.createServer(async (req, res) => {
     }
     send(res, 404, { ok: false, error: 'Not Found: ' + u.pathname });
   } catch (e) {
-    send(res, 500, { ok: false, error: String((e && e.message) || e) });
+    const statusCode = Number(e && e.statusCode);
+    const code = Number.isInteger(statusCode) && statusCode >= 400 && statusCode <= 599 ? statusCode : 500;
+    if (!res.headersSent) send(res, code, { ok: false, error: String((e && e.message) || e) });
+    else if (!res.writableEnded && !res.destroyed) res.destroy(e);
   }
 });
 

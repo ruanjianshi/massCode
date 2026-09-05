@@ -26,16 +26,18 @@ if %NODE_MAJOR% LSS 18 (
 cd /d "%~dp0masscode-runner"
 if not exist "node_modules\@novnc\novnc\core\rfb.js" goto install_deps
 if not exist "node_modules\ws" goto install_deps
+if not exist "node_modules\ssh2" goto install_deps
+if not exist "node_modules\saxes" goto install_deps
 goto deps_ready
 
 :install_deps
 where npm >nul 2>nul
 if errorlevel 1 (
-  echo [错误] 未找到 npm，无法安装码境的 SSH/VNC 界面依赖。
+  echo [错误] 未找到 npm，无法安装码境运行依赖。
   pause
   exit /b 1
 )
-echo 首次启动：正在安装 SSH/VNC 界面依赖…
+echo 首次启动或依赖已更新：正在安装码境运行依赖…
 call npm ci --omit=dev
 if errorlevel 1 (
   echo [错误] 依赖安装失败，请检查网络后重试。

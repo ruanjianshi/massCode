@@ -526,7 +526,7 @@
   #resource-font { width: 100%; display: flex; flex-direction: column; justify-content: center; gap: 18px; padding: 28px; }
   #resource-font .sample { font-size: 32px; line-height: 1.5; overflow-wrap: anywhere; }
   #resource-font .alphabet { color: var(--dim); font-size: 20px; line-height: 1.7; }
-  /* ---- 绘图（massCode 移植：Excalidraw .excalidraw 文件，位于 vault/drawings/） ---- */
+  /* ---- 绘图（Excalidraw / Draw.io 文件，位于 vault/drawings/） ---- */
   #pane-draw { display: flex; flex-direction: column; max-height: 70%; min-height: 40px; border-top: 1px solid var(--border); background: var(--panel); }
   #pane-draw.collapsed { height: auto !important; }
   #pane-draw.collapsed #draw-list { display: none; }
@@ -584,6 +584,34 @@
   #draw-lib-note { font-size: 11px; color: var(--dim); margin-left: 10px; }
   #excal-root { flex: 1; min-height: 0; position: relative; }   /* .excalidraw 以此为包含块：填满头部行之下区域，不被 #draw-ed-head 遮挡 */
   #excal-root .excalidraw { position: absolute; inset: 0; }
+  #drawio-root { flex:1; min-height:0; position:relative; display:none; background:#1e1e1e; }
+  #drawio-root iframe { position:absolute; inset:0; width:100%; height:100%; border:0; background:#fff; }
+  #draw-ai-btn, #draw-xml-btn { display:none; }
+  #draw-tool-dialog { position:absolute; inset:0; z-index:120; display:none; align-items:center; justify-content:center; padding:24px; background:rgba(3,7,12,.72); backdrop-filter:blur(5px); }
+  #draw-tool-dialog.open { display:flex; }
+  .draw-tool-panel { display:flex; flex-direction:column; width:min(820px,96%); max-height:88%; overflow:hidden; border:1px solid var(--border); border-radius:14px; background:var(--panel); box-shadow:0 22px 70px rgba(0,0,0,.55); }
+  .draw-tool-head { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--border); background:var(--theme-sub,#101820); }
+  .draw-tool-head strong { margin-right:auto; font-size:13px; }
+  .draw-tool-head button { padding:5px 10px; font-size:11px; }
+  .draw-tool-head button.on { color:#fff; border-color:var(--accent); background:var(--accent); }
+  .draw-tool-body { display:flex; flex-direction:column; min-height:0; gap:10px; padding:14px; overflow:auto; }
+  .draw-tool-intro { color:var(--dim); font-size:11px; line-height:1.6; }
+  #draw-ai-prompt, #draw-xml-source { width:100%; box-sizing:border-box; resize:vertical; border:1px solid var(--border); border-radius:9px; outline:none; background:var(--theme-deep,#091018); color:var(--text); padding:11px 12px; font:12px/1.55 var(--mono); }
+  #draw-ai-prompt { min-height:112px; font-family:inherit; }
+  #draw-xml-source { min-height:360px; tab-size:2; white-space:pre; }
+  #draw-ai-prompt:focus, #draw-xml-source:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .draw-tool-options, .draw-tool-actions { display:flex; align-items:center; flex-wrap:wrap; gap:10px; color:var(--dim); font-size:11px; }
+  .draw-tool-options label { display:flex; align-items:center; gap:5px; }
+  .draw-tool-actions { justify-content:flex-end; }
+  .draw-tool-actions .primary { color:#fff; border-color:var(--accent); background:var(--accent); }
+  #draw-tool-status { min-height:18px; color:var(--dim); font-size:11px; line-height:1.55; }
+  .draw-tool-panel > #draw-tool-status { padding:0 14px 12px; }
+  #draw-tool-status.ok { color:var(--ok); } #draw-tool-status.err { color:var(--err); }
+  #draw-tool-sources { display:flex; flex-wrap:wrap; gap:6px; }
+  #draw-tool-sources a { max-width:220px; overflow:hidden; padding:3px 7px; border:1px solid var(--border); border-radius:999px; color:var(--accent); font-size:9px; text-decoration:none; text-overflow:ellipsis; white-space:nowrap; }
+  #draw-xml-pane { display:none; }
+  #draw-tool-dialog.xml-mode #draw-ai-pane { display:none; }
+  #draw-tool-dialog.xml-mode #draw-xml-pane { display:flex; }
   .md-doc { padding: 16px 20px 48px; font-size: 14px; line-height: 1.75; color: var(--text); }
   .md-doc h1, .md-doc h2, .md-doc h3, .md-doc h4, .md-doc h5, .md-doc h6 { margin: 1.1em 0 .45em; line-height: 1.35; font-weight: 700; scroll-margin-top: 12px; }
   .md-doc .md-flash { animation: md-flash-hl 1.4s ease; border-radius: 6px; }
@@ -957,6 +985,7 @@
   #sym-modal-res { flex:1; min-height:0; overflow:auto; padding:6px 4px; }
   #sym-modal-box.ai-mode #sym-filter { display:none; }
   #sym-modal-box.symbol-mode #sym-ai-submit { display:none; }
+  #sym-modal-box.history-mode #sym-ai-submit, #sym-modal-box.history-mode #sym-filter { display:none; }
   .ai-search-home { padding:18px 20px 22px; color:var(--dim); font-size:12px; line-height:1.7; }
   .ai-search-home strong { display:block; margin-bottom:4px; color:var(--text); font-size:13px; }
   .ai-search-examples { display:flex; flex-wrap:wrap; gap:7px; margin-top:13px; }
@@ -982,6 +1011,20 @@
   .ai-search-source a:hover { text-decoration:underline; }
   .ai-search-source time { white-space:nowrap; color:var(--dim); font:9px var(--mono); }
   .ai-search-loading { display:flex; align-items:center; gap:9px; padding:24px; color:var(--dim); }
+  .ai-search-history { padding:12px 14px 16px; }
+  .ai-search-history-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; color:var(--dim); font-size:10px; }
+  .ai-search-history-head strong { color:var(--text); font-size:12px; }
+  .ai-search-history-head .sp { flex:1; }
+  .ai-search-history-head button { padding:3px 8px; color:var(--dim); border-radius:7px; font-size:9px; }
+  .ai-search-history-list { display:flex; flex-direction:column; gap:6px; }
+  .ai-search-history-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:center; padding:8px 9px; border:1px solid var(--border); border-radius:8px; background:var(--panel2); }
+  .ai-search-history-row:hover { border-color:color-mix(in srgb,var(--accent) 55%,var(--border)); }
+  .ai-search-history-query { min-width:0; overflow:hidden; color:var(--text); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+  .ai-search-history-meta { margin-top:2px; color:var(--dim); font:8.5px var(--mono); }
+  .ai-search-history-use, .ai-search-history-delete { width:26px; height:26px; padding:0; border-radius:7px; color:var(--dim); }
+  .ai-search-history-use:hover { color:var(--accent); border-color:var(--accent); }
+  .ai-search-history-delete:hover { color:var(--err); border-color:var(--err); }
+  .ai-search-history-empty { padding:34px 16px; color:var(--dim); font-size:11px; text-align:center; }
   .symr .meta { margin-left:auto; min-width:0; color:var(--dim); font:10px var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .sym-help { padding:18px; color:var(--dim); font-size:12px; line-height:1.8; }
   /* ---- 关系树：调用 / 被调用 / 文件包含 ---- */
@@ -1260,9 +1303,13 @@
   .sync-dot::before { width:7px; height:7px; box-shadow:0 0 8px rgba(95,209,123,.8); }
 
   main { background:var(--bg); }
-  #side { background:#0f151d; border-right-color:#273241; }
+  #side { min-height:0; overflow:hidden; background:#0f151d; border-right-color:#273241; }
   #pane-tree, #pane-git, #pane-tags, #pane-draw { background:#0f151d; }
-  #pane-tree { min-height:160px; }
+  #pane-tree { min-height:96px; }
+  #pane-git, #pane-tags, #pane-draw { flex:0 1 auto; min-height:37px; }
+  #pane-draw { min-height:108px; }
+  #pane-draw.collapsed { min-height:40px; }
+  #git-body, #tagbar, #draw-list { min-height:0; }
   #search { min-height:36px; margin:10px 10px 7px; padding:8px 11px; border-color:#2b3747; border-radius:8px; background:#0a1017; color:#dfe7f2; font-size:12px; }
   #search::placeholder, input::placeholder, textarea::placeholder { color:#647286; opacity:1; }
   #search:focus { border-color:#6898df; background:#0d141d; box-shadow:0 0 0 3px rgba(120,169,255,.09); }
@@ -1344,6 +1391,9 @@
   .draw-row.on { border-color:rgba(120,169,255,.42); background:rgba(120,169,255,.13); }
   .draw-file-ic { flex:none; width:18px; color:#77aaff; font-size:15px; text-align:center; }
   .draw-row .draw-name { color:#cdd7e4; }
+  .draw-type { flex:none; padding:1px 6px; border:1px solid; border-radius:999px; font:8px/1.55 var(--mono); letter-spacing:.02em; white-space:nowrap; }
+  .draw-type--excalidraw { color:#8fb5ff; border-color:rgba(120,169,255,.35); background:rgba(79,140,255,.10); }
+  .draw-type--drawio { color:#65d397; border-color:rgba(78,201,135,.34); background:rgba(54,179,113,.10); }
   .tree-children > .fnode::before, .tree-children > .item::after, .tree-children > .resource-row::before,
   .draw-children > .draw-frow::before, .draw-children > .draw-row::before {
     content:''; position:absolute; left:-9px; top:15px; width:8px; border-top:1px solid #273546; pointer-events:none;
@@ -1679,7 +1729,7 @@
         <span id="draw-count" class="count"></span>
         <span class="sp"></span>
         <button id="draw-new-folder" title="新建绘图文件夹（可含 / 嵌套）">📁</button>
-        <button id="draw-new-manual" title="新建绘图（自定义名称，不同文件夹可重名）">＋</button>
+        <button id="draw-new-manual" title="新建 Excalidraw / Draw.io 绘图（自定义名称，不同文件夹可重名）">＋</button>
       </div>
       <div id="draw-list"></div>
       <div id="draw-ndialog" style="display:none">
@@ -1688,6 +1738,8 @@
           <div class="nd-hint" id="draw-nd-hint"></div>
           <label id="draw-nd-name-label" for="draw-nd-name">名称</label>
           <input type="text" id="draw-nd-name" placeholder="Untitled" autocomplete="off">
+          <label id="draw-nd-type-label" for="draw-nd-type">绘图类型</label>
+          <select id="draw-nd-type"><option value="excalidraw">Excalidraw（手绘风格）</option><option value="drawio">Draw.io（流程图 / 架构图）</option></select>
           <label id="draw-nd-dir-label" for="draw-nd-dir">位置</label>
           <select id="draw-nd-dir"></select>
           <div class="nd-btns">
@@ -1722,9 +1774,25 @@
         <span id="draw-ed-name"></span>
         <span id="draw-lib-note" title="库文件存放于 vault/libraries/ 文件夹，下载/放入即自动加载"></span>
         <span class="sp"></span>
+        <button id="draw-ai-btn" title="用 AI 生成或修改可编辑的 Draw.io XML">✨ AI 绘图</button>
+        <button id="draw-xml-btn" title="查看、编辑并校验当前 Draw.io XML">&lt;/&gt; XML</button>
         <span id="draw-ed-status"></span>
       </div>
       <div id="excal-root"></div>
+      <div id="drawio-root" aria-label="Draw.io 编辑器"></div>
+      <div id="draw-tool-dialog" role="dialog" aria-modal="true" aria-labelledby="draw-tool-title">
+        <div class="draw-tool-panel">
+          <div class="draw-tool-head"><strong id="draw-tool-title">Draw.io 智能绘图</strong><button id="draw-tool-ai-tab" class="on">✨ AI 生成</button><button id="draw-tool-xml-tab">&lt;/&gt; XML</button><button id="draw-tool-close">✕</button></div>
+          <div id="draw-ai-pane" class="draw-tool-body">
+            <div class="draw-tool-intro">描述流程、模块、关系、配色和布局。AI 会返回标准、未压缩的 mxGraph XML，校验通过后直接载入 Draw.io，所有节点仍可编辑。</div>
+            <textarea id="draw-ai-prompt" placeholder="例如：绘制一个机器人控制系统架构图，左侧是状态机与动力学模型，右侧是 PPO 强化学习模块，下方是控制器和仿真环境；蓝色表示前馈，绿色表示反馈。"></textarea>
+            <div class="draw-tool-options"><label><input id="draw-ai-current" type="checkbox" checked> 基于当前图修改</label><label><input id="draw-ai-web" type="checkbox"> 联网检索相关绘图经验</label></div>
+            <div id="draw-tool-sources"></div><div class="draw-tool-actions"><button id="draw-ai-example">填入测试图描述</button><button id="draw-ai-generate" class="primary">生成并应用</button></div>
+          </div>
+          <div id="draw-xml-pane" class="draw-tool-body"><div class="draw-tool-intro">直接编辑未压缩 Draw.io XML。应用前会检查 XML 语法、根节点、单元 ID 和连线引用。</div><textarea id="draw-xml-source" spellcheck="false"></textarea><div class="draw-tool-actions"><button id="draw-xml-format">格式化</button><button id="draw-xml-validate">校验</button><button id="draw-xml-apply" class="primary">校验并应用</button></div></div>
+          <div id="draw-tool-status"></div>
+        </div>
+      </div>
     </div>
     <div id="edit-split">
       <div id="code-wrap" class="editor-column"><div id="primary-group-bar"><span>主编辑栏</span><span class="name" id="primary-group-name"></span><span class="sp"></span><span>大纲跟随此栏</span></div><div id="ln"></div><pre id="code"></pre><textarea id="code-edit" spellcheck="false" style="display:none"></textarea><div id="comp-pop"></div><div id="editor-find" class="hidden" role="dialog" aria-label="代码查找和替换"><div class="editor-find-row"><button id="editor-find-toggle" type="button" title="展开或收起替换">▸</button><input id="editor-find-query" aria-label="查找内容" placeholder="查找（Enter 下一个）" spellcheck="false"><span id="editor-find-count">0/0</span><button id="editor-find-prev" type="button" title="上一个（Shift+Enter）">↑</button><button id="editor-find-next" type="button" title="下一个（Enter）">↓</button><button id="editor-find-close" type="button" title="关闭（Esc）">×</button></div><div id="editor-find-replace-row" class="editor-find-row editor-find-replace hidden"><button id="editor-find-case" type="button" title="区分大小写">Aa</button><input id="editor-find-replacement" aria-label="替换内容" placeholder="替换为" spellcheck="false"><button id="editor-find-one" type="button">替换</button><button id="editor-find-all" type="button">全部替换</button><span id="editor-find-status"></span></div></div></div>
@@ -1920,6 +1988,7 @@
     <div id="sym-modal-mode" role="tablist" aria-label="搜索类型">
       <button class="on" data-search-mode="ai" role="tab" aria-selected="true">✨ AI 搜索</button>
       <button data-search-mode="symbol" role="tab" aria-selected="false">🔎 项目符号</button>
+      <button data-search-mode="history" role="tab" aria-selected="false">🕘 搜索记录</button>
     </div>
     <div id="sym-modal-head">
       <input id="sym-q" aria-label="AI 或项目符号搜索" placeholder="询问 API、函数用途、参数、示例或代码问题…" spellcheck="false">
@@ -2185,9 +2254,22 @@ function confirmLeaveEdit() {
 }
 
 async function api(path, body) {
-  const r = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined);
-  const data = await r.json();
-  if (r.status === 404 && data && /^Not Found:/i.test(String(data.error || ''))) data.backendOutdated = true;
+  let response;
+  try {
+    response = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined);
+  } catch (error) {
+    return { ok:false, networkError:true, error:'无法连接 CodeScope 后端：' + String((error&&error.message)||error) };
+  }
+  const text = await response.text();
+  let data;
+  try { data = text ? JSON.parse(text) : {}; }
+  catch (_) {
+    return { ok:false, status:response.status, error:'后端返回了无法解析的响应（HTTP '+response.status+'）' };
+  }
+  if (!data || typeof data !== 'object') data = { ok:false, error:'后端响应格式不正确' };
+  if (!response.ok && data.ok !== false) data.ok = false;
+  data.status = response.status;
+  if (response.status === 404 && /^Not Found:/i.test(String(data.error || ''))) data.backendOutdated = true;
   return data;
 }
 
@@ -2829,19 +2911,24 @@ function wireNewDialog() {
 }
 window.addEventListener('DOMContentLoaded', wireNewDialog);
 
-/* ------------------------- 绘图（massCode 移植：Excalidraw 编辑器，.excalidraw 文件存于 vault/drawings/） ------------------------- */
+/* ------------------------- 绘图（Excalidraw / Draw.io，文件存于 vault/drawings/） ------------------------- */
 let DRAWINGS = [];            // [{name,size,updated}]
 let DRAW_FILE = null;         // 当前打开的绘图文件名
-let DRAW_PENDING = null;      // 待保存的最新场景 {elements,appState,files}
+let DRAW_KIND = null;         // excalidraw | drawio
+let DRAW_PENDING = null;      // 待保存的最新 Excalidraw 场景或 {xml}
 let DRAW_SAVE_T = 0;          // 防抖定时器
 let DRAW_ROOT = null;         // React 根（Excalidraw）
 let DRAW_DIRTY = false;
 let EXCAL_PROMISE = null;     // loader 懒加载 promise
+let DRAWIO_FRAME = null;
+let DRAWIO_XML = '';
+const DRAWIO_ORIGIN = 'https://embed.diagrams.net';
 let DRAW_OPEN = (() => { try { return localStorage.getItem('mc-draw-open') !== '0'; } catch (_) { return true; } })();
 let DRAW_DIR_OPEN = (() => { try { return new Set(JSON.parse(localStorage.getItem('mc-draw-open-dirs') || '[]')); } catch (_) { return new Set(); } })();
 let DRAW_ND_KIND = 'drawing';
 function saveDrawDirs() { try { localStorage.setItem('mc-draw-open-dirs', JSON.stringify([...DRAW_DIR_OPEN])); } catch (_) {} }
-function drawBase(n) { return String(n).split('/').pop().replace(/\.excalidraw$/i, ''); }   // 显示名：路径 → 文件名（不含扩展）
+function drawKind(n) { return /\.drawio$/i.test(String(n || '')) ? 'drawio' : 'excalidraw'; }
+function drawBase(n) { return String(n).split('/').pop().replace(/\.(?:excalidraw|drawio)$/i, ''); }   // 显示名：路径 → 文件名（不含扩展）
 /* ---- 库（Library）：与本绘图共享同一套编辑器，库文件存于 vault/libraries/*.excalidrawLibrary ---- */
 let LIB_SAVE_T = 0;            // 库改动防抖定时器
 let LIB_POLL_T = 0;            // 文件夹轮询定时器
@@ -2850,7 +2937,7 @@ let LIB_LAST_IDS = '';         // 上次已加载 item id 快照（用于判断�
 window.__LIB_COUNT = 0;        // 测试/调试：当前库 item 数
 const LIB_APP_FILE = 'local.excalidrawLibrary';   // 应用内改动的自写文件名（轮询忽略它，避免写读循环）
 
-function drawName(n) { return String(n).replace(/\.excalidraw$/i, ''); }
+function drawName(n) { return String(n).replace(/\.(?:excalidraw|drawio)$/i, ''); }
 
 function loadExcalLoader() {
   if (window.ExcalLoader) return Promise.resolve(window.ExcalLoader);
@@ -2882,9 +2969,152 @@ async function saveDrawing() {
   clearTimeout(DRAW_SAVE_T); DRAW_SAVE_T = 0;
   if (!DRAW_FILE || !DRAW_PENDING) return;
   const data = DRAW_PENDING; DRAW_PENDING = null;
-  const r = await api('/api/drawings/save', { name: DRAW_FILE, data: sanitizeScene(data) });
-  if (r.ok) { DRAW_DIRTY = false; setDrawStatus('已保存 ' + new Date().toTimeString().slice(0, 8), 'ok'); }
-  else { DRAW_DIRTY = true; DRAW_PENDING = data; setDrawStatus('保存失败：' + (r.error || '未知错误'), 'err'); }
+  const body = DRAW_KIND === 'drawio' ? { xml: data.xml || '' } : sanitizeScene(data);
+  const r = await api('/api/drawings/save', { name: DRAW_FILE, data: body });
+  if (r.ok) {
+    DRAW_DIRTY = !!DRAW_PENDING;
+    setDrawStatus(DRAW_PENDING ? '仍有改动待保存…' : '已保存 ' + new Date().toTimeString().slice(0, 8), DRAW_PENDING ? 'dirty' : 'ok');
+  } else {
+    DRAW_DIRTY = true;
+    if (!DRAW_PENDING) DRAW_PENDING = data; // 不用较旧请求覆盖请求期间产生的新内容
+    setDrawStatus('保存失败：' + (r.error || '未知错误'), 'err');
+  }
+}
+
+function sendDrawio(message) {
+  if (!DRAWIO_FRAME || !DRAWIO_FRAME.contentWindow) return;
+  DRAWIO_FRAME.contentWindow.postMessage(JSON.stringify(message), DRAWIO_ORIGIN);
+}
+
+function openDrawioEditor(xml) {
+  const root=$('drawio-root');root.innerHTML='';root.style.display='block';$('excal-root').style.display='none';
+  const frame=document.createElement('iframe');
+  frame.title='Draw.io · '+drawBase(DRAW_FILE);
+  frame.referrerPolicy='no-referrer';
+  frame.allow='clipboard-read; clipboard-write; fullscreen';
+  const dark=document.documentElement.dataset.theme==='light'?0:1;
+  frame.src=DRAWIO_ORIGIN+'/?embed=1&proto=json&spin=1&libraries=1&themes=1&noExitBtn=1&saveAndExit=0&modified=0&ui=kennedy&dark='+dark;
+  frame.addEventListener('error',()=>setDrawStatus('Draw.io 加载失败，请检查网络', 'err'));
+  DRAWIO_FRAME=frame;DRAWIO_XML=String(xml||'');DRAW_PENDING=null;DRAW_DIRTY=false;root.appendChild(frame);
+  setDrawStatus('正在连接 Draw.io…','');
+  setTimeout(()=>{
+    const status=$('draw-ed-status');
+    if(DRAWIO_FRAME===frame&&status&&status.textContent==='正在连接 Draw.io…')setDrawStatus('Draw.io 连接超时，请检查网络后重开','err');
+  },12000);
+}
+
+function onDrawioMessage(event) {
+  const frame=DRAWIO_FRAME;
+  if (!frame || DRAW_KIND!=='drawio' || event.source!==frame.contentWindow || event.origin!==DRAWIO_ORIGIN) return;
+  let msg;try{msg=typeof event.data==='string'?JSON.parse(event.data):event.data;}catch(_){return;}
+  if(!msg||typeof msg!=='object')return;
+  if(msg.event==='init'){
+    sendDrawio({action:'load',xml:DRAWIO_XML,autosave:1,modified:'未保存',title:drawBase(DRAW_FILE)});
+    setDrawStatus('Draw.io 已连接','ok');
+  } else if((msg.event==='autosave'||msg.event==='save')&&typeof msg.xml==='string'){
+    DRAWIO_XML=msg.xml;DRAW_PENDING={xml:msg.xml};scheduleDrawSave();
+    if(msg.event==='save')saveDrawing();
+  } else if(msg.event==='load') {
+    setDrawStatus('已加载 · 自动保存','ok');
+  } else if(msg.event==='exit') {
+    closeDrawEditor(true);
+  } else if(msg.event==='openLink'&&typeof msg.href==='string') {
+    try{const url=new URL(msg.href);if(['http:','https:'].includes(url.protocol))window.open(url.href,'_blank','noopener');}catch(_){}
+  }
+}
+
+let DRAW_AI_BUSY=false;
+const DRAW_TEST_PROMPT='绘制“基于扩展 SLIP 与强化学习的两轮足机器人控制框架”。画布横向 1600×950。左上用蓝色虚线圆角容器表示“1. 扩展SLIP模型（前馈生成）”，内部包含六状态有限状态机、状态转换条件、扩展SLIP动力学、飞行期前馈波形提升、前馈参考轨迹生成和SLIP到关节角/轮速映射。右上用绿色虚线圆角容器表示“2. 强化学习模块（反馈修正）”，内部包含观测向量、PPO Actor-Critic 网络、反馈动作修正、奖励函数和分阶段奖励权重。底部居中依次放置加权融合、PD控制器和两轮足机器人仿真环境。蓝色箭头表示前馈信号流，绿色表示反馈修正，紫色表示融合与控制，黑色表示环境交互，红色虚线表示奖励与反重置流。布局整齐、文字清晰、所有节点可编辑。';
+
+function setDrawToolStatus(message,cls){const el=$('draw-tool-status');el.textContent=message||'';el.className=cls||'';}
+function drawioExtractXml(value){
+  let text=String(value||'').trim().replace(/^```(?:xml|drawio)?\s*/i,'').replace(/```\s*$/,'').trim();
+  const fileStart=text.indexOf('<mxfile'), fileEnd=text.lastIndexOf('</mxfile>');
+  if(fileStart>=0&&fileEnd>fileStart) return text.slice(fileStart,fileEnd+9);
+  const modelStart=text.indexOf('<mxGraphModel'), modelEnd=text.lastIndexOf('</mxGraphModel>');
+  if(modelStart>=0&&modelEnd>modelStart) return text.slice(modelStart,modelEnd+15);
+  return text;
+}
+function validateDrawioXmlLocal(value){
+  let xml=drawioExtractXml(value);
+  if(!xml||xml.length>40000000) return {ok:false,error:'XML 为空或超过 40 MB'};
+  if(/<!DOCTYPE|<!ENTITY/i.test(xml)) return {ok:false,error:'不允许 DOCTYPE 或外部实体'};
+  const doc=new DOMParser().parseFromString(xml,'application/xml');
+  const parseError=doc.querySelector('parsererror');
+  if(parseError) return {ok:false,error:'XML 语法错误：'+parseError.textContent.replace(/\s+/g,' ').trim().slice(0,180)};
+  const root=doc.documentElement;
+  if(!root||!['mxfile','mxGraphModel'].includes(root.nodeName)) return {ok:false,error:'根节点必须是 mxfile 或 mxGraphModel'};
+  const models=root.nodeName==='mxGraphModel'?[root]:[...doc.querySelectorAll('mxGraphModel')];
+  if(root.nodeName==='mxfile'&&!models.length) return {ok:true,xml,format:'compressed',cells:0,pages:doc.querySelectorAll('diagram').length};
+  const cells=[...doc.querySelectorAll('mxCell')], ids=new Set();
+  for(const cell of cells){const id=cell.getAttribute('id');if(!id)return {ok:false,error:'存在缺少 id 的 mxCell'};if(ids.has(id))return {ok:false,error:'mxCell id 重复：'+id};ids.add(id);}
+  if(!ids.has('0')||!ids.has('1')) return {ok:false,error:'必须包含根单元 id=0 和默认层 id=1'};
+  for(const cell of cells)for(const attr of ['parent','source','target']){const ref=cell.getAttribute(attr);if(ref&&!ids.has(ref))return {ok:false,error:'单元 '+cell.id+' 的 '+attr+' 引用了不存在的 id：'+ref};}
+  if(root.nodeName==='mxGraphModel') xml='<mxfile host="CodeScope"><diagram id="page-1" name="Page-1">'+new XMLSerializer().serializeToString(root)+'</diagram></mxfile>';
+  return {ok:true,xml,format:'uncompressed',cells:cells.length,pages:models.length};
+}
+function prettyDrawioXml(value){
+  const checked=validateDrawioXmlLocal(value);if(!checked.ok)throw new Error(checked.error);
+  const compact=checked.xml.replace(/>\s*</g,'><').trim();let depth=0,out=[];
+  for(const token of compact.replace(/</g,'\n<').trim().split('\n')){
+    if(/^<\//.test(token))depth=Math.max(0,depth-1);
+    out.push('  '.repeat(depth)+token);
+    if(/^<[^!?/][^>]*[^/]?>$/.test(token)&&!/^<(?:mxCell|mxGeometry)\b[^>]*\/>$/.test(token))depth++;
+  }
+  return out.join('\n');
+}
+function applyDrawioXml(value,label){
+  const checked=validateDrawioXmlLocal(value);
+  if(!checked.ok){setDrawToolStatus('❌ '+checked.error,'err');return false;}
+  DRAWIO_XML=checked.xml;DRAW_PENDING={xml:checked.xml};scheduleDrawSave();
+  sendDrawio({action:'load',xml:checked.xml,autosave:1,modified:'未保存',title:drawBase(DRAW_FILE)});
+  $('draw-xml-source').value=checked.xml;
+  setDrawToolStatus('✅ '+(label||'XML 已应用')+' · '+checked.pages+' 页 · '+checked.cells+' 个单元','ok');
+  return true;
+}
+function showDrawTool(mode){
+  if(DRAW_KIND!=='drawio')return;
+  const dialog=$('draw-tool-dialog');dialog.classList.add('open');dialog.classList.toggle('xml-mode',mode==='xml');
+  $('draw-tool-ai-tab').classList.toggle('on',mode!=='xml');$('draw-tool-xml-tab').classList.toggle('on',mode==='xml');
+  $('draw-tool-title').textContent=mode==='xml'?'Draw.io XML 编辑器':'Draw.io 智能绘图';setDrawToolStatus('','');
+  if(mode==='xml'){$('draw-xml-source').value=DRAWIO_XML;requestAnimationFrame(()=>$('draw-xml-source').focus());}
+  else requestAnimationFrame(()=>$('draw-ai-prompt').focus());
+}
+function hideDrawTool(){if(!DRAW_AI_BUSY)$('draw-tool-dialog').classList.remove('open');}
+function renderDrawToolSources(results){
+  const box=$('draw-tool-sources');box.innerHTML='';
+  for(const item of results||[]){const a=document.createElement('a');a.href=item.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=item.title||item.url;a.title=item.snippet||item.url;box.appendChild(a);}
+}
+async function generateDrawioWithAi(){
+  const prompt=$('draw-ai-prompt').value.trim();if(!prompt||DRAW_AI_BUSY)return;
+  const cfg=aiCfg();cfg.url=aiNormalizeUrl(cfg.url);
+  if(!cfg.url||!cfg.model){setDrawToolStatus('❌ 请先在右侧 AI 面板的“设置”中配置 API URL 和模型','err');return;}
+  DRAW_AI_BUSY=true;$('draw-ai-generate').disabled=true;setDrawToolStatus('正在准备绘图上下文…','');renderDrawToolSources([]);
+  let generationTimer=0;
+  try{
+    let webContext='未启用联网检索。';
+    if($('draw-ai-web').checked){
+      if(!cfg.searchKey)throw new Error('已勾选联网检索，但尚未配置 Tavily/Brave Search API Key');
+      setDrawToolStatus('正在联网检索相关架构图与表达经验…','');
+      const web=await api('/api/ai/web-search',{provider:cfg.searchProvider||'tavily',key:cfg.searchKey,query:prompt+' draw.io 架构图 可视化 最佳实践'});
+      if(!web.ok)throw new Error(web.error||'联网检索失败');
+      renderDrawToolSources(web.results);
+      webContext=(web.results||[]).map((item,i)=>'['+(i+1)+'] '+item.title+'\n'+item.snippet).join('\n\n').slice(0,10000);
+    }
+    const current=$('draw-ai-current').checked?DRAWIO_XML.slice(0,160000):'';
+    const system='你是专业的 Draw.io 架构图生成器。只返回一个完整、未压缩、格式良好的 mxfile XML，不要 Markdown 围栏或解释。必须使用 mxGraphModel/root/mxCell/mxGeometry；包含 id=0 和 id=1，所有 id 唯一，parent/source/target 必须引用已有 id。节点使用明确坐标和尺寸，避免重叠；连接线使用 edge=1、edgeStyle=orthogonalEdgeStyle、rounded=1，标签中的 & < > 必须 XML 转义。优先使用统一圆角矩形、分组虚线容器、克制配色和清晰层级，保证在 1600×950 画布内完整可读。输出应能在 diagrams.net 中继续编辑。';
+    const user='【绘图要求】\n'+prompt+'\n\n【联网经验摘要】\n'+webContext+(current?'\n\n【当前图 XML；请在其基础上修改并返回完整 XML】\n'+current:'');
+    const generationStarted=Date.now();
+    const updateGenerationStatus=()=>setDrawToolStatus('AI 正在生成可编辑 mxGraph XML… 已等待 '+Math.max(1,Math.round((Date.now()-generationStarted)/1000))+' 秒（复杂图可能需要 1–5 分钟）','');
+    updateGenerationStatus();generationTimer=setInterval(updateGenerationStatus,1000);
+    const result=await api('/api/ai/chat',{url:cfg.url,key:cfg.key,model:cfg.model,timeoutMs:300000,messages:[{role:'system',content:system},{role:'user',content:user}]});
+    clearInterval(generationTimer);generationTimer=0;
+    if(!result.ok)throw new Error(result.error||'AI 生成失败');
+    const checked=validateDrawioXmlLocal(result.content);
+    if(!checked.ok){$('draw-xml-source').value=drawioExtractXml(result.content);showDrawTool('xml');setDrawToolStatus('❌ AI 已返回内容，但结构校验失败：'+checked.error+'。可在 XML 页修正后应用。','err');return;}
+    applyDrawioXml(checked.xml,'AI 图稿已生成并载入');
+  }catch(error){setDrawToolStatus('❌ '+String((error&&error.message)||error),'err');}
+  finally{if(generationTimer)clearInterval(generationTimer);DRAW_AI_BUSY=false;$('draw-ai-generate').disabled=false;}
 }
 
 function scheduleDrawSave() {
@@ -2898,10 +3128,22 @@ async function openDrawing(name) {
   if (!r.ok) { setStatus('err', '打开绘图失败：' + (r.error || '')); return; }
   await closeDrawEditor(true);            // 先落盘 / 销毁上一个绘图
   DRAW_FILE = name;
+  DRAW_KIND = drawKind(name);
   document.body.classList.add('drawing-mode');
   $('draw-editor').style.display = 'flex';
   $('draw-ed-name').textContent = drawBase(name);
   setDrawStatus('加载中…', '');
+  if (DRAW_KIND === 'drawio') {
+    $('draw-lib-note').textContent='Draw.io · 在线编辑';
+    $('draw-lib-note').title='使用 diagrams.net 官方嵌入编辑器，文件自动保存到 vault/drawings';
+    $('draw-ai-btn').style.display='inline-block';$('draw-xml-btn').style.display='inline-block';
+    openDrawioEditor(r.xml);
+    renderDrawList();
+    return;
+  }
+  $('drawio-root').style.display='none';
+  $('excal-root').style.display='block';
+  $('draw-ai-btn').style.display='none';$('draw-xml-btn').style.display='none';
   try { await loadExcalLoader(); }
   catch (e2) { document.body.classList.remove('drawing-mode'); $('draw-editor').style.display = 'none'; DRAW_FILE = null; setStatus('err', e2.message); return; }
   const L = window.ExcalLoader;
@@ -2942,12 +3184,19 @@ async function closeDrawEditor(flush) {
   flushLibSave(LIB_ITEMS);       // 库改动落盘（vault/libraries/local.excalidrawLibrary）
   LIB_ITEMS = []; window.__LIB_COUNT = 0; LIB_LAST_IDS = '';
   if (DRAW_ROOT) { try { DRAW_ROOT.unmount(); } catch (_) {} DRAW_ROOT = null; }
+  if (DRAWIO_FRAME) { try { DRAWIO_FRAME.remove(); } catch (_) {} DRAWIO_FRAME = null; }
+  DRAWIO_XML = '';
   DRAW_API = null;
   window.__EX = null;          // 清除旧实例引用（防止重开时误判/读旧场景）
-  DRAW_FILE = null; DRAW_PENDING = null; DRAW_DIRTY = false;
+  DRAW_FILE = null; DRAW_KIND = null; DRAW_PENDING = null; DRAW_DIRTY = false;
   document.body.classList.remove('drawing-mode');
   $('draw-editor').style.display = 'none';
   $('excal-root').innerHTML = '';
+  $('excal-root').style.display = 'block';
+  $('drawio-root').innerHTML = '';
+  $('drawio-root').style.display = 'none';
+  $('draw-ai-btn').style.display='none';$('draw-xml-btn').style.display='none';
+  $('draw-tool-dialog').classList.remove('open');
   renderDrawList();
 }
 
@@ -3052,11 +3301,20 @@ function openDrawNewDialog(kind) {
   $('draw-nd-title').textContent = DRAW_ND_KIND === 'folder' ? '新建绘图文件夹' : '新建绘图';
   $('draw-nd-hint').textContent = DRAW_ND_KIND === 'folder'
     ? '名称可含 / 嵌套创建（如 工作/架构图），可放在任意层级下'
-    : '名称可自定义（不含空格限制）；同目录内重名自动加 -2、-3，不同文件夹下可重名';
+    : 'Excalidraw 适合草图；Draw.io 适合流程图、架构图和 UML（编辑时需要联网）';
   $('draw-nd-name').value = '';
   $('draw-nd-name').placeholder = DRAW_ND_KIND === 'folder' ? '我的文件夹' : 'Untitled';
   $('draw-nd-name-label').textContent = DRAW_ND_KIND === 'folder' ? '文件夹名称' : '绘图名称';
   $('draw-nd-dir-label').style.display = '';
+  const typeLabel = $('draw-nd-type-label');
+  const typeSelect = $('draw-nd-type');
+  const choosingType = DRAW_ND_KIND === 'drawing';
+  typeLabel.style.display = choosingType ? '' : 'none';
+  typeSelect.style.display = choosingType ? '' : 'none';
+  if (choosingType) {
+    try { typeSelect.value = localStorage.getItem('mc-draw-new-kind') === 'drawio' ? 'drawio' : 'excalidraw'; }
+    catch (_) { typeSelect.value = 'excalidraw'; }
+  }
   // 位置下拉：递归收集绘图文件夹
   (async () => {
     const r = await api('/api/drawings/tree');
@@ -3090,6 +3348,8 @@ function openDrawRenameDialog(path) {
   $('draw-nd-name').placeholder = '新名称';
   $('draw-nd-name-label').textContent = '新名称';
   $('draw-nd-dir-label').style.display = 'none';
+  $('draw-nd-type-label').style.display = 'none';
+  $('draw-nd-type').style.display = 'none';
   const sel = $('draw-nd-dir');
   sel.innerHTML = '';
   const o0 = document.createElement('option'); o0.value = ''; o0.textContent = '（保持当前文件夹）'; sel.appendChild(o0);
@@ -3124,7 +3384,9 @@ async function submitDrawNewDialog() {
     setStatus('ok', '已创建文件夹：' + r.path);
   } else {
     if (DRAW_FILE || DRAW_ROOT) await closeDrawEditor(true);
-    const r = await api('/api/drawings/new', { dir, name });
+    const kind = $('draw-nd-type').value === 'drawio' ? 'drawio' : 'excalidraw';
+    try { localStorage.setItem('mc-draw-new-kind', kind); } catch (_) {}
+    const r = await api('/api/drawings/new', { dir, name, kind });
     if (!r.ok) { setStatus('err', '新建绘图失败：' + (r.error || '')); await renderDrawList(); return; }
     setStatus('ok', '已新建绘图：' + r.name);
     await renderDrawList();
@@ -3213,7 +3475,8 @@ async function renderDrawList() {
       } else {
         const row = document.createElement('div');
         row.className = 'draw-row' + (DRAW_FILE === c.path ? ' on' : '');
-        row.title = c.path + '　点击打开（Excalidraw 编辑器，改动自动保存）；拖到文件夹行可移动';
+        const kind = drawKind(c.path);
+        row.title = c.path + '　点击打开（' + (kind === 'drawio' ? 'Draw.io 在线编辑器' : 'Excalidraw 编辑器') + '，改动自动保存）；拖到文件夹行可移动';
         row.draggable = true;
         row.addEventListener('dragstart', (e) => {
           if (e.target.closest('button')) { e.preventDefault(); return; }
@@ -3226,7 +3489,16 @@ async function renderDrawList() {
         nm.textContent = drawBase(c.path);
         const fileIcon = document.createElement('span');
         fileIcon.className = 'draw-file-ic';
-        fileIcon.textContent = '◇';
+        fileIcon.textContent = kind === 'drawio' ? '▦' : '◇';
+        fileIcon.title = kind === 'drawio' ? 'Draw.io' : 'Excalidraw';
+        const typeBadge = document.createElement('span');
+        // 不直接使用 `.excalidraw` 类名，避免与编辑器自带的全局样式冲突。
+        typeBadge.className = 'draw-type draw-type--' + kind;
+        typeBadge.dataset.kind = kind;
+        typeBadge.textContent = kind === 'drawio' ? 'Draw.io' : 'Excalidraw';
+        typeBadge.title = kind === 'drawio'
+          ? '类型：Draw.io（流程图、架构图、UML）'
+          : '类型：Excalidraw（手绘草图、白板）';
         const ren = document.createElement('button');
         ren.className = 'draw-ren';
         ren.textContent = '✎';
@@ -3237,7 +3509,7 @@ async function renderDrawList() {
         del.textContent = '✕';
         del.title = '删除绘图';
         del.onclick = (e) => { e.stopPropagation(); deleteDrawing(c.path); };
-        row.appendChild(fileIcon); row.appendChild(nm); row.appendChild(ren); row.appendChild(del);
+        row.appendChild(fileIcon); row.appendChild(nm); row.appendChild(typeBadge); row.appendChild(ren); row.appendChild(del);
         row.onclick = () => openDrawing(c.path);
         container.appendChild(row);
       }
@@ -3351,13 +3623,27 @@ function wireDrawingPanel() {
   $('draw-nd-cancel').onclick = closeDrawNewDialog;
   $('draw-nd-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitDrawNewDialog(); });
   $('draw-back').onclick = () => closeDrawEditor(true);
+  $('draw-ai-btn').onclick=()=>showDrawTool('ai');
+  $('draw-xml-btn').onclick=()=>showDrawTool('xml');
+  $('draw-tool-ai-tab').onclick=()=>showDrawTool('ai');
+  $('draw-tool-xml-tab').onclick=()=>showDrawTool('xml');
+  $('draw-tool-close').onclick=hideDrawTool;
+  $('draw-ai-example').onclick=()=>{$('draw-ai-prompt').value=DRAW_TEST_PROMPT;$('draw-ai-prompt').focus();};
+  $('draw-ai-generate').onclick=generateDrawioWithAi;
+  $('draw-xml-validate').onclick=()=>{const checked=validateDrawioXmlLocal($('draw-xml-source').value);setDrawToolStatus(checked.ok?'✅ XML 有效 · '+checked.pages+' 页 · '+checked.cells+' 个单元':'❌ '+checked.error,checked.ok?'ok':'err');};
+  $('draw-xml-format').onclick=()=>{try{$('draw-xml-source').value=prettyDrawioXml($('draw-xml-source').value);setDrawToolStatus('✅ 已格式化','ok');}catch(error){setDrawToolStatus('❌ '+error.message,'err');}};
+  $('draw-xml-apply').onclick=()=>applyDrawioXml($('draw-xml-source').value,'XML 已校验并载入');
+  $('draw-tool-dialog').addEventListener('mousedown',(event)=>{if(event.target===$('draw-tool-dialog'))hideDrawTool();});
+  document.addEventListener('keydown',(event)=>{if(event.key==='Escape'&&$('draw-tool-dialog').classList.contains('open'))hideDrawTool();});
   $('pane-draw').classList.toggle('collapsed', !DRAW_OPEN);
+  window.addEventListener('message', onDrawioMessage);
   wireLibDownloadCapture();   // 一次性：拦截「下载库」→ 存到 vault/libraries/
   // 离开页面前把未保存改动写盘（keepalive 尽力而为）
   window.addEventListener('beforeunload', () => {
     if (DRAW_FILE && DRAW_PENDING) {
       clearTimeout(DRAW_SAVE_T);
-      try { fetch('/api/drawings/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: DRAW_FILE, data: sanitizeScene(DRAW_PENDING) }), keepalive: true }); } catch (_) {}
+      const data = DRAW_KIND === 'drawio' ? { xml: DRAW_PENDING.xml || '' } : sanitizeScene(DRAW_PENDING);
+      try { fetch('/api/drawings/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: DRAW_FILE, data }), keepalive: true }); } catch (_) {}
     }
     flushLibSave(LIB_ITEMS);
   });
@@ -6437,6 +6723,55 @@ function fuzzyScore(q, name) {
 }
 let symTimer = null;
 let SEARCH_MODE = 'ai', AI_SEARCH_BUSY = false, AI_SEARCH_SEQ = 0;
+const AI_SEARCH_HISTORY_KEY='codescope-ai-search-history-v1', AI_SEARCH_HISTORY_LIMIT=20;
+function aiSearchHistory() {
+  try {
+    const value=JSON.parse(localStorage.getItem(AI_SEARCH_HISTORY_KEY)||'[]');
+    return Array.isArray(value)?value.filter((item)=>item&&typeof item.query==='string').slice(0,AI_SEARCH_HISTORY_LIMIT):[];
+  } catch (_) { return []; }
+}
+function saveAiSearchHistory(items) {
+  try { localStorage.setItem(AI_SEARCH_HISTORY_KEY,JSON.stringify(items.slice(0,AI_SEARCH_HISTORY_LIMIT))); } catch (_) {}
+}
+function addAiSearchHistory(query,useWeb) {
+  const normalized=String(query||'').trim();if(!normalized)return;
+  const items=aiSearchHistory().filter((item)=>item.query!==normalized);
+  items.unshift({query:normalized,searchedAt:Date.now(),web:useWeb!==false});saveAiSearchHistory(items);
+}
+function removeAiSearchHistory(query) {
+  saveAiSearchHistory(aiSearchHistory().filter((item)=>item.query!==query));
+  renderAiSearchHistory($('sym-q').value);
+}
+function useAiSearchHistory(query) {
+  setSearchMode('ai');$('sym-q').value=query;$('sym-q').focus();
+}
+function renderAiSearchHistory(filter) {
+  const q=String(filter||'').trim().toLowerCase(), all=aiSearchHistory();
+  const items=q?all.filter((item)=>item.query.toLowerCase().includes(q)):all;
+  const box=$('sym-modal-res');box.innerHTML='';
+  const wrap=document.createElement('div');wrap.className='ai-search-history';
+  const head=document.createElement('div');head.className='ai-search-history-head';
+  const title=document.createElement('strong');title.textContent='最近搜索';head.appendChild(title);
+  const count=document.createElement('span');count.textContent=items.length+(q?' / '+all.length:'')+' 条';head.appendChild(count);
+  const spacer=document.createElement('span');spacer.className='sp';head.appendChild(spacer);
+  if(all.length){const clear=document.createElement('button');clear.textContent='清空记录';clear.onclick=()=>{if(confirm('清空全部 AI 搜索记录？')){saveAiSearchHistory([]);renderAiSearchHistory('');}};head.appendChild(clear);}
+  wrap.appendChild(head);
+  if(!items.length){const empty=document.createElement('div');empty.className='ai-search-history-empty';empty.textContent=q?'没有匹配的搜索记录':'完成一次 AI 搜索后，记录会显示在这里。';wrap.appendChild(empty);}
+  else {
+    const list=document.createElement('div');list.className='ai-search-history-list';
+    items.forEach((item)=>{
+      const row=document.createElement('div');row.className='ai-search-history-row';
+      const info=document.createElement('div');
+      const query=document.createElement('div');query.className='ai-search-history-query';query.textContent=item.query;query.title=item.query;
+      const meta=document.createElement('div');meta.className='ai-search-history-meta';meta.textContent=(item.web?'实时联网':'仅 AI')+' · '+new Date(item.searchedAt||Date.now()).toLocaleString();
+      info.appendChild(query);info.appendChild(meta);row.appendChild(info);
+      const use=document.createElement('button');use.className='ai-search-history-use';use.title='填入搜索框';use.setAttribute('aria-label','再次使用这条搜索');use.textContent='↗';use.onclick=()=>useAiSearchHistory(item.query);row.appendChild(use);
+      const del=document.createElement('button');del.className='ai-search-history-delete';del.title='删除记录';del.setAttribute('aria-label','删除这条搜索记录');del.textContent='×';del.onclick=()=>removeAiSearchHistory(item.query);row.appendChild(del);
+      row.ondblclick=()=>useAiSearchHistory(item.query);list.appendChild(row);
+    });wrap.appendChild(list);
+  }
+  box.appendChild(wrap);$('sym-modal-status').textContent=all.length+' 条本地记录';
+}
 function aiSearchMatches(query) {
   const q=String(query||'').trim().toLowerCase();
   if(!q) return [];
@@ -6466,13 +6801,13 @@ function renderAiSearchHome() {
 }
 function setSearchMode(mode) {
   AI_SEARCH_SEQ++;AI_SEARCH_BUSY=false;$('sym-ai-submit').disabled=false;
-  SEARCH_MODE=mode==='symbol'?'symbol':'ai';
-  const box=$('sym-modal-box'), isAi=SEARCH_MODE==='ai';
-  box.classList.toggle('ai-mode',isAi);box.classList.toggle('symbol-mode',!isAi);
-  $('sym-q').placeholder=isAi?'询问 API、函数用途、参数、示例或代码问题…':'函数 / 类型 / 宏 / 变量名…（跨库，支持模糊匹配）';
+  SEARCH_MODE=mode==='symbol'?'symbol':mode==='history'?'history':'ai';
+  const box=$('sym-modal-box'), isAi=SEARCH_MODE==='ai', isSymbol=SEARCH_MODE==='symbol';
+  box.classList.toggle('ai-mode',isAi);box.classList.toggle('symbol-mode',isSymbol);box.classList.toggle('history-mode',SEARCH_MODE==='history');
+  $('sym-q').placeholder=isAi?'询问 API、函数用途、参数、示例或代码问题…':isSymbol?'函数 / 类型 / 宏 / 变量名…（跨库，支持模糊匹配）':'筛选搜索记录…';
   $('sym-modal-mode').querySelectorAll('button').forEach((button)=>{const on=button.dataset.searchMode===SEARCH_MODE;button.classList.toggle('on',on);button.setAttribute('aria-selected',String(on));});
   $('sym-q').value='';
-  if(isAi) renderAiSearchHome(); else renderSymResults('');
+  if(isAi) renderAiSearchHome(); else if(isSymbol) renderSymResults(''); else renderAiSearchHistory('');
   requestAnimationFrame(()=>$('sym-q').focus());
 }
 function renderAiSearchHits(container, matches) {
@@ -6519,6 +6854,7 @@ async function submitAiSearch(options) {
   }
   const useWeb=options.web!==false;
   if(useWeb&&!cfg.searchKey){renderAiSearchSetup('请在 AI 设置中选择 Tavily 或 Brave，并填写对应的 Search API Key。密钥仅保存在当前浏览器。',true);$('sym-modal-status').textContent='缺少联网配置';return;}
+  addAiSearchHistory(query,useWeb);
   const matches=aiSearchMatches(query), seq=++AI_SEARCH_SEQ;
   AI_SEARCH_BUSY=true;$('sym-ai-submit').disabled=true;$('sym-modal-status').textContent='正在检索…';
   box.innerHTML='<div class="ai-search-loading"><span class="typing"><i></i><i></i><i></i></span><span>'+(useWeb?'正在实时搜索网络资料…':'正在结合 AI 知识与项目代码生成答案…')+'</span></div>';
@@ -8840,6 +9176,7 @@ function makeHResizer(handle, getter, setter) {
   $('sym-ai-submit').onclick = submitAiSearch;
   $('sym-modal-mode').querySelectorAll('button').forEach((button)=>button.onclick=()=>setSearchMode(button.dataset.searchMode));
   $('sym-q').addEventListener('input', (e) => {
+    if(SEARCH_MODE==='history'){renderAiSearchHistory(e.target.value);return;}
     if(SEARCH_MODE!=='symbol') return;
     clearTimeout(symTimer);
     symTimer = setTimeout(() => renderSymResults(e.target.value), 120);
@@ -8848,6 +9185,10 @@ function makeHResizer(handle, getter, setter) {
     if(SEARCH_MODE==='ai'){
       if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitAiSearch();}
       else if(e.key==='Escape') closeSymModal();
+      return;
+    }
+    if(SEARCH_MODE==='history'){
+      if(e.key==='Escape')closeSymModal();
       return;
     }
     if (e.key === 'ArrowDown') { e.preventDefault(); setActiveSymResult(SYM_ACTIVE + 1); }
@@ -9011,6 +9352,10 @@ async function loadEnv(refreshNow, quiet) {
   try {
   const d = await api('/api/env' + (refreshNow ? '?refresh=1' : ''));
   if (!d || !d.summary || !d.env) throw new Error((d && d.error) || '环境检测返回异常');
+  const drawCfg=aiCfg(), aiDrawingReady=!!(aiNormalizeUrl(drawCfg.url)&&drawCfg.model);
+  d.env.aiDrawing={key:'aiDrawing',label:'AI 绘图模型',for:'自然语言生成 / 修改 Draw.io XML',group:'绘图工具',available:aiDrawingReady,installed:aiDrawingReady,required:false,version:aiDrawingReady?drawCfg.model:'',path:aiDrawingReady?aiNormalizeUrl(drawCfg.url):'',issue:aiDrawingReady?'':'尚未配置 OpenAI 兼容 API URL 与模型',hint:'在右侧 AI 面板打开“设置”，填写 API URL、Key 和模型后测试连接',installable:false};
+  d.summary.total+=1;
+  if(aiDrawingReady)d.summary.ready+=1;else{d.summary.missing+=1;d.summary.optionalMissing+=1;}
   ENV_DATA = d;
   envButton.classList.remove('env-checking');
   envButton.classList.add(d.summary.requiredMissing ? 'env-warn' : 'env-ok');
