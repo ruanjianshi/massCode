@@ -1049,10 +1049,10 @@
   .rel-row .edge { margin-left:4px; padding:0 4px; border:1px solid var(--border); border-radius:7px; color:var(--dim); font-size:8px; }
   .rel-row .edge.dynamic { color:#dbb904; border-color:rgba(219,185,4,.45); }
   .rel-row .edge.cycle { color:var(--err); border-color:rgba(248,81,73,.45); }
-  .rel-graph { container-type:inline-size; position:relative; display:grid; grid-template-columns:minmax(104px,1fr) minmax(118px,.92fr) minmax(104px,1fr); gap:clamp(16px,4%,34px); align-items:stretch; min-height:250px; padding:18px 14px 22px; overflow:hidden; border-bottom:1px solid color-mix(in srgb,var(--border) 65%,transparent); background:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--accent) 5%,transparent),transparent 42%); }
-  .rel-graph.no-upstream { grid-template-columns:minmax(130px,.8fr) minmax(180px,1.2fr); padding-inline:clamp(22px,7%,64px); }
+  .rel-graph { container-type:inline-size; position:relative; display:grid; grid-template-columns:minmax(104px,1fr) minmax(118px,.92fr) minmax(104px,1fr); gap:clamp(30px,6%,64px); align-items:stretch; min-height:250px; padding:18px 14px 22px; overflow:hidden; border-bottom:1px solid color-mix(in srgb,var(--border) 65%,transparent); background:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--accent) 5%,transparent),transparent 42%); }
+  .rel-graph.no-upstream { grid-template-columns:minmax(130px,.88fr) minmax(180px,1.12fr); gap:clamp(32px,9%,82px); padding-inline:clamp(18px,4%,42px); }
   .rel-graph.no-upstream > .rel-graph-col.upstream { display:none; }
-  .rel-graph.no-downstream { grid-template-columns:minmax(180px,1.2fr) minmax(130px,.8fr); padding-inline:clamp(22px,7%,64px); }
+  .rel-graph.no-downstream { grid-template-columns:minmax(180px,1.12fr) minmax(130px,.88fr); gap:clamp(32px,9%,82px); padding-inline:clamp(18px,4%,42px); }
   .rel-graph.no-downstream > .rel-graph-col.downstream { display:none; }
   .rel-graph.isolated { display:flex; align-items:center; justify-content:center; }
   .rel-graph.isolated > .rel-graph-col:not(.root) { display:none; }
@@ -6534,18 +6534,23 @@ function drawRelationGraph(graph) {
   svg.querySelectorAll('.rel-link,.rel-link-halo,.rel-port').forEach(p => p.remove());
   const path=(d,color,marker)=>{
     const halo=document.createElementNS('http://www.w3.org/2000/svg','path');halo.setAttribute('class','rel-link-halo');halo.setAttribute('d',d);halo.setAttribute('fill','none');halo.setAttribute('stroke','var(--bg)');halo.setAttribute('stroke-width','5');halo.setAttribute('stroke-linecap','round');halo.setAttribute('opacity','.72');svg.appendChild(halo);
-    const line=document.createElementNS('http://www.w3.org/2000/svg','path');line.setAttribute('class','rel-link');line.setAttribute('d',d);line.setAttribute('fill','none');line.setAttribute('stroke',color);line.setAttribute('stroke-width','1.6');line.setAttribute('stroke-linecap','round');line.setAttribute('stroke-linejoin','round');line.setAttribute('opacity','.9');if(marker)line.setAttribute('marker-end','url(#'+marker+')');svg.appendChild(line);
+    const line=document.createElementNS('http://www.w3.org/2000/svg','path');line.setAttribute('class','rel-link');line.setAttribute('d',d);line.setAttribute('fill','none');line.setAttribute('stroke',color);line.setAttribute('stroke-width','1.35');line.setAttribute('stroke-linecap','round');line.setAttribute('stroke-linejoin','round');line.setAttribute('opacity','.82');if(marker)line.setAttribute('marker-end','url(#'+marker+')');svg.appendChild(line);
   };
   const port=(x,y,color)=>{const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('class','rel-port');circle.setAttribute('cx',String(x));circle.setAttribute('cy',String(y));circle.setAttribute('r','3');circle.setAttribute('fill',color);circle.setAttribute('stroke','var(--bg)');circle.setAttribute('stroke-width','2');svg.appendChild(circle);};
   const rootY=rootBox.top+rootBox.height/2-box.top;
   const wireSide=(cards,incoming)=>{
-    if(!cards.length)return;const color=incoming?'var(--accent)':'var(--ok)',rootX=(incoming?rootBox.left:rootBox.right)-box.left;
-    const rects=cards.map(card=>card.getBoundingClientRect()),ends=rects.map(rect=>({x:(incoming?rect.right:rect.left)-box.left,y:rect.top+rect.height/2-box.top}));
-    const nearest=ends.reduce((best,item)=>Math.min(best,Math.abs(item.x-rootX)),Infinity),trunkX=incoming?rootX-Math.max(16,nearest*.42):rootX+Math.max(16,nearest*.42);
-    const ys=ends.map(item=>item.y),top=Math.min(rootY,...ys),bottom=Math.max(rootY,...ys);
-    if(bottom-top>1)path('M'+trunkX+','+top+' V'+bottom,color,'');
-    ends.forEach(item=>path('M'+item.x+','+item.y+' H'+trunkX,color,incoming?'':graph.dataset.downMarker));
-    path('M'+trunkX+','+rootY+' H'+rootX,color,incoming?graph.dataset.upMarker:'');port(rootX,rootY,color);
+    if(!cards.length)return;
+    const color=incoming?'var(--accent)':'var(--ok)',rootX=(incoming?rootBox.left:rootBox.right)-box.left;
+    const ends=cards.map(card=>card.getBoundingClientRect()).map(rect=>({x:(incoming?rect.right:rect.left)-box.left,y:rect.top+rect.height/2-box.top}));
+    /* 每条边从同一个安静的端口平滑扇出；目标端使用轻量空心箭头。 */
+    ends.forEach(item=>{
+      const gap=Math.max(1,Math.abs(item.x-rootX)),bend=Math.max(18,Math.min(76,gap*.42));
+      const d=incoming
+        ? 'M'+item.x+','+item.y+' C'+(item.x+bend)+','+item.y+' '+(rootX-bend)+','+rootY+' '+rootX+','+rootY
+        : 'M'+rootX+','+rootY+' C'+(rootX+bend)+','+rootY+' '+(item.x-bend)+','+item.y+' '+item.x+','+item.y;
+      path(d,color,incoming?graph.dataset.upMarker:graph.dataset.downMarker);
+    });
+    port(rootX,rootY,color);
   };
   wireSide([...graph.querySelectorAll('.rel-card.upstream')],true);
   wireSide([...graph.querySelectorAll('.rel-card.downstream')],false);
@@ -6557,8 +6562,8 @@ function buildRelationGraph(body, left, center, right, labels) {
   const seq = ++REL_GRAPH_SEQ, upMarker = 'rel-up-' + seq, downMarker = 'rel-down-' + seq;
   graph.dataset.upMarker = upMarker; graph.dataset.downMarker = downMarker;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'rel-graph-svg');
-  svg.innerHTML = '<defs><marker id="' + upMarker + '" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--accent)"/></marker>' +
-    '<marker id="' + downMarker + '" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="var(--ok)"/></marker></defs>';
+  svg.innerHTML = '<defs><marker id="' + upMarker + '" markerWidth="6" markerHeight="6" refX="5.15" refY="3" viewBox="0 0 6 6" orient="auto" markerUnits="userSpaceOnUse"><path d="M.8,.75 L5.15,3 L.8,5.25" fill="none" stroke="var(--accent)" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></marker>' +
+    '<marker id="' + downMarker + '" markerWidth="6" markerHeight="6" refX="5.15" refY="3" viewBox="0 0 6 6" orient="auto" markerUnits="userSpaceOnUse"><path d="M.8,.75 L5.15,3 L.8,5.25" fill="none" stroke="var(--ok)" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>';
   graph.appendChild(svg);
   const makeCol = (label, items, side) => {
     const col = document.createElement('div'); col.className = 'rel-graph-col '+side;
