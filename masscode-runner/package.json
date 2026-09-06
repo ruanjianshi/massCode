@@ -15,6 +15,7 @@
   "license": "MIT",
   "dependencies": {
     "@novnc/novnc": "^1.7.0",
+    "pdfjs-dist": "^4.10.38",
     "saxes": "^6.0.0",
     "ssh2": "^1.17.0",
     "ws": "^8.21.3"

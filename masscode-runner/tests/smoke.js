@@ -73,6 +73,25 @@ async function postJson(baseUrl, pathname, body, expectedStatus = 200) {
   return response.json();
 }
 
+function samplePdf(text) {
+  const escaped = String(text).replace(/([\\()])/g, '\\$1');
+  const stream = `BT /F1 18 Tf 72 720 Td (${escaped}) Tj ET`;
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let pdf = '%PDF-1.4\n', offsets = [0];
+  objects.forEach((object, index) => { offsets.push(Buffer.byteLength(pdf)); pdf += `${index + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (let index = 1; index <= objects.length; index++) pdf += String(offsets[index]).padStart(10, '0') + ' 00000 n \n';
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(pdf);
+}
+
 async function main() {
   fs.mkdirSync(path.join(vault, 'code'), { recursive: true });
   fs.mkdirSync(path.join(vault, 'drawings'), { recursive: true });
@@ -124,7 +143,7 @@ int main(void) { return 0; }
   await waitForServer(baseUrl, output);
 
   const version = await requestJson(baseUrl, '/api/version');
-  assert(version.ok && version.name === '码境 CodeScope' && version.version === '1.2.0' && version.apiRevision >= 2 && version.features.includes('project-health') && version.features.includes('live-web-search') && version.features.includes('search-history') && version.features.includes('editor-groups') && version.features.includes('drawio') && version.features.includes('drawio-xml') && version.features.includes('ai-drawio') && version.features.includes('full-text-search') && version.features.includes('quick-open') && version.features.includes('navigation-history') && version.features.includes('definition-peek') && version.features.includes('header-source-switch') && version.features.includes('lsp'), '版本接口返回异常');
+  assert(version.ok && version.name === '码境 CodeScope' && version.version === '1.2.0' && version.apiRevision >= 2 && version.features.includes('project-health') && version.features.includes('live-web-search') && version.features.includes('search-history') && version.features.includes('editor-groups') && version.features.includes('drawio') && version.features.includes('drawio-xml') && version.features.includes('ai-drawio') && version.features.includes('full-text-search') && version.features.includes('quick-open') && version.features.includes('navigation-history') && version.features.includes('definition-peek') && version.features.includes('header-source-switch') && version.features.includes('lsp') && version.features.includes('pdf-library') && version.features.includes('pdf-translation') && version.features.includes('reading-fragments') && version.features.includes('reading-split-view') && version.features.includes('reading-projects') && version.features.includes('reading-code-notes'), '版本接口返回异常');
 
   const page = await fetch(baseUrl + '/');
   const html = await page.text();
@@ -145,6 +164,7 @@ int main(void) { return 0; }
   assert(html.includes('timeoutMs:300000') && html.includes('复杂图可能需要 1–5 分钟') && serverSource.includes('Math.min(600000') && serverSource.includes("e.name === 'TimeoutError'"), 'Draw.io AI 绘图长耗时请求或超时提示缺失');
   assert(html.includes('networkError:true') && html.includes('后端返回了无法解析的响应') && serverSource.includes("require('saxes')"), '全局 API 错误处理或服务端 XML 解析器缺失');
   assert((launchers.match(/node_modules[\\/]saxes/g) || []).length === 4, '启动脚本未完整检测新增运行依赖');
+  assert((launchers.match(/node_modules[\\/]pdfjs-dist/g) || []).length === 4, '启动脚本未完整检测 PDF 文本解析依赖');
   assert(html.includes('id="editor-drop-overlay"') && html.includes('split-editor-group') && html.includes('initEditorGroups') && html.includes('application/x-codescope-editor'), '2 至 4 栏拖拽编辑功能缺失');
   assert(html.includes('data-search-mode="text"') && html.includes('renderTextResults') && html.includes('id="text-regex"'), '全文搜索或正则检索功能缺失');
   assert(html.includes('data-search-mode="file"') && html.includes('renderFileResults') && html.includes("key==='p'"), '快速打开文件功能缺失');
@@ -155,7 +175,18 @@ int main(void) { return 0; }
   assert(html.includes('DEFINITION_HOVER_INTERACTING') && html.includes('scheduleDefinitionHoverHide') && html.includes('overscroll-behavior:contain') && html.includes('from+120'), '悬停定义卡片缺少鼠标移入、滚动或长定义查看能力');
   assert(html.includes('/api/lsp/query') && html.includes('enrichDefinitionHover') && serverSource.includes("require('./lib/lsp-service')"), '通用 LSP 服务或悬停信息接入缺失');
   assert(html.includes('id="btn-pair-switch"') && html.includes('pairedCodeFile') && html.includes("key==='o'"), '头文件与源文件快速切换功能缺失');
-  assert(html.includes('#pane-git, #pane-tags, #pane-draw { flex:0 1 auto; min-height:37px; }') && html.includes('#pane-tree { min-height:96px; }') && html.includes('#pane-draw { min-height:108px; }'), '左侧多面板在低高度窗口中缺少自适应收缩');
+  assert(html.includes('#pane-git, #pane-tags, #pane-draw, #pane-reading { flex:0 1 auto; min-height:37px; }') && html.includes('#pane-tree { min-height:96px; }') && html.includes('#pane-draw, #pane-reading { min-height:108px; }'), '左侧多面板在低高度窗口中缺少自适应收缩');
+  assert(html.includes('id="pane-reading"') && html.includes('id="reading-workspace"') && html.includes('application/x-codescope-reading') && html.includes('拖到阅读区右侧新建一栏'), 'PDF 阅读项目或拖拽片段组合入口缺失');
+  assert(html.includes('translateReadingSelection') && html.includes('translateReadingPage') && html.includes('translateReadingAll') && html.includes('renderReadingFragments'), 'PDF AI 翻译或片段管理功能缺失');
+  assert(html.includes('openReadingProject') && html.includes('addReadingProjectFragment') && html.includes('/api/readings/text-fragment') && html.includes('已匹配中文 PDF'), '阅读项目、多类型片段或中文版 PDF 自动配对功能缺失');
+  assert(html.includes('<option value="source">可选文本</option>') && html.includes('requireSelectableReadingText') && html.includes('已切换到“可选文本”'), 'PDF 选段翻译或摘录缺少可读取文本模式');
+  assert(html.includes('readingPdfVersions') && html.includes("versions.translation?'中文 PDF':'AI 中文译文'") && html.includes("versions.bilingual?'双语 PDF':'双语对照'") && html.includes('translatedDoc.pages'), 'PDF 视图切换未优先使用项目内已有中文或双语版本');
+  assert(html.includes('id="reading-fragments-resizer"') && html.includes('mc-reading-fragments-width') && html.includes('finishFragmentResize'), '阅读片段面板缺少横向拖拽调整宽度能力');
+  assert(html.includes('id="reading-project-tabs"') && html.includes('reading-project-tab') && html.includes('renderReadingProjectTabs') && html.includes('＋ 片段'), '阅读项目缺少代码式片段标签、新建入口或拖拽组合能力');
+  assert(html.includes('id="reading-new-library-folder"') && html.includes('createReadingFolder') && html.includes('editReadingProjectMeta') && html.includes('reading-project-tag'), '阅读项目缺少文件夹、说明或标签管理能力');
+  assert(!html.includes('id="reading-one"') && !html.includes('id="reading-two"') && html.includes('id="reading-new-column-drop"') && html.includes('updateReadingColumnLayout') && html.includes('closeReadingColumn'), '阅读工作区仍依赖固定单/双栏按钮或缺少拖拽自动分栏');
+  assert(html.includes('id="reading-new-dialog"') && html.includes('submitReadingNewFragment') && html.includes('<option value="latex">LaTeX') && html.includes('<option value="python">Python'), '阅读项目缺少统一的 PDF、文档与代码片段新建窗口');
+  assert(serverSource.includes("'/api/readings/node/move'") && html.includes('application/x-codescope-reading-node'), '阅读文件夹或项目缺少拖拽调整层级能力');
   assert(html.includes('html[data-theme] .split-editor-input') && html.includes("classList.toggle('plain',!exact)"), '多栏编辑器高亮层遮挡修复或纯文本降级缺失');
   assert(html.includes('withActiveSplitContext') && html.includes('activateSplitReading') && html.includes('activateOpenSplitLocation'), '右侧阅读面板未跟随多栏编辑器焦点');
   assert(html.includes('if(multi)applySplitRatios()') && /applyMdView\(\);\s*if\(multi\)applySplitRatios/.test(html), '多栏退出后 Markdown/LaTeX 预览恢复逻辑缺失');
@@ -167,6 +198,49 @@ int main(void) { return 0; }
 
   const snippets = await requestJson(baseUrl, '/api/snippets');
   assert(snippets.vault === vault && snippets.snippets.length === 1, '片段接口返回异常');
+
+  const readingFolder = await postJson(baseUrl, '/api/readings/folder', { name:'Research', parent:'' });
+  assert(readingFolder.ok && readingFolder.path === 'Research', '阅读文库文件夹创建失败');
+  const readingProject = await postJson(baseUrl, '/api/readings/project/new', { name:'Papers', parent:'Research', description:'机器人论文资料', tags:'机器人，强化学习' });
+  assert(readingProject.ok && readingProject.path === 'Research/Papers' && readingProject.meta.tags.length === 2, '嵌套阅读项目、说明或标签创建失败');
+  const updatedProjectMeta = await postJson(baseUrl, '/api/readings/project/meta', { project:'Research/Papers', description:'机器人与控制论文', tags:['机器人','控制'] });
+  assert(updatedProjectMeta.ok && updatedProjectMeta.meta.description === '机器人与控制论文' && updatedProjectMeta.meta.tags.includes('控制'), '阅读项目说明或标签更新失败');
+  const archiveFolder = await postJson(baseUrl, '/api/readings/folder', { name:'Archive', parent:'' });
+  const movedProject = await postJson(baseUrl, '/api/readings/node/move', { type:'project', path:'Research/Papers', toFolder:'Archive' });
+  const restoredProject = await postJson(baseUrl, '/api/readings/node/move', { type:'project', path:'Archive/Papers', toFolder:'Research' });
+  const deletedArchive = await postJson(baseUrl, '/api/readings/folder/delete', { folder:'Archive' });
+  assert(archiveFolder.ok && movedProject.ok && movedProject.path === 'Archive/Papers' && restoredProject.ok && restoredProject.path === 'Research/Papers' && deletedArchive.ok, '阅读项目拖拽调整文件夹层级失败');
+  const nestedReadingFolder = await postJson(baseUrl, '/api/readings/folder', { name:'归档', parent:'Research' });
+  const renamedReadingFolder = await postJson(baseUrl, '/api/readings/folder/rename', { folder:nestedReadingFolder.path, name:'已读' });
+  const deletedReadingFolder = await postJson(baseUrl, '/api/readings/folder/delete', { folder:renamedReadingFolder.path });
+  assert(nestedReadingFolder.ok && renamedReadingFolder.ok && renamedReadingFolder.path === 'Research/已读' && deletedReadingFolder.ok, '嵌套阅读文件夹创建、重命名或删除失败');
+  const readingInfo = Buffer.from(JSON.stringify({ name:'paper.pdf', folder:'Research/Papers' })).toString('base64');
+  const readingUploadResponse = await fetch(baseUrl + '/api/readings/upload-stream', { method:'POST', headers:{'Content-Type':'application/pdf','X-CodeScope-Reading':readingInfo}, body:samplePdf('Hello research paper') });
+  const readingUpload = await readingUploadResponse.json();
+  assert(readingUploadResponse.ok && readingUpload.ok && readingUpload.path === 'Research/Papers/paper.pdf', 'PDF 流式导入失败');
+  const chineseInfo = Buffer.from(JSON.stringify({ name:'paper_中文.pdf', folder:'Research/Papers' })).toString('base64');
+  const chineseResponse = await fetch(baseUrl + '/api/readings/upload-stream', { method:'POST', headers:{'Content-Type':'application/pdf','X-CodeScope-Reading':chineseInfo}, body:samplePdf('Chinese paper') });
+  const chineseUpload = await chineseResponse.json();
+  assert(chineseResponse.ok && chineseUpload.ok, '中文版 PDF 导入失败');
+  const note = await postJson(baseUrl, '/api/readings/text/new', { project:'Research/Papers', name:'阅读笔记.md' });
+  assert(note.ok && note.kind === 'markdown', '阅读项目 Markdown 片段创建失败');
+  const savedNote = await postJson(baseUrl, '/api/readings/text-fragment', { path:note.path, content:'# 结论\n\n测试笔记' });
+  const openedNote = await requestJson(baseUrl, '/api/readings/text-fragment?path=' + encodeURIComponent(note.path));
+  assert(savedNote.ok && openedNote.ok && /测试笔记/.test(openedNote.content), '阅读项目文本片段读写失败');
+  const readingTree = await requestJson(baseUrl, '/api/readings/tree');
+  const researchFolder = readingTree.root.children.find((item) => item.path === 'Research');
+  const paperProject = researchFolder && researchFolder.children.find((item) => item.path === 'Research/Papers');
+  assert(readingTree.ok && readingTree.total === 3 && researchFolder && researchFolder.type === 'folder' && paperProject && paperProject.count === 3 && paperProject.description === '机器人与控制论文' && paperProject.tags.includes('控制') && paperProject.children.every((item) => item.project === 'Research/Papers') && paperProject.children.some((item) => item.role === 'original') && paperProject.children.some((item) => item.role === 'translation') && paperProject.children.some((item) => item.kind === 'markdown'), '阅读文件夹、项目元数据或多类型片段聚合异常');
+  const readingText = await requestJson(baseUrl, '/api/readings/text?path=' + encodeURIComponent(readingUpload.path));
+  assert(readingText.ok && readingText.pageCount === 1 && /Hello research paper/.test(readingText.pages[0]), 'PDF 页级文本提取失败');
+  const readingMeta = await postJson(baseUrl, '/api/readings/meta', { path:readingUpload.path, meta:{ page:1, view:'bilingual', translations:{1:'你好，研究论文'}, fragments:[{id:'f1',page:1,source:'research paper',translation:'研究论文',note:'术语'}] } });
+  assert(readingMeta.ok && readingMeta.meta.view === 'bilingual' && readingMeta.meta.fragments.length === 1, 'PDF 译文或片段记录保存失败');
+  const readingRange = await fetch(baseUrl + '/api/readings/file?path=' + encodeURIComponent(readingUpload.path), { headers:{Range:'bytes=0-4'} });
+  assert(readingRange.status === 206 && await readingRange.text() === '%PDF-', 'PDF Range 分段读取失败');
+  const readingRename = await postJson(baseUrl, '/api/readings/rename', { path:readingUpload.path, name:'renamed.pdf' });
+  assert(readingRename.ok && readingRename.path === 'Research/Papers/renamed.pdf', 'PDF 重命名失败');
+  const readingMetaAfterRename = await requestJson(baseUrl, '/api/readings/meta?path=' + encodeURIComponent(readingRename.path));
+  assert(readingMetaAfterRename.ok && readingMetaAfterRename.meta.translations['1'] === '你好，研究论文', 'PDF 重命名后译文记录丢失');
 
   const newDrawio = await postJson(baseUrl, '/api/drawings/new', { name: 'Smoke Drawio', dir: '', kind: 'drawio' });
   assert(newDrawio.ok && newDrawio.kind === 'drawio' && newDrawio.name.endsWith('.drawio') && newDrawio.xml.includes('<mxfile'), 'Draw.io 文件创建失败');

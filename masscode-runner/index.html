@@ -64,8 +64,8 @@
   #pane-git { flex: 0 0 auto; display: flex; flex-direction: column; overflow: hidden; }
   #pane-tags { flex: 0 0 auto; display: flex; flex-direction: column; overflow: hidden; }
   /* 面板拖拽重排：按住面板标题栏上下拖动即可换位（顺序持久化到 localStorage） */
-  #tree-head, #git-head, #tag-head, #draw-head { cursor: grab; }
-  #tree-head:active, #git-head:active, #tag-head:active, #draw-head:active { cursor: grabbing; }
+  #tree-head, #git-head, #tag-head, #draw-head, #reading-head { cursor: grab; }
+  #tree-head:active, #git-head:active, #tag-head:active, #draw-head:active, #reading-head:active { cursor: grabbing; }
   .pane-dragging { opacity: .45 !important; }
   #panel-drop-line { position: fixed; left: 10px; width: calc(100% - 140px); height: 2px; background: var(--accent); z-index: 210; pointer-events: none; display: none; box-shadow: 0 0 6px rgba(79,140,255,.6); }
   .hsplit { flex: none; height: 7px; cursor: row-resize; position: relative; background: transparent; }
@@ -562,6 +562,108 @@
   .draw-row:hover .draw-ren { visibility: visible; }
   .draw-row .draw-ren:hover { color: #9fc0ff; background: rgba(79,140,255,.14); }
   .draw-empty { padding: 10px 8px; color: var(--dim); font-size: 12px; font-style: italic; }
+  /* ---- 阅读文库（PDF / 论文 / 开发文档） ---- */
+  #pane-reading { display:flex; flex:0 1 auto; min-height:108px; max-height:70%; flex-direction:column; overflow:hidden; border-top:1px solid var(--border); background:var(--panel); }
+  #pane-reading.collapsed { min-height:40px; height:auto !important; }
+  #pane-reading.collapsed #reading-list { display:none; }
+  #reading-head { display:flex; align-items:center; gap:5px; min-height:38px; padding:7px 10px; color:var(--dim); font-size:12px; font-weight:600; cursor:grab; user-select:none; }
+  #reading-head:hover { color:var(--text); } #reading-head .sp { flex:1; }
+  #reading-head .arrow { width:10px; text-align:center; transition:transform .15s; }
+  #pane-reading.collapsed #reading-head .arrow { transform:rotate(-90deg); }
+  #reading-head button { padding:1px 5px; border-color:transparent; background:transparent; color:var(--accent); font-size:13px; }
+  #reading-list { flex:1; min-height:0; overflow:auto; padding:4px 7px 10px; background:var(--theme-deep,var(--bg)); }
+  .reading-folder,.reading-file { display:flex; align-items:center; gap:6px; min-height:30px; padding:4px 7px; border-radius:6px; color:var(--dim); font-size:11px; }
+  .reading-folder { cursor:pointer; user-select:none; } .reading-folder:hover,.reading-file:hover { background:var(--panel2); color:var(--text); }
+  .reading-project { margin-top:3px; border:1px solid transparent; font-weight:650; color:var(--text); }
+  .reading-project.on { border-color:var(--accent); background:var(--accent-soft); }
+  .reading-project-copy { min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; padding:2px 0; }
+  .reading-project-copy .name { flex:none; font-size:11px; }
+  .reading-project-desc { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dim); font-size:9px; font-weight:400; }
+  .reading-project-desc.empty { opacity:.72; font-style:italic; }
+  .reading-project-tags { display:flex; gap:3px; overflow:hidden; }
+  .reading-project-tag { padding:0 5px; border:1px solid rgba(79,140,255,.35); border-radius:8px; color:#8fb5ff; font-size:8px; font-weight:400; white-space:nowrap; }
+  .reading-project-tag.empty { border-style:dashed; color:var(--dim); cursor:pointer; }
+  .reading-library-folder { margin-top:3px; color:var(--text); font-weight:650; }
+  .reading-library-folder.drop-target,#reading-list.root-drop { background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent); }
+  .reading-project.dragging,.reading-library-folder.dragging { opacity:.45; }
+  .reading-library-folder .meta { color:var(--dim); font-size:9px; font-weight:400; }
+  .reading-library-children { margin-left:12px; padding-left:6px; border-left:1px solid var(--border); }
+  .reading-project .meta { color:var(--dim); font-size:9px; font-weight:400; white-space:nowrap; }
+  .reading-project button { visibility:hidden; padding:1px 4px; border:0; background:transparent; color:var(--dim); font-size:10px; }
+  .reading-project:hover button { visibility:visible; }
+  .reading-file { color:var(--text); cursor:pointer; } .reading-file.on { background:var(--accent-soft); box-shadow:inset 2px 0 var(--accent); }
+  .reading-file .name,.reading-folder .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .reading-file .meta { color:var(--dim); font-size:9px; white-space:nowrap; }
+  .reading-file button { visibility:hidden; padding:1px 4px; border:0; background:transparent; color:var(--dim); font-size:10px; }
+  .reading-file:hover button { visibility:visible; } .reading-file button:hover { color:var(--accent); }
+  .reading-children { margin-left:14px; padding-left:6px; border-left:1px solid var(--border); }
+  .reading-kind { width:20px; flex:none; text-align:center; color:var(--accent); font:700 9px var(--mono); }
+  .reading-kind.markdown { color:#bc8cff; } .reading-kind.code { color:#67d58a; }
+  .reading-role { flex:none; padding:1px 5px; border:1px solid var(--border); border-radius:9px; color:var(--dim); font-size:8px; white-space:nowrap; }
+  .reading-role.translation { border-color:rgba(83,201,139,.45); color:#67d58a; }
+  .reading-role.bilingual { border-color:rgba(188,140,255,.5); color:#bc8cff; }
+  #reading-workspace { display:none; flex:1; min-height:0; flex-direction:column; overflow:hidden; background:var(--bg); }
+  body.reading-mode #reading-workspace { display:flex; }
+  body.reading-mode #toolbar,body.reading-mode #tabs,body.reading-mode #code-context-bar,body.reading-mode #draw-editor,body.reading-mode #edit-split,body.reading-mode #resource-viewer,body.reading-mode #preview,body.reading-mode #input-area,body.reading-mode #split-h,body.reading-mode #output,body.reading-mode #split-v2,body.reading-mode #outline-panel { display:none !important; }
+  .reading-toolbar { display:flex; align-items:center; gap:7px; min-height:48px; padding:7px 10px; border-bottom:1px solid var(--border); background:var(--panel); }
+  .reading-toolbar .title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:650; }
+  #reading-project-context { max-width:38%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dim); font-size:10px; }
+  .reading-toolbar .sp { flex:1; } .reading-toolbar button.on { background:var(--accent-soft); }
+  #reading-project-tabs { min-height:42px; display:flex; align-items:flex-end; gap:2px; padding:5px 8px 0; overflow-x:auto; overflow-y:hidden; border-bottom:1px solid var(--border); background:var(--theme-deep,var(--bg)); scrollbar-width:thin; }
+  .reading-project-tab { min-width:110px; max-width:250px; height:36px; display:flex; align-items:center; gap:6px; padding:0 9px; flex:none; border:1px solid transparent; border-bottom:0; border-radius:8px 8px 0 0; background:var(--panel2); color:var(--dim); cursor:pointer; user-select:none; }
+  .reading-project-tab:hover { color:var(--text); background:var(--panel); }
+  .reading-project-tab.on { border-color:var(--border); background:var(--panel); color:var(--text); box-shadow:inset 0 -2px var(--accent); }
+  .reading-project-tab.dragging { opacity:.45; }
+  .reading-project-tab .tab-kind { flex:none; color:var(--accent); font:700 9px var(--mono); }
+  .reading-project-tab .tab-name { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+  .reading-project-tab .tab-role { flex:none; color:var(--dim); font-size:8px; }
+  .reading-project-tab .tab-action { display:none; padding:0 2px; border:0; background:transparent; color:var(--dim); font-size:9px; }
+  .reading-project-tab:hover .tab-action { display:block; }
+  .reading-project-tab .tab-action:hover { color:var(--accent); }
+  #reading-project-add { height:34px; margin:0 0 1px 3px; padding:0 12px; flex:none; border-style:dashed; color:var(--dim); background:transparent; }
+  #reading-project-add:hover { color:var(--accent); border-color:var(--accent); }
+  #reading-stage { --reading-left:50%; --reading-fragments-width:300px; flex:1; min-height:0; display:flex; overflow:hidden; padding:8px; gap:0; }
+  #reading-columns { position:relative; flex:1; min-width:0; display:grid; grid-template-columns:minmax(220px,var(--reading-left)) 7px minmax(220px,1fr); min-height:0; overflow:hidden; }
+  #reading-columns.single { grid-template-columns:minmax(0,1fr); } #reading-columns.single #reading-divider,#reading-columns.single .reading-col[data-slot="1"] { display:none; }
+  #reading-new-column-drop { display:none; position:absolute; z-index:30; top:54px; right:10px; bottom:10px; width:34%; place-items:center; border:2px dashed var(--accent); border-radius:9px; background:rgba(8,14,22,.78); color:#b9d0ff; font-weight:700; pointer-events:auto; }
+  #reading-columns.single.fragment-dragging #reading-new-column-drop { display:grid; }
+  .reading-col { position:relative; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; border:1px solid var(--border); border-radius:9px; background:var(--panel2); }
+  .reading-col.drag-over { border-color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent); }
+  .reading-col.drag-over::after { content:'放到此栏'; position:absolute; z-index:20; inset:44px 10px 10px; display:grid; place-items:center; border:2px dashed var(--accent); border-radius:8px; background:rgba(8,14,22,.72); color:#b9d0ff; font-weight:700; pointer-events:none; }
+  .reading-col-head { display:flex; align-items:center; gap:6px; min-height:38px; padding:5px 8px; border-bottom:1px solid var(--border); background:var(--panel); }
+  .reading-col-head .doc { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:10px var(--mono); }
+  .reading-col-head select,.reading-col-head input { padding:3px 5px; border:1px solid var(--border); border-radius:5px; background:var(--bg); color:var(--text); font-size:10px; }
+  .reading-col-head select { flex:none; min-width:104px; max-width:132px; }
+  .reading-page-input { width:45px; text-align:center; }
+  .reading-col-body { flex:1; min-height:0; position:relative; overflow:auto; }
+  .reading-pdf { width:100%; height:100%; border:0; background:#525659; }
+  .reading-paper { min-height:100%; box-sizing:border-box; padding:24px clamp(18px,5%,54px); background:var(--theme-code,var(--panel2)); color:var(--text); font:14px/1.82 Georgia,"Noto Serif SC",serif; }
+  .reading-paper h3 { margin:0 0 16px; color:var(--accent); font:600 13px var(--ui); }
+  .reading-paper .source,.reading-paper .translation { white-space:pre-wrap; overflow-wrap:anywhere; }
+  .reading-paper.bilingual .source { margin-bottom:18px; padding-bottom:18px; border-bottom:1px dashed var(--border); color:var(--dim); }
+  .reading-paper .empty { color:var(--dim); font-family:var(--ui); text-align:center; }
+  .reading-text-shell { height:100%; min-height:0; display:grid; grid-template-rows:minmax(0,1fr) auto; background:var(--theme-code,var(--bg)); }
+  .reading-text-editor { width:100%; height:100%; min-height:0; resize:none; box-sizing:border-box; padding:22px 24px; border:0; outline:0; background:transparent; color:var(--text); font:13px/1.7 var(--mono); tab-size:2; }
+  .reading-text-editor.markdown { font-family:var(--ui); line-height:1.75; }
+  .reading-text-foot { display:flex; align-items:center; justify-content:flex-end; min-height:28px; padding:3px 9px; border-top:1px solid var(--border); color:var(--dim); font-size:9px; }
+  #reading-divider { position:relative; cursor:col-resize; }
+  #reading-divider::after { content:''; position:absolute; top:0; bottom:0; left:3px; width:1px; background:var(--border); }
+  #reading-divider:hover::after { background:var(--accent); }
+  #reading-fragments-resizer { position:relative; width:9px; flex:none; cursor:col-resize; touch-action:none; }
+  #reading-fragments-resizer::after { content:''; position:absolute; top:8px; bottom:8px; left:4px; width:1px; border-radius:2px; background:var(--border); transition:background .15s,box-shadow .15s; }
+  #reading-fragments-resizer:hover::after,#reading-fragments-resizer.dragging::after { background:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); }
+  #reading-fragments-resizer.hidden { display:none; }
+  #reading-fragments { width:var(--reading-fragments-width); min-width:240px; max-width:45vw; display:flex; flex:none; flex-direction:column; overflow:hidden; border:1px solid var(--border); border-radius:9px; background:var(--panel); }
+  #reading-fragments.hidden { display:none; }
+  .reading-frag-head { display:flex; align-items:center; gap:6px; padding:8px 9px; border-bottom:1px solid var(--border); font-size:11px; font-weight:650; }
+  .reading-frag-head .sp { flex:1; }
+  #reading-frag-list { flex:1; min-height:0; overflow:auto; padding:7px; }
+  .reading-frag { margin-bottom:7px; padding:8px; border:1px solid var(--border); border-radius:8px; background:var(--panel2); font-size:10px; line-height:1.55; }
+  .reading-frag .page { color:var(--accent); font-weight:650; } .reading-frag .src { margin-top:5px; color:var(--dim); white-space:pre-wrap; }
+  .reading-frag .zh { margin-top:5px; white-space:pre-wrap; } .reading-frag .actions { display:flex; justify-content:flex-end; gap:4px; margin-top:5px; }
+  .reading-frag .actions button { padding:2px 5px; font-size:9px; }
+  #reading-status { min-width:100px; color:var(--dim); font-size:10px; text-align:right; }
+  @media(max-width:900px){#reading-stage{padding:4px}.reading-col-head .doc{display:none}#reading-fragments-resizer{display:none}#reading-fragments{position:absolute;z-index:20;right:6px;top:56px;bottom:6px;width:min(320px,85%);max-width:85%;box-shadow:0 12px 36px rgba(0,0,0,.5)}}
   /* 绘图树（与项目树同级风格：文件夹可展开/收起、绘图为叶子） */
   .draw-frow { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--dim); user-select: none; }
   .draw-frow:hover { background: var(--panel2); color: var(--text); }
@@ -580,6 +682,13 @@
   #draw-ndialog .nd-btns { display: flex; gap: 8px; margin-top: 14px; }
   #draw-ndialog .nd-btns button { flex: 1; padding: 6px 0; border-radius: 6px; cursor: pointer; font-size: 12px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); }
   #draw-ndialog .nd-btns button:hover { border-color: var(--accent); color: var(--text); }
+  #reading-new-dialog { display:none; position:fixed; z-index:120; inset:0; align-items:center; justify-content:center; background:rgba(0,0,0,.62); }
+  #reading-new-dialog.open { display:flex; }
+  #reading-new-dialog .nd-panel { width:430px; max-width:92vw; padding:16px 18px; border:1px solid var(--border); border-radius:12px; background:var(--panel); box-shadow:0 16px 48px rgba(0,0,0,.55); }
+  #reading-new-dialog h3 { margin:0 0 5px; font-size:14px; }
+  #reading-new-dialog .nd-hint,#reading-new-dialog label { display:block; margin:8px 0 4px; color:var(--dim); font-size:11px; }
+  #reading-new-dialog input,#reading-new-dialog select { width:100%; box-sizing:border-box; padding:7px 9px; border:1px solid var(--border); border-radius:6px; background:var(--panel2); color:var(--text); }
+  #reading-new-dialog .nd-btns { display:flex; justify-content:flex-end; gap:8px; margin-top:15px; }
   /* 绘图编辑器：覆盖整个主编辑区（左侧栏保持可见，可随时切换/新建绘图） */
   #main { position: relative; }
   body.drawing-mode header { display: none; }   /* 绘图时隐藏应用顶栏：Excalidraw 的 fixed 菜单对齐到编辑器头部行 */
@@ -1353,12 +1462,12 @@
 
   main { background:var(--bg); }
   #side { min-height:0; overflow:hidden; background:#0f151d; border-right-color:#273241; }
-  #pane-tree, #pane-git, #pane-tags, #pane-draw { background:#0f151d; }
+  #pane-tree, #pane-git, #pane-tags, #pane-draw, #pane-reading { background:#0f151d; }
   #pane-tree { min-height:96px; }
-  #pane-git, #pane-tags, #pane-draw { flex:0 1 auto; min-height:37px; }
-  #pane-draw { min-height:108px; }
+  #pane-git, #pane-tags, #pane-draw, #pane-reading { flex:0 1 auto; min-height:37px; }
+  #pane-draw, #pane-reading { min-height:108px; }
   #pane-draw.collapsed { min-height:40px; }
-  #git-body, #tagbar, #draw-list { min-height:0; }
+  #git-body, #tagbar, #draw-list, #reading-list { min-height:0; }
   #search { min-height:36px; margin:10px 10px 7px; padding:8px 11px; border-color:#2b3747; border-radius:8px; background:#0a1017; color:#dfe7f2; font-size:12px; }
   #search::placeholder, input::placeholder, textarea::placeholder { color:#647286; opacity:1; }
   #search:focus { border-color:#6898df; background:#0d141d; box-shadow:0 0 0 3px rgba(120,169,255,.09); }
@@ -1561,12 +1670,12 @@
   html[data-theme] button { border-color:var(--border); background:var(--control); color:var(--text); }
   html[data-theme] button:hover:not(:disabled) { border-color:var(--accent); background:var(--control-hover); }
   html[data-theme] button.on { border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
-  html[data-theme] #side, html[data-theme] #pane-tree, html[data-theme] #pane-git, html[data-theme] #pane-tags, html[data-theme] #pane-draw,
+  html[data-theme] #side, html[data-theme] #pane-tree, html[data-theme] #pane-git, html[data-theme] #pane-tags, html[data-theme] #pane-draw, html[data-theme] #pane-reading,
   html[data-theme] #outline-panel, html[data-theme] #outline-list, html[data-theme] #outline-list.stack-on { background:var(--theme-side); border-color:var(--border); }
   html[data-theme] #tree-head, html[data-theme] #git-head, html[data-theme] #tag-head, html[data-theme] #draw-head,
   html[data-theme] #toolbar, html[data-theme] #resource-head, html[data-theme] #outline-head, html[data-theme] .pane-title, html[data-theme] .ai-title-row,
   html[data-theme] #remote-head, html[data-theme] #env-head, html[data-theme] .project-head { background:var(--theme-elevated); border-color:var(--border); color:var(--text); }
-  html[data-theme] #git-body, html[data-theme] #tagbar, html[data-theme] #draw-list, html[data-theme] #tabs,
+  html[data-theme] #git-body, html[data-theme] #tagbar, html[data-theme] #draw-list, html[data-theme] #reading-list, html[data-theme] #tabs,
   html[data-theme] #outline-actions, html[data-theme] #outline-tools, html[data-theme] #sym-tabs, html[data-theme] .ai-actions-row,
   html[data-theme] #ai-ctx, html[data-theme] #ai-quick, html[data-theme] #out-head { background:var(--theme-sub); border-color:var(--border); }
   html[data-theme] #main, html[data-theme] #edit-split, html[data-theme] #resource-body { background:var(--bg); }
@@ -1799,6 +1908,15 @@
         </div>
       </div>
     </div>
+    <div class="hsplit" id="h-reading" title="拖拽调整阅读面板高度"></div>
+    <div id="pane-reading">
+      <div id="reading-head" title="显示/隐藏阅读文库（按住标题可上下拖动调整位置）">
+        <span id="reading-arrow" class="arrow">▾</span><span>📚 阅读</span><span id="reading-count" class="count"></span><span class="sp"></span>
+        <button id="reading-new-folder" title="新建阅读项目">＋项目</button><button id="reading-new-library-folder" title="新建阅读文件夹">＋文件夹</button><button id="reading-import" title="向阅读项目导入 PDF（支持大文件）">导入</button>
+      </div>
+      <div id="reading-list"></div>
+      <input id="reading-file-input" type="file" accept="application/pdf,.pdf" multiple hidden>
+    </div>
   </div>
   <div id="split-v" title="拖拽调整左侧宽度"></div>
   <div id="main">
@@ -1849,6 +1967,25 @@
         </div>
       </div>
     </div>
+    <section id="reading-workspace" aria-label="PDF 阅读工作区">
+      <div class="reading-toolbar">
+        <button id="reading-back">← 返回代码</button><span class="title" id="reading-title">阅读</span><span id="reading-project-context"></span><span class="sp"></span>
+        <button id="reading-add-fragment" title="保存当前选中的原文为阅读片段">✂ 摘录</button><button id="reading-translate-selection" title="AI 翻译当前选中文字">译选中</button>
+        <button id="reading-translate-page" title="AI 翻译当前页">译本页</button><button id="reading-translate-all" title="逐页 AI 翻译整篇 PDF，并保存中文版与双语版数据">译全文</button>
+        <button id="reading-frag-toggle" class="on">☷ 摘录</button><span id="reading-status"></span>
+      </div>
+      <div id="reading-project-tabs" aria-label="阅读项目片段标签"></div>
+      <div id="reading-stage">
+        <div id="reading-columns">
+          <article class="reading-col" data-slot="0"><div class="reading-col-head"><span class="doc"></span><select class="reading-view"><option value="original">PDF 原文</option><option value="source">可选文本</option><option value="translation">中文译文</option><option value="bilingual">双语对照</option></select><button class="reading-prev">‹</button><input class="reading-page-input" type="number" min="1" value="1"><span class="reading-pages">/ ?</span><button class="reading-next">›</button><button class="reading-close-col" title="关闭此栏">×</button></div><div class="reading-col-body"></div></article>
+          <div id="reading-divider" title="拖动调整两栏宽度"></div>
+          <article class="reading-col" data-slot="1"><div class="reading-col-head"><span class="doc"></span><select class="reading-view"><option value="original">PDF 原文</option><option value="source">可选文本</option><option value="translation" selected>中文译文</option><option value="bilingual">双语对照</option></select><button class="reading-prev">‹</button><input class="reading-page-input" type="number" min="1" value="1"><span class="reading-pages">/ ?</span><button class="reading-next">›</button><button class="reading-close-col" title="关闭此栏">×</button></div><div class="reading-col-body"></div></article>
+          <div id="reading-new-column-drop">拖到此处新建阅读栏</div>
+        </div>
+        <div id="reading-fragments-resizer" title="左右拖动调整阅读片段宽度" role="separator" aria-label="调整阅读片段宽度"></div>
+        <aside id="reading-fragments"><div class="reading-frag-head"><span>✂ 摘录笔记</span><span class="sp"></span><span id="reading-frag-count">0</span></div><div id="reading-frag-list"></div></aside>
+      </div>
+    </section>
     <div id="edit-split">
       <div id="code-wrap" class="editor-column"><div id="primary-group-bar"><span>主编辑栏</span><span class="name" id="primary-group-name"></span><span class="sp"></span><span>大纲跟随此栏</span></div><div id="ln"></div><pre id="code"></pre><textarea id="code-edit" spellcheck="false" style="display:none"></textarea><div id="comp-pop"></div><div id="editor-find" class="hidden" role="dialog" aria-label="代码查找和替换"><div class="editor-find-row"><button id="editor-find-toggle" type="button" title="展开或收起替换">▸</button><input id="editor-find-query" aria-label="查找内容" placeholder="查找（Enter 下一个）" spellcheck="false"><span id="editor-find-count">0/0</span><button id="editor-find-prev" type="button" title="上一个（Shift+Enter）">↑</button><button id="editor-find-next" type="button" title="下一个（Enter）">↓</button><button id="editor-find-close" type="button" title="关闭（Esc）">×</button></div><div id="editor-find-replace-row" class="editor-find-row editor-find-replace hidden"><button id="editor-find-case" type="button" title="区分大小写">Aa</button><input id="editor-find-replacement" aria-label="替换内容" placeholder="替换为" spellcheck="false"><button id="editor-find-one" type="button">替换</button><button id="editor-find-all" type="button">全部替换</button><span id="editor-find-status"></span></div></div></div>
       <div id="edit-split-v" title="拖动调整编辑 / 预览宽度"></div>
@@ -2971,6 +3108,203 @@ function wireNewDialog() {
 }
 window.addEventListener('DOMContentLoaded', wireNewDialog);
 
+/* ------------------------- 阅读文库（PDF / AI 翻译 / 摘录） ------------------------- */
+let READING_TREE = null;
+let READING_CURRENT = '';
+let READING_SLOTS = ['', ''];
+let READING_DOCS = new Map();
+let READING_OPEN = (() => { try { return localStorage.getItem('mc-reading-open') !== '0'; } catch (_) { return true; } })();
+let READING_DIR_OPEN = (() => { try { return new Set(JSON.parse(localStorage.getItem('mc-reading-dirs') || '[]')); } catch (_) { return new Set(); } })();
+let READING_ACTIVE_SLOT = 0;
+let READING_TRANSLATING = false;
+let READING_PROJECT_CURRENT = '';
+let READING_IMPORT_PROJECT = '';
+let READING_FRAGMENT_INDEX = new Map();
+let READING_PROJECT_INDEX = new Map();
+let READING_TEXT_DOCS = new Map();
+let READING_TEXT_SAVE_TIMERS = new Map();
+function readingStatus(text, error) { const el=$('reading-status');el.textContent=text||'';el.style.color=error?'var(--err)':'var(--dim)'; }
+function readingBase(path) { return String(path||'').split('/').pop().replace(/\.[^.]+$/,''); }
+function readingFragment(path) { return READING_FRAGMENT_INDEX.get(path)||null; }
+function readingRoleLabel(item){return item.role==='original'?'原版':item.role==='translation'?'中文版':item.role==='bilingual'?'双语版':item.kind==='markdown'?'Markdown':'代码';}
+function readingKindIcon(item){return item.kind==='pdf'?'▤':item.kind==='markdown'?'M↓':'</>';}
+function readingProjectFor(path){const fragment=readingFragment(path);return fragment&&fragment.project||'';}
+function readingSize(bytes) { if(bytes<1024*1024)return Math.max(1,Math.round(bytes/1024))+' KB';return (bytes/1024/1024).toFixed(1)+' MB'; }
+function saveReadingDirs() { try { localStorage.setItem('mc-reading-dirs',JSON.stringify([...READING_DIR_OPEN])); } catch (_) {} }
+function readingNodePayload(event){try{return JSON.parse(event.dataTransfer.getData('application/x-codescope-reading-node')||'null');}catch(_){return null;}}
+async function moveReadingNode(payload,toFolder){if(!payload||!payload.path)return;const result=await api('/api/readings/node/move',{type:payload.type,path:payload.path,toFolder:toFolder||''});if(!result.ok)return alert(result.error);if(result.unchanged)return;const prefix=payload.path+'/';READING_SLOTS=READING_SLOTS.map((value)=>value===payload.path?result.path:value.startsWith(prefix)?result.path+'/'+value.slice(prefix.length):value);if(READING_PROJECT_CURRENT===payload.path)READING_PROJECT_CURRENT=result.path;else if(READING_PROJECT_CURRENT.startsWith(prefix))READING_PROJECT_CURRENT=result.path+'/'+READING_PROJECT_CURRENT.slice(prefix.length);if(toFolder)READING_DIR_OPEN.add(toFolder);saveReadingDirs();await loadReadings();await Promise.all([renderReadingSlot(0),renderReadingSlot(1)]);}
+async function loadReadings(silent) {
+  const result=await api('/api/readings/tree');
+  if(!result.ok){if(!silent)setStatus('err',result.error||'读取文库失败');return;}
+  READING_TREE=result.root;READING_FRAGMENT_INDEX=new Map();READING_PROJECT_INDEX=new Map();let projects=0;const index=(nodes)=>{for(const node of nodes||[]){if(node.type==='project'){projects++;READING_PROJECT_INDEX.set(node.path,node);for(const item of node.children||[])READING_FRAGMENT_INDEX.set(item.path,item);}else index(node.children);}};index(result.root.children);
+  $('reading-count').textContent=projects?'('+projects+')':'';renderReadingList();renderReadingProjectTabs();
+}
+function renderReadingList() {
+  const host=$('reading-list');host.replaceChildren();
+  host.ondragover=(e)=>{if(e.dataTransfer.types.includes('application/x-codescope-reading-node')){e.preventDefault();host.classList.add('root-drop');}};host.ondragleave=(e)=>{if(e.target===host)host.classList.remove('root-drop');};host.ondrop=(e)=>{e.preventDefault();host.classList.remove('root-drop');moveReadingNode(readingNodePayload(e),'');};
+  if(!READING_TREE||!READING_TREE.children.length){const empty=document.createElement('div');empty.className='draw-empty';empty.textContent='还没有阅读项目：点击 ＋ 创建项目';host.appendChild(empty);return;}
+  const drawNodes=(nodes,parent)=>{for(const node of nodes||[]){if(node.type==='folder'){const open=READING_DIR_OPEN.has(node.path),row=document.createElement('div');row.className='reading-folder reading-library-folder';row.draggable=true;const arrow=document.createElement('span');arrow.textContent=open?'▾':'▸';const icon=document.createElement('span');icon.textContent=open?'📂':'📁';const name=document.createElement('span');name.className='name';name.textContent=node.name;const count=document.createElement('span');count.className='meta';count.textContent=(node.count||0)+' 项目';
+      const addProject=document.createElement('button');addProject.textContent='＋';addProject.title='在此文件夹新建阅读项目';addProject.onclick=(e)=>{e.stopPropagation();createReadingProject(node.path);};const addFolder=document.createElement('button');addFolder.textContent='📁+';addFolder.title='新建子文件夹';addFolder.onclick=(e)=>{e.stopPropagation();createReadingFolder(node.path);};const ren=document.createElement('button');ren.textContent='✎';ren.title='重命名文件夹';ren.onclick=(e)=>{e.stopPropagation();renameReadingFolder(node);};const del=document.createElement('button');del.textContent='×';del.title='删除文件夹';del.onclick=(e)=>{e.stopPropagation();deleteReadingFolder(node);};row.append(arrow,icon,name,count,addProject,addFolder,ren,del);row.onclick=()=>{open?READING_DIR_OPEN.delete(node.path):READING_DIR_OPEN.add(node.path);saveReadingDirs();renderReadingList();};row.addEventListener('dragstart',(e)=>{if(e.target.closest('button'))return e.preventDefault();e.dataTransfer.setData('application/x-codescope-reading-node',JSON.stringify({type:'folder',path:node.path}));e.dataTransfer.effectAllowed='move';row.classList.add('dragging');});row.addEventListener('dragend',()=>row.classList.remove('dragging'));row.addEventListener('dragover',(e)=>{if(e.dataTransfer.types.includes('application/x-codescope-reading-node')){e.preventDefault();e.stopPropagation();row.classList.add('drop-target');}});row.addEventListener('dragleave',()=>row.classList.remove('drop-target'));row.addEventListener('drop',(e)=>{e.preventDefault();e.stopPropagation();row.classList.remove('drop-target');moveReadingNode(readingNodePayload(e),node.path);});parent.appendChild(row);if(open){const children=document.createElement('div');children.className='reading-library-children';parent.appendChild(children);drawNodes(node.children,children);}continue;}
+      const project=node,row=document.createElement('div');row.className='reading-folder reading-project'+(project.path===READING_PROJECT_CURRENT?' on':'');row.draggable=true;const icon=document.createElement('span');icon.textContent=project.path===READING_PROJECT_CURRENT?'📖':'📚';const copy=document.createElement('div');copy.className='reading-project-copy';const name=document.createElement('span');name.className='name';name.textContent=project.name;copy.appendChild(name);const desc=document.createElement('span');desc.className='reading-project-desc'+(project.description?'':' empty');desc.textContent=project.description||'暂无说明 · 点击 ⓘ 完善';copy.appendChild(desc);const tags=document.createElement('span');tags.className='reading-project-tags';if(project.tags&&project.tags.length){for(const value of project.tags.slice(0,3)){const tag=document.createElement('span');tag.className='reading-project-tag';tag.textContent=value;tags.appendChild(tag);}}else{const tag=document.createElement('span');tag.className='reading-project-tag empty';tag.textContent='＋ 标签';tag.onclick=(e)=>{e.stopPropagation();editReadingProjectMeta(project);};tags.appendChild(tag);}copy.appendChild(tags);const count=document.createElement('span');count.className='meta';count.textContent=project.count+' 片段';const add=document.createElement('button');add.textContent='＋';add.title='添加项目片段';add.onclick=(e)=>{e.stopPropagation();addReadingProjectFragment(project);};const info=document.createElement('button');info.textContent='ⓘ';info.title='编辑项目说明和标签';info.onclick=(e)=>{e.stopPropagation();editReadingProjectMeta(project);};const renp=document.createElement('button');renp.textContent='✎';renp.title='重命名阅读项目';renp.onclick=(e)=>{e.stopPropagation();renameReadingProject(project);};const delp=document.createElement('button');delp.textContent='×';delp.title='删除整个阅读项目';delp.onclick=(e)=>{e.stopPropagation();deleteReadingProject(project);};row.append(icon,copy,count,add,info,renp,delp);row.onclick=()=>openReadingProject(project);row.addEventListener('dragstart',(e)=>{if(e.target.closest('button'))return e.preventDefault();e.dataTransfer.setData('application/x-codescope-reading-node',JSON.stringify({type:'project',path:project.path}));e.dataTransfer.effectAllowed='move';row.classList.add('dragging');});row.addEventListener('dragend',()=>row.classList.remove('dragging'));parent.appendChild(row);}};drawNodes(READING_TREE.children,host);
+}
+async function createReadingProject(parent){const name=prompt('阅读项目名称');if(!name)return;const description=prompt('项目说明（可留空）','')??'';const tags=prompt('标签（使用逗号分隔）','')??'';const result=await api('/api/readings/project/new',{parent:parent||'',name,description,tags});if(!result.ok)return alert(result.error);if(parent)READING_DIR_OPEN.add(parent);READING_PROJECT_CURRENT=result.path;saveReadingDirs();await loadReadings();const project=READING_PROJECT_INDEX.get(result.path);if(project)openReadingProject(project);}
+async function createReadingFolder(parent){const name=prompt('阅读文件夹名称');if(!name)return;const result=await api('/api/readings/folder',{parent:parent||'',name});if(!result.ok)return alert(result.error);READING_DIR_OPEN.add(result.path);if(parent)READING_DIR_OPEN.add(parent);saveReadingDirs();await loadReadings();}
+async function editReadingProjectMeta(project){const description=prompt('项目说明',project.description||'');if(description===null)return;const tags=prompt('标签（使用逗号分隔）',(project.tags||[]).join('，'));if(tags===null)return;const result=await api('/api/readings/project/meta',{project:project.path,description,tags});if(!result.ok)return alert(result.error);await loadReadings();}
+async function renameReadingProject(project){const next=prompt('阅读项目名称',project.name);if(!next||next===project.name)return;const r=await api('/api/readings/project/rename',{project:project.path,name:next});if(!r.ok)return alert(r.error);const prefix=project.path+'/';READING_SLOTS=READING_SLOTS.map((value)=>value.startsWith(prefix)?r.project+'/'+value.slice(prefix.length):value);READING_PROJECT_CURRENT=r.project;await loadReadings();await Promise.all([renderReadingSlot(0),renderReadingSlot(1)]);}
+async function deleteReadingProject(project){if(!confirm('删除阅读项目「'+project.name+'」及其中 '+project.count+' 个片段？'))return;const r=await api('/api/readings/project/delete',{project:project.path});if(!r.ok)return alert(r.error);if(READING_PROJECT_CURRENT===project.path)closeReading();await loadReadings();}
+async function renameReadingFolder(folder){const next=prompt('阅读文件夹名称',folder.name);if(!next||next===folder.name)return;const r=await api('/api/readings/folder/rename',{folder:folder.path,name:next});if(!r.ok)return alert(r.error);const prefix=folder.path+'/';READING_SLOTS=READING_SLOTS.map((value)=>value.startsWith(prefix)?r.path+'/'+value.slice(prefix.length):value);if(READING_PROJECT_CURRENT.startsWith(prefix))READING_PROJECT_CURRENT=r.path+'/'+READING_PROJECT_CURRENT.slice(prefix.length);READING_DIR_OPEN.delete(folder.path);READING_DIR_OPEN.add(r.path);saveReadingDirs();await loadReadings();}
+async function deleteReadingFolder(folder){if(!confirm('删除文件夹「'+folder.name+'」及其中 '+(folder.count||0)+' 个阅读项目？'))return;const r=await api('/api/readings/folder/delete',{folder:folder.path});if(!r.ok)return alert(r.error);if(READING_PROJECT_CURRENT===folder.path||READING_PROJECT_CURRENT.startsWith(folder.path+'/'))closeReading();await loadReadings();}
+function sortedReadingFragments(project){const order={original:0,translation:1,bilingual:2,markdown:3,code:4};return [...(project&&project.children||[])].sort((a,b)=>(order[a.role]??9)-(order[b.role]??9)||a.name.localeCompare(b.name));}
+async function renameReadingFragment(item){const next=prompt('片段文件名',item.name);if(!next)return;const r=await api('/api/readings/rename',{path:item.path,name:next});if(!r.ok)return alert(r.error);READING_DOCS.delete(item.path);READING_TEXT_DOCS.delete(item.path);READING_SLOTS=READING_SLOTS.map(v=>v===item.path?r.path:v);if(READING_CURRENT===item.path)READING_CURRENT=r.path;await loadReadings();await Promise.all([renderReadingSlot(0),renderReadingSlot(1)]);}
+async function deleteReadingFragment(item){if(!confirm('删除片段「'+item.name+'」？'))return;const r=await api('/api/readings/delete',{path:item.path});if(!r.ok)return alert(r.error);READING_DOCS.delete(item.path);READING_TEXT_DOCS.delete(item.path);READING_SLOTS=READING_SLOTS.map(v=>v===item.path?'':v);if(!READING_SLOTS[0]&&READING_SLOTS[1])READING_SLOTS=[READING_SLOTS[1],''];READING_ACTIVE_SLOT=READING_SLOTS[READING_ACTIVE_SLOT]?READING_ACTIVE_SLOT:0;if(READING_CURRENT===item.path)READING_CURRENT=READING_SLOTS[READING_ACTIVE_SLOT]||'';updateReadingColumnLayout();await loadReadings();await Promise.all([renderReadingSlot(0),renderReadingSlot(1)]);renderReadingFragments();}
+function renderReadingProjectTabs(){
+  const host=$('reading-project-tabs');if(!host)return;host.replaceChildren();const project=READING_PROJECT_INDEX.get(READING_PROJECT_CURRENT);
+  if(!project){const hint=document.createElement('span');hint.className='draw-empty';hint.textContent='打开左侧阅读项目后，在这里管理和组合片段';host.appendChild(hint);return;}
+  for(const item of sortedReadingFragments(project)){const tab=document.createElement('div');tab.className='reading-project-tab'+(item.path===READING_CURRENT?' on':'');tab.draggable=true;tab.title='点击在当前栏打开；拖到阅读区右侧新建一栏';
+    const kind=document.createElement('span');kind.className='tab-kind';kind.textContent=readingKindIcon(item);const name=document.createElement('span');name.className='tab-name';name.textContent=readingBase(item.name);const role=document.createElement('span');role.className='tab-role';role.textContent=readingRoleLabel(item);
+    const ren=document.createElement('button');ren.className='tab-action';ren.textContent='✎';ren.title='重命名片段';ren.onclick=(e)=>{e.stopPropagation();renameReadingFragment(item);};const del=document.createElement('button');del.className='tab-action';del.textContent='×';del.title='删除片段';del.onclick=(e)=>{e.stopPropagation();deleteReadingFragment(item);};
+    tab.append(kind,name,role,ren,del);tab.onclick=()=>openReading(item.path,READING_ACTIVE_SLOT);tab.addEventListener('dragstart',(e)=>{tab.classList.add('dragging');$('reading-columns').classList.add('fragment-dragging');e.dataTransfer.setData('application/x-codescope-reading',item.path);e.dataTransfer.effectAllowed='copy';});tab.addEventListener('dragend',()=>{tab.classList.remove('dragging');$('reading-columns').classList.remove('fragment-dragging');});host.appendChild(tab);
+  }
+  const add=document.createElement('button');add.id='reading-project-add';add.textContent='＋ 片段';add.title='新建或导入 PDF、Markdown、代码片段';add.onclick=()=>addReadingProjectFragment(project);host.appendChild(add);
+}
+async function ensureReadingDoc(path) {
+  let doc=READING_DOCS.get(path);if(doc)return doc;
+  doc={path,pages:null,pageCount:0,meta:{path,page:1,view:'original',translations:{},fragments:[]},loading:true};READING_DOCS.set(path,doc);
+  const [meta,text]=await Promise.all([api('/api/readings/meta?path='+encodeURIComponent(path)),api('/api/readings/text?path='+encodeURIComponent(path))]);
+  if(meta.ok)doc.meta=meta.meta;
+  if(text.ok){doc.pages=text.pages;doc.pageCount=text.pageCount;}else{doc.pages=[];doc.error=text.error||'无法提取文本';}
+  doc.loading=false;return doc;
+}
+async function saveReadingDoc(doc) {
+  if(!doc)return;await api('/api/readings/meta',{path:doc.path,meta:doc.meta});
+}
+function readingSlotElements(slot) { const col=document.querySelector('.reading-col[data-slot="'+slot+'"]');return {col,body:col.querySelector('.reading-col-body'),name:col.querySelector('.doc'),view:col.querySelector('.reading-view'),page:col.querySelector('.reading-page-input'),pages:col.querySelector('.reading-pages')}; }
+function updateReadingColumnLayout(){$('reading-columns').classList.toggle('single',!READING_SLOTS[1]);}
+async function closeReadingColumn(slot){
+  if(slot===0&&READING_SLOTS[1])READING_SLOTS=[READING_SLOTS[1],''];else READING_SLOTS[slot]='';
+  if(!READING_SLOTS[0]&&READING_SLOTS[1])READING_SLOTS=[READING_SLOTS[1],''];
+  READING_ACTIVE_SLOT=0;READING_CURRENT=READING_SLOTS[0]||'';updateReadingColumnLayout();renderReadingProjectTabs();await Promise.all([renderReadingSlot(0),renderReadingSlot(1)]);syncReadingTools();renderReadingFragments();
+}
+function syncReadingTools(){const fragment=readingFragment(READING_SLOTS[READING_ACTIVE_SLOT]);const pdf=!fragment||fragment.kind==='pdf';for(const id of ['reading-add-fragment','reading-translate-selection','reading-translate-page','reading-translate-all'])$(id).disabled=!pdf;}
+function readingPdfVersions(fragment){const project=fragment&&READING_PROJECT_INDEX.get(fragment.project),pdfs=(project&&project.children||[]).filter((item)=>item.kind==='pdf');return {original:pdfs.find((item)=>item.role==='original')||null,translation:pdfs.find((item)=>item.role==='translation')||null,bilingual:pdfs.find((item)=>item.role==='bilingual')||null};}
+function syncReadingViewOptions(els,versions){const options=els.view.options;options[0].textContent=versions.original?'PDF 原版':'当前 PDF';options[1].textContent='可选文本';options[2].textContent=versions.translation?'中文 PDF':'AI 中文译文';options[3].textContent=versions.bilingual?'双语 PDF':'双语对照';}
+async function renderReadingSlot(slot) {
+  const els=readingSlotElements(slot),path=READING_SLOTS[slot],fragment=readingFragment(path);els.body.replaceChildren();els.name.textContent=path?readingBase(path):'拖入项目片段';
+  els.view.style.display='';els.page.style.display='';els.pages.style.display='';els.col.querySelector('.reading-prev').style.display='';els.col.querySelector('.reading-next').style.display='';
+  if(!path){const empty=document.createElement('div');empty.className='reading-paper';empty.innerHTML='<div class="empty">从左侧阅读项目拖入 PDF、Markdown 或代码片段<br>可与另一片段并排阅读</div>';els.body.appendChild(empty);els.page.disabled=true;return;}
+  if(fragment&&fragment.kind!=='pdf'){
+    els.view.style.display='none';els.page.style.display='none';els.pages.style.display='none';els.col.querySelector('.reading-prev').style.display='none';els.col.querySelector('.reading-next').style.display='none';
+    let record=READING_TEXT_DOCS.get(path);if(!record){const result=await api('/api/readings/text-fragment?path='+encodeURIComponent(path));record={content:result.ok?result.content:'',error:result.ok?'':result.error};READING_TEXT_DOCS.set(path,record);}
+    const shell=document.createElement('div');shell.className='reading-text-shell';const editor=document.createElement('textarea');editor.className='reading-text-editor '+fragment.kind;editor.spellcheck=false;editor.value=record.content||'';editor.placeholder=fragment.kind==='markdown'?'在这里记录论文笔记、结论与引用…':'在这里添加与论文相关的代码…';
+    const foot=document.createElement('div');foot.className='reading-text-foot';foot.textContent=record.error||((record.content||'').length+' 字符 · 自动保存');
+    editor.addEventListener('input',()=>{record.content=editor.value;foot.textContent='正在编辑…';clearTimeout(READING_TEXT_SAVE_TIMERS.get(path));READING_TEXT_SAVE_TIMERS.set(path,setTimeout(async()=>{const result=await api('/api/readings/text-fragment',{path,content:record.content});foot.textContent=result.ok?'已自动保存 · '+record.content.length+' 字符':'保存失败：'+(result.error||'未知错误');if(result.ok)loadReadings(true);},500));});
+    shell.append(editor,foot);els.body.appendChild(shell);if(slot===READING_ACTIVE_SLOT)syncReadingTools();return;
+  }
+  const doc=await ensureReadingDoc(path),versions=readingPdfVersions(fragment),view=els.view.value;syncReadingViewOptions(els,versions);let page=Math.max(1,Math.min(doc.pageCount||9999,Number(els.page.value)||doc.meta.page||1));els.page.value=page;els.page.disabled=false;els.page.max=doc.pageCount||9999;els.pages.textContent='/ '+(doc.pageCount||'?');
+  if(slot===READING_ACTIVE_SLOT){doc.meta.page=page;doc.meta.view=view;saveReadingDoc(doc);}
+  if(slot===READING_ACTIVE_SLOT)syncReadingTools();
+  const physical=view==='original'?(versions.original||fragment):view==='translation'?versions.translation:view==='bilingual'?versions.bilingual:null;
+  if(physical){
+    const physicalDoc=physical.path===path?doc:await ensureReadingDoc(physical.path);page=Math.max(1,Math.min(physicalDoc.pageCount||9999,page));els.page.value=page;els.page.max=physicalDoc.pageCount||9999;els.pages.textContent='/ '+(physicalDoc.pageCount||'?');els.name.textContent=readingBase(physical.name)+(physical.path===path?'':' · '+readingRoleLabel(physical));
+    const frame=document.createElement('iframe');frame.className='reading-pdf';frame.title=readingBase(physical.path);frame.src='/api/readings/file?path='+encodeURIComponent(physical.path)+'#page='+page+'&zoom=page-width';els.body.appendChild(frame);return;
+  }
+  const sourceFragment=versions.original||fragment,sourceDoc=sourceFragment.path===path?doc:await ensureReadingDoc(sourceFragment.path);const translatedDoc=view==='bilingual'&&versions.translation?await ensureReadingDoc(versions.translation.path):null;
+  const paper=document.createElement('div');paper.className='reading-paper '+view;const source=(sourceDoc.pages&&sourceDoc.pages[page-1])||'';const translation=translatedDoc?((translatedDoc.pages&&translatedDoc.pages[page-1])||''):String((sourceDoc.meta.translations||{})[page]||(doc.meta.translations||{})[page]||'');
+  const title=document.createElement('h3');title.textContent='第 '+page+' 页 · '+(view==='source'?'可选择原文':view==='bilingual'?'原文 / 中文对照':'中文译文');paper.appendChild(title);
+  if(view==='source'||view==='bilingual'){const src=document.createElement('div');src.className='source';src.textContent=source||'本页未提取到可选择文字（可能是扫描版 PDF）';paper.appendChild(src);}
+  if(view!=='source'){const zh=document.createElement('div');zh.className='translation';zh.textContent=translation||'本页尚未生成 AI 译文。';paper.appendChild(zh);}els.body.appendChild(paper);
+}
+async function openReadingProject(project) {
+  if(!project)return;
+  if(DRAW_FILE||DRAW_ROOT)await closeDrawEditor(true);
+  READING_PROJECT_CURRENT=project.path;READING_DIR_OPEN.add(project.path);saveReadingDirs();
+  document.body.classList.add('reading-mode');$('reading-title').textContent=project.name;$('reading-project-context').textContent=[project.description,(project.tags||[]).map((tag)=>'#'+tag).join(' ')].filter(Boolean).join(' · ');renderReadingList();renderReadingProjectTabs();
+  if(!project.children||!project.children.length){READING_SLOTS=['',''];READING_CURRENT='';updateReadingColumnLayout();await Promise.all([renderReadingSlot(0),renderReadingSlot(1)]);renderReadingFragments();readingStatus('空阅读项目 · 点击“＋ 片段”添加 PDF、Markdown 或代码');return;}
+  const original=project.children.find((item)=>item.kind==='pdf'&&item.role==='original');
+  const translated=project.children.find((item)=>item.kind==='pdf'&&item.role==='translation');
+  const bilingual=project.children.find((item)=>item.kind==='pdf'&&item.role==='bilingual');
+  const first=original||translated||bilingual||project.children[0],second=null;
+  READING_SLOTS=[first.path,second?second.path:''];READING_CURRENT=first.path;READING_ACTIVE_SLOT=0;updateReadingColumnLayout();
+  readingSlotElements(0).view.value='original';readingSlotElements(1).view.value='original';
+  renderReadingList();renderReadingProjectTabs();readingStatus('正在打开项目片段…');
+  const pdfs=[first,second].filter(Boolean).filter((item,index,all)=>item.kind==='pdf'&&all.findIndex((v)=>v.path===item.path)===index);await Promise.all(pdfs.map((item)=>ensureReadingDoc(item.path)));
+  for(let slot=0;slot<2;slot++){const doc=READING_DOCS.get(READING_SLOTS[slot]);if(doc){readingSlotElements(slot).page.value=doc.meta.page||1;readingSlotElements(slot).view.value=['original','source','translation','bilingual'].includes(doc.meta.view)?doc.meta.view:'original';}}
+  await Promise.all([renderReadingSlot(0),renderReadingSlot(1)]);renderReadingFragments();
+  readingStatus(project.count+' 个片段 · 拖动上方片段到右侧可并排阅读'+(translated?' · 已匹配中文 PDF':bilingual?' · 已匹配双语 PDF':' · 可使用 AI 生成译文'));
+}
+async function openReading(path,slot) {
+  if(DRAW_FILE||DRAW_ROOT)await closeDrawEditor(true);
+  const fragment=readingFragment(path);READING_PROJECT_CURRENT=readingProjectFor(path);READING_CURRENT=path;READING_ACTIVE_SLOT=slot==null?0:slot;READING_SLOTS[READING_ACTIVE_SLOT]=path;
+  updateReadingColumnLayout();
+  const project=READING_PROJECT_INDEX.get(READING_PROJECT_CURRENT);document.body.classList.add('reading-mode');$('reading-title').textContent=project?project.name:(READING_PROJECT_CURRENT||readingBase(path));$('reading-project-context').textContent=project?[project.description,(project.tags||[]).map((tag)=>'#'+tag).join(' ')].filter(Boolean).join(' · '):'';renderReadingList();renderReadingProjectTabs();readingStatus(fragment&&fragment.kind!=='pdf'?'正在打开项目片段…':'正在解析 PDF…');
+  if(fragment&&fragment.kind!=='pdf'){await renderReadingSlot(READING_ACTIVE_SLOT);renderReadingFragments();readingStatus(readingRoleLabel(fragment)+' · 编辑内容会自动保存');return;}
+  const doc=await ensureReadingDoc(path);const primary=readingSlotElements(READING_ACTIVE_SLOT);primary.page.value=doc.meta.page||1;primary.view.value=['original','source','translation','bilingual'].includes(doc.meta.view)?doc.meta.view:'original';
+  await renderReadingSlot(READING_ACTIVE_SLOT);renderReadingFragments();readingStatus(doc.error?doc.error:(doc.pageCount+' 页 · 可选择文字保存摘录'),!!doc.error);
+}
+function closeReading(){document.body.classList.remove('reading-mode');READING_CURRENT='';READING_PROJECT_CURRENT='';$('reading-project-context').textContent='';renderReadingList();renderReadingProjectTabs();}
+function activeReadingDoc(){const path=READING_SLOTS[READING_ACTIVE_SLOT]||READING_CURRENT;return READING_DOCS.get(path);}
+function currentReadingPage(){return Number(readingSlotElements(READING_ACTIVE_SLOT).page.value)||1;}
+async function setReadingPage(slot,value){const doc=READING_DOCS.get(READING_SLOTS[slot]);const max=(doc&&doc.pageCount)||9999;readingSlotElements(slot).page.value=Math.max(1,Math.min(max,Number(value)||1));READING_ACTIVE_SLOT=slot;await renderReadingSlot(slot);renderReadingFragments();}
+async function translateReadingText(text,label) {
+  const cfg=getAiCfg();if(!cfg.url||!cfg.model)throw new Error('请先在右侧 AI 助手设置 API URL 与模型');
+  const chunks=[];let rest=String(text||'').trim();while(rest){let at=Math.min(6000,rest.length);if(at<rest.length){const boundary=Math.max(rest.lastIndexOf('\n',at),rest.lastIndexOf('. ',at));if(boundary>2000)at=boundary+1;}chunks.push(rest.slice(0,at));rest=rest.slice(at).trim();}
+  const out=[];for(let i=0;i<chunks.length;i++){readingStatus((label||'AI 翻译')+' '+(i+1)+'/'+chunks.length+'…');const r=await api('/api/ai/chat',{url:cfg.url,key:cfg.key,model:cfg.model,timeoutMs:300000,messages:[{role:'system',content:'你是专业技术文献翻译。把英文准确翻译为简体中文，保留标题层级、公式编号、变量、API、代码、引用编号和专业术语；只输出译文，不解释。'},{role:'user',content:chunks[i]}]});if(!r.ok)throw new Error(r.error||'AI 翻译失败');out.push(r.content.trim());}
+  return out.join('\n\n');
+}
+function selectedReadingText(){const sel=window.getSelection();if(!sel||sel.isCollapsed)return '';const node=sel.anchorNode&&sel.anchorNode.parentElement;if(!node||!node.closest('.reading-paper'))return '';return String(sel.toString()).trim();}
+async function requireSelectableReadingText(action){
+  const text=selectedReadingText();if(text)return text;const els=readingSlotElements(READING_ACTIVE_SLOT),fragment=readingFragment(READING_SLOTS[READING_ACTIVE_SLOT]);
+  if(fragment&&fragment.kind==='pdf'&&els.view.value==='original'){els.view.value='source';await renderReadingSlot(READING_ACTIVE_SLOT);readingStatus('已切换到“可选文本”：请重新划选文字，再点击“'+action+'”',true);return '';}
+  readingStatus('请先在“可选文本”或“双语对照”区域划选文字',true);return '';
+}
+async function translateReadingPage() {
+  if(READING_TRANSLATING)return;const doc=activeReadingDoc(),page=currentReadingPage();if(!doc||!doc.pages||!doc.pages[page-1])return readingStatus('本页没有可翻译文字',true);
+  READING_TRANSLATING=true;try{doc.meta.translations[page]=await translateReadingText(doc.pages[page-1],'翻译第 '+page+' 页');await saveReadingDoc(doc);await renderReadingSlot(READING_ACTIVE_SLOT);if(READING_SLOTS[1-READING_ACTIVE_SLOT]===doc.path)await renderReadingSlot(1-READING_ACTIVE_SLOT);renderReadingFragments();readingStatus('第 '+page+' 页译文已保存');loadReadings(true);}catch(error){readingStatus(error.message,true);}finally{READING_TRANSLATING=false;}
+}
+async function translateReadingSelection() {
+  if(READING_TRANSLATING)return;const text=await requireSelectableReadingText('译选中');if(!text)return;const doc=activeReadingDoc(),page=currentReadingPage();
+  READING_TRANSLATING=true;try{const translation=await translateReadingText(text,'翻译选中片段');doc.meta.fragments.unshift({id:cryptoRandomId(),page,source:text,translation,note:'',createdAt:Date.now()});await saveReadingDoc(doc);renderReadingFragments();readingStatus('选中片段已翻译并保存');}catch(error){readingStatus(error.message,true);}finally{READING_TRANSLATING=false;}
+}
+function cryptoRandomId(){return (self.crypto&&self.crypto.randomUUID)?self.crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2);}
+async function translateReadingAll() {
+  if(READING_TRANSLATING)return;const doc=activeReadingDoc();if(!doc||!doc.pages||!doc.pages.length)return;if(!confirm('将逐页调用 AI 翻译 '+doc.pages.length+' 页并保存，可随时保留已完成进度。继续吗？'))return;
+  READING_TRANSLATING=true;try{for(let page=1;page<=doc.pages.length;page++){if(doc.meta.translations[page]||!doc.pages[page-1])continue;doc.meta.translations[page]=await translateReadingText(doc.pages[page-1],'全文翻译 '+page+'/'+doc.pages.length);await saveReadingDoc(doc);}await Promise.all([renderReadingSlot(0),renderReadingSlot(1)]);readingStatus('全文翻译完成 · 可切换中文版或双语版');loadReadings(true);}catch(error){readingStatus('已保存完成部分 · '+error.message,true);}finally{READING_TRANSLATING=false;}
+}
+async function addReadingFragment() {
+  const doc=activeReadingDoc(),text=await requireSelectableReadingText('摘录'),page=currentReadingPage();if(!doc||!text)return;
+  doc.meta.fragments.unshift({id:cryptoRandomId(),page,source:text,translation:'',note:'',createdAt:Date.now()});await saveReadingDoc(doc);renderReadingFragments();readingStatus('摘录已保存');
+}
+function renderReadingFragments() {
+  const host=$('reading-frag-list'),doc=activeReadingDoc(),items=(doc&&doc.meta.fragments)||[];host.replaceChildren();$('reading-frag-count').textContent=items.length;
+  if(!items.length){const e=document.createElement('div');e.className='draw-empty';e.textContent='选择原文后点击“摘录”，集中管理重要定义、结论和引用。';host.appendChild(e);return;}
+  for(const item of items){const card=document.createElement('div');card.className='reading-frag';const page=document.createElement('span');page.className='page';page.textContent='P.'+item.page;const src=document.createElement('div');src.className='src';src.textContent=item.source;card.append(page,src);if(item.translation){const zh=document.createElement('div');zh.className='zh';zh.textContent=item.translation;card.appendChild(zh);}const actions=document.createElement('div');actions.className='actions';const go=document.createElement('button');go.textContent='定位';go.onclick=()=>setReadingPage(READING_ACTIVE_SLOT,item.page);const note=document.createElement('button');note.textContent='笔记';note.onclick=async()=>{const value=prompt('片段笔记',item.note||'');if(value===null)return;item.note=value;await saveReadingDoc(doc);renderReadingFragments();};const del=document.createElement('button');del.textContent='删除';del.onclick=async()=>{doc.meta.fragments=items.filter(v=>v.id!==item.id);await saveReadingDoc(doc);renderReadingFragments();};actions.append(go,note,del);if(item.note){const n=document.createElement('div');n.className='zh';n.textContent='笔记：'+item.note;card.appendChild(n);}card.appendChild(actions);host.appendChild(card);}
+}
+async function importReadingFiles(files) {
+  if(!files||!files.length)return;let folder=READING_IMPORT_PROJECT||READING_PROJECT_CURRENT;READING_IMPORT_PROJECT='';const projects=[...READING_PROJECT_INDEX.keys()];if(!folder){if(!projects.length)return readingStatus('请先创建一个阅读项目',true);const choice=prompt('导入到哪个阅读项目？\n可选：'+projects.join('、'),projects[0]);if(choice===null)return;folder=choice.trim();}if(!projects.includes(folder))return readingStatus('阅读项目不存在：'+folder,true);
+  for(let i=0;i<files.length;i++){const file=files[i];if(!/\.pdf$/i.test(file.name)){readingStatus('已跳过非 PDF：'+file.name,true);continue;}readingStatus('正在导入 '+(i+1)+'/'+files.length+' · '+file.name);const info=btoa(unescape(encodeURIComponent(JSON.stringify({name:file.name,folder}))));let response;try{response=await fetch('/api/readings/upload-stream',{method:'POST',headers:{'Content-Type':'application/pdf','X-CodeScope-Reading':info},body:file});const result=await response.json();if(!result.ok)throw new Error(result.error);if(i===files.length-1)READING_CURRENT=result.path;}catch(error){readingStatus(error.message,true);return;}}
+  READING_PROJECT_CURRENT=folder;saveReadingDirs();await loadReadings();readingStatus('PDF 已加入阅读项目');const project=READING_PROJECT_INDEX.get(folder);if(project)openReadingProject(project);
+}
+const READING_NEW_DEFAULTS={pdf:'',markdown:'阅读笔记.md',c:'示例代码.c',h:'接口定义.h',cpp:'示例代码.cpp',python:'示例代码.py',javascript:'示例代码.js',typescript:'示例代码.ts',latex:'公式笔记.tex',text:'阅读记录.txt'};
+function addReadingProjectFragment(project){const dialog=$('reading-new-dialog'),select=$('reading-new-project');select.replaceChildren();for(const item of READING_PROJECT_INDEX.values()){const option=document.createElement('option');option.value=item.path;option.textContent=item.path;select.appendChild(option);}select.value=project&&project.path||READING_PROJECT_CURRENT||select.value;$('reading-new-kind').value='markdown';$('reading-new-name').disabled=false;$('reading-new-name').value=READING_NEW_DEFAULTS.markdown;dialog.classList.add('open');$('reading-new-name').focus();$('reading-new-name').select();}
+function closeReadingNewDialog(){$('reading-new-dialog').classList.remove('open');}
+async function submitReadingNewFragment(){const project=$('reading-new-project').value,kind=$('reading-new-kind').value,name=$('reading-new-name').value.trim();if(!project)return readingStatus('请先创建阅读项目',true);if(kind==='pdf'){closeReadingNewDialog();READING_IMPORT_PROJECT=project;$('reading-file-input').click();return;}if(!name)return $('reading-new-name').focus();const result=await api('/api/readings/text/new',{project,name});if(!result.ok)return alert(result.error);closeReadingNewDialog();READING_PROJECT_CURRENT=project;await loadReadings();openReading(result.path,READING_ACTIVE_SLOT);}
+function wireReadingPanel() {
+  try{const saved=Number(localStorage.getItem('mc-reading-fragments-width'));if(saved>=240)$('reading-stage').style.setProperty('--reading-fragments-width',saved+'px');}catch(_){}
+  $('pane-reading').classList.toggle('collapsed',!READING_OPEN);$('reading-head').onclick=()=>{READING_OPEN=!READING_OPEN;$('pane-reading').classList.toggle('collapsed',!READING_OPEN);try{localStorage.setItem('mc-reading-open',READING_OPEN?'1':'0');}catch(_){}};
+  $('reading-import').onclick=(e)=>{e.stopPropagation();READING_IMPORT_PROJECT='';$('reading-file-input').click();};$('reading-file-input').onchange=(e)=>{importReadingFiles([...e.target.files]);e.target.value='';};
+  $('reading-new-folder').onclick=(e)=>{e.stopPropagation();createReadingProject('');};$('reading-new-library-folder').onclick=(e)=>{e.stopPropagation();createReadingFolder('');};
+  $('reading-new-kind').onchange=()=>{$('reading-new-name').value=READING_NEW_DEFAULTS[$('reading-new-kind').value]||'';$('reading-new-name').disabled=$('reading-new-kind').value==='pdf';};$('reading-new-cancel').onclick=closeReadingNewDialog;$('reading-new-submit').onclick=submitReadingNewFragment;$('reading-new-name').onkeydown=(e)=>{if(e.key==='Enter')submitReadingNewFragment();};$('reading-new-dialog').addEventListener('mousedown',(e)=>{if(e.target===$('reading-new-dialog'))closeReadingNewDialog();});
+  $('reading-back').onclick=closeReading;
+  $('reading-add-fragment').onclick=addReadingFragment;$('reading-translate-selection').onclick=translateReadingSelection;$('reading-translate-page').onclick=translateReadingPage;$('reading-translate-all').onclick=translateReadingAll;
+  $('reading-frag-toggle').onclick=()=>{const hidden=$('reading-fragments').classList.toggle('hidden');$('reading-fragments-resizer').classList.toggle('hidden',hidden);$('reading-frag-toggle').classList.toggle('on',!hidden);};
+  document.querySelectorAll('.reading-col').forEach((col)=>{const slot=Number(col.dataset.slot),els=readingSlotElements(slot);col.addEventListener('mousedown',()=>{READING_ACTIVE_SLOT=slot;READING_CURRENT=READING_SLOTS[slot]||READING_CURRENT;renderReadingProjectTabs();syncReadingTools();renderReadingFragments();});els.view.onchange=()=>renderReadingSlot(slot);els.page.onchange=()=>setReadingPage(slot,els.page.value);col.querySelector('.reading-prev').onclick=()=>setReadingPage(slot,Number(els.page.value)-1);col.querySelector('.reading-next').onclick=()=>setReadingPage(slot,Number(els.page.value)+1);col.querySelector('.reading-close-col').onclick=(e)=>{e.stopPropagation();closeReadingColumn(slot);};col.addEventListener('dragover',(e)=>{if(e.dataTransfer.types.includes('application/x-codescope-reading')){e.preventDefault();col.classList.add('drag-over');}});col.addEventListener('dragleave',()=>col.classList.remove('drag-over'));col.addEventListener('drop',(e)=>{e.preventDefault();col.classList.remove('drag-over');$('reading-columns').classList.remove('fragment-dragging');const path=e.dataTransfer.getData('application/x-codescope-reading');if(path)openReading(path,slot);});});
+  const newColumnDrop=$('reading-new-column-drop');newColumnDrop.addEventListener('dragover',(e)=>{if(e.dataTransfer.types.includes('application/x-codescope-reading')){e.preventDefault();e.stopPropagation();}});newColumnDrop.addEventListener('drop',(e)=>{e.preventDefault();e.stopPropagation();$('reading-columns').classList.remove('fragment-dragging');const path=e.dataTransfer.getData('application/x-codescope-reading');if(path)openReading(path,1);});
+  let resize=null;$('reading-divider').addEventListener('pointerdown',(e)=>{resize={x:e.clientX,left:$('reading-columns').getBoundingClientRect().left,width:$('reading-columns').getBoundingClientRect().width};$('reading-divider').setPointerCapture(e.pointerId);});$('reading-divider').addEventListener('pointermove',(e)=>{if(!resize)return;const pct=Math.max(22,Math.min(78,(e.clientX-resize.left)/resize.width*100));$('reading-stage').style.setProperty('--reading-left',pct+'%');});$('reading-divider').addEventListener('pointerup',()=>{resize=null;});
+  let fragmentResize=null;const fragmentResizer=$('reading-fragments-resizer');fragmentResizer.tabIndex=0;fragmentResizer.addEventListener('pointerdown',(e)=>{const stageWidth=$('reading-stage').getBoundingClientRect().width;fragmentResize={x:e.clientX,width:$('reading-fragments').getBoundingClientRect().width,max:Math.max(240,Math.min(640,stageWidth-480))};fragmentResizer.classList.add('dragging');document.body.style.cursor='col-resize';document.body.style.userSelect='none';try{fragmentResizer.setPointerCapture(e.pointerId);}catch(_){}e.preventDefault();});window.addEventListener('pointermove',(e)=>{if(!fragmentResize)return;const width=Math.max(240,Math.min(fragmentResize.max,fragmentResize.width+fragmentResize.x-e.clientX));$('reading-stage').style.setProperty('--reading-fragments-width',Math.round(width)+'px');});const finishFragmentResize=()=>{if(!fragmentResize)return;const width=Math.round($('reading-fragments').getBoundingClientRect().width);fragmentResize=null;fragmentResizer.classList.remove('dragging');document.body.style.cursor='';document.body.style.userSelect='';try{localStorage.setItem('mc-reading-fragments-width',String(width));}catch(_){}};window.addEventListener('pointerup',finishFragmentResize);window.addEventListener('pointercancel',finishFragmentResize);window.addEventListener('blur',finishFragmentResize);fragmentResizer.addEventListener('keydown',(e)=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;const current=$('reading-fragments').getBoundingClientRect().width,delta=e.key==='ArrowLeft'?24:-24,width=Math.max(240,Math.min(640,current+delta));$('reading-stage').style.setProperty('--reading-fragments-width',Math.round(width)+'px');try{localStorage.setItem('mc-reading-fragments-width',String(Math.round(width)));}catch(_){}e.preventDefault();});
+  loadReadings(true);
+}
+window.addEventListener('DOMContentLoaded',wireReadingPanel);
+
 /* ------------------------- 绘图（Excalidraw / Draw.io，文件存于 vault/drawings/） ------------------------- */
 let DRAWINGS = [];            // [{name,size,updated}]
 let DRAW_FILE = null;         // 当前打开的绘图文件名
@@ -3579,11 +3913,11 @@ async function renderDrawList() {
 }
 
 /* ---- 左侧面板拖拽重排（项目 / Git / 标签 / 绘图 可自由换位，顺序持久化） ---- */
-const PANEL_DEFAULT = ['pane-tree', 'pane-git', 'pane-tags', 'pane-draw'];
+const PANEL_DEFAULT = ['pane-tree', 'pane-git', 'pane-tags', 'pane-draw', 'pane-reading'];
 let PANEL_ORDER = (() => {
   try {
     const o = JSON.parse(localStorage.getItem('mc-panel-order') || '');
-    if (Array.isArray(o) && o.length && o.every(id => PANEL_DEFAULT.includes(id))) return o;
+    if (Array.isArray(o) && o.length && o.every(id => PANEL_DEFAULT.includes(id))) return [...o,...PANEL_DEFAULT.filter(id=>!o.includes(id))];
   } catch (_) {}
   return PANEL_DEFAULT.slice();
 })();
@@ -3662,7 +3996,7 @@ function wirePanelReorder() {
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   };
-  for (const [pid, hid] of [['pane-tree', 'tree-head'], ['pane-git', 'git-head'], ['pane-tags', 'tag-head'], ['pane-draw', 'draw-head']]) {
+  for (const [pid, hid] of [['pane-tree', 'tree-head'], ['pane-git', 'git-head'], ['pane-tags', 'tag-head'], ['pane-draw', 'draw-head'], ['pane-reading', 'reading-head']]) {
     const head = $(hid); if (!head) continue;
     head.addEventListener('mousedown', (e) => onDown(e, pid));
   }
@@ -7529,6 +7863,7 @@ function initEditorGroups() {
 
 function select(s) {
   if (DRAW_FILE || DRAW_ROOT) closeDrawEditor(true);   // 打开片段时退出绘图编辑（未保存改动先落盘）
+  if (document.body.classList.contains('reading-mode')) closeReading();
   if (!confirmLeaveEdit()) return false;
   RESOURCE_CURRENT = null; $('resource-viewer').style.display = 'none';
   rememberNavigation({snippet:s,frag:0,line:1});
@@ -9465,6 +9800,11 @@ function makeHResizer(handle, getter, setter) {
   makeHResizer($('h-draw'),
     () => $('pane-draw').getBoundingClientRect().height,
     (v) => { $('pane-draw').style.height = clampV(v, 60, maxPaneH) + 'px'; try { localStorage.setItem('mc-draw-h', String(Math.round(v))); } catch (_) {} });
+  const readingH = parseInt(localStorage.getItem('mc-reading-h'));
+  if (readingH && READING_OPEN) $('pane-reading').style.height = clampV(readingH, 60, maxPaneH) + 'px';
+  makeHResizer($('h-reading'),
+    () => $('pane-reading').getBoundingClientRect().height,
+    (v) => { $('pane-reading').style.height = clampV(v, 60, maxPaneH) + 'px'; try { localStorage.setItem('mc-reading-h', String(Math.round(v))); } catch (_) {} });
   // 大纲面板默认显示，记忆开关与宽度（收起时保留操作按钮列）
   let showOutline = true;
   try { showOutline = localStorage.getItem('mc-outline') !== '0'; } catch (_) {}
@@ -9890,6 +10230,16 @@ setInterval(() => loadEnv(true, true), 60000);
       <button id="cd-cancel">取消</button>
       <button id="cd-ok">确定</button>
     </div>
+  </div>
+</div>
+<div id="reading-new-dialog" role="dialog" aria-modal="true" aria-labelledby="reading-new-title">
+  <div class="nd-panel">
+    <h3 id="reading-new-title">新建项目片段</h3>
+    <div class="nd-hint">与代码工程一致：选择类型和名称。PDF 使用导入，其余片段创建后可直接编辑并自动保存。</div>
+    <label for="reading-new-project">所属阅读项目</label><select id="reading-new-project"></select>
+    <label for="reading-new-kind">片段类型</label><select id="reading-new-kind"><option value="pdf">PDF 文档（导入文件）</option><option value="markdown">Markdown 文档</option><option value="c">C 源文件</option><option value="h">C/C++ 头文件</option><option value="cpp">C++ 源文件</option><option value="python">Python</option><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="latex">LaTeX</option><option value="text">纯文本</option></select>
+    <label for="reading-new-name">文件名</label><input id="reading-new-name" type="text" placeholder="阅读笔记.md" autocomplete="off" spellcheck="false">
+    <div class="nd-btns"><button id="reading-new-cancel">取消</button><button id="reading-new-submit" class="primary">创建</button></div>
   </div>
 </div>
 </body>

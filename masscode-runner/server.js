@@ -11,6 +11,7 @@ const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const { StringDecoder } = require('string_decoder');
 const { spawn, execFile, execFileSync } = require('child_process');
 const { pipeline } = require('stream/promises');
@@ -2101,6 +2102,140 @@ async function projectHealth() {
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf', '.otf': 'font/otf', '.ttf': 'font/ttf', '.ttc': 'font/collection', '.woff': 'font/woff', '.woff2': 'font/woff2', '.bib': 'text/plain; charset=utf-8', '.csv': 'text/csv; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 
+/* ------------------------------- PDF 阅读文库 ------------------------------- */
+
+function readingsDir() { return path.join(vaultPath(), 'readings'); }
+const READING_TEXT_EXTS = new Set(['.md','.markdown','.txt','.c','.h','.cpp','.hpp','.cc','.py','.js','.ts','.json','.yaml','.yml','.tex']);
+const READING_PROJECT_META = '.codescope-project.json';
+const READING_FOLDER_META = '.codescope-folder.json';
+function readingPath(value, allowFolder) {
+  if (typeof value !== 'string') return null;
+  const rel = value.replace(/\\/g, '/').split('/').map((part) => part.trim()).filter(Boolean).join('/');
+  if (!rel || /(^|\/)\.{1,2}(\/|$)|^\/|\/\//.test(rel) || /^[A-Za-z]:/.test(rel)) return null;
+  if (!/^[A-Za-z0-9._\-\u00a0-\uffff ()\[\],+&/]+$/.test(rel)) return null;
+  if (!allowFolder && !/\.pdf$/i.test(rel)) return null;
+  return rel;
+}
+function readingAssetPath(value) {
+  const rel = readingPath(value, true);
+  if (!rel) return null;
+  const ext = path.extname(rel).toLowerCase();
+  return ext === '.pdf' || READING_TEXT_EXTS.has(ext) ? rel : null;
+}
+function readingFragmentInfo(rel, stat, project) {
+  const ext = path.extname(rel).toLowerCase(), base = path.basename(rel);
+  const kind = ext === '.pdf' ? 'pdf' : (['.md','.markdown'].includes(ext) ? 'markdown' : 'code');
+  let role = kind;
+  if (kind === 'pdf') {
+    if (/双语|bilingual|parallel/i.test(base)) role = 'bilingual';
+    else if (/中文|汉化|chinese|[_-](?:zh|cn)(?:[_.-]|$)/i.test(base)) role = 'translation';
+    else role = 'original';
+  }
+  return { type:'fragment', kind, role, name:base, path:rel, project:project||'', size:stat.size, updated:stat.mtimeMs };
+}
+function readingProjectMetaFile(rel){return path.join(readingsDir(),rel,READING_PROJECT_META);}
+function loadReadingProjectMeta(rel){try{const value=JSON.parse(fs.readFileSync(readingProjectMetaFile(rel),'utf8'));return{description:String(value.description||'').slice(0,1000),tags:Array.isArray(value.tags)?value.tags.map(String).filter(Boolean).slice(0,30):[]};}catch(_){return{description:'',tags:[]};}}
+function saveReadingProjectMeta(rel,value){const clean={version:1,description:String(value&&value.description||'').trim().slice(0,1000),tags:[...new Set((Array.isArray(value&&value.tags)?value.tags:String(value&&value.tags||'').split(/[,，]/)).map((tag)=>String(tag).trim()).filter(Boolean))].slice(0,30),updatedAt:Date.now()};fs.mkdirSync(path.join(readingsDir(),rel),{recursive:true});fs.writeFileSync(readingProjectMetaFile(rel),JSON.stringify(clean,null,2),'utf8');return clean;}
+function readingMetaFile(rel) {
+  const id = crypto.createHash('sha256').update(rel).digest('hex');
+  return path.join(readingsDir(), '.codescope', id + '.json');
+}
+function defaultReadingMeta(rel) {
+  return { version:1, path:rel, page:1, view:'original', translations:{}, fragments:[], updatedAt:0 };
+}
+function loadReadingMeta(rel) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(readingMetaFile(rel), 'utf8'));
+    return { ...defaultReadingMeta(rel), ...parsed, path:rel,
+      translations:parsed && typeof parsed.translations === 'object' ? parsed.translations : {},
+      fragments:Array.isArray(parsed && parsed.fragments) ? parsed.fragments : [] };
+  } catch (_) { return defaultReadingMeta(rel); }
+}
+function saveReadingMeta(rel, value) {
+  const clean = defaultReadingMeta(rel);
+  clean.page = Math.max(1, Number(value && value.page) || 1);
+  clean.view = ['original', 'source', 'translation', 'bilingual'].includes(value && value.view) ? value.view : 'original';
+  clean.translations = value && typeof value.translations === 'object' ? value.translations : {};
+  clean.fragments = Array.isArray(value && value.fragments) ? value.fragments.slice(0, 2000).map((item) => ({
+    id:String(item.id || crypto.randomUUID()), page:Math.max(1, Number(item.page) || 1),
+    source:String(item.source || '').slice(0, 30000), translation:String(item.translation || '').slice(0, 30000),
+    note:String(item.note || '').slice(0, 10000), createdAt:Number(item.createdAt) || Date.now(),
+  })) : [];
+  clean.updatedAt = Date.now();
+  const target = readingMetaFile(rel);
+  fs.mkdirSync(path.dirname(target), { recursive:true });
+  fs.writeFileSync(target, JSON.stringify(clean, null, 2), 'utf8');
+  return clean;
+}
+function moveReadingMeta(from, to) {
+  const oldFile = readingMetaFile(from), nextFile = readingMetaFile(to);
+  if (!fs.existsSync(oldFile)) return;
+  try {
+    const meta = loadReadingMeta(from); meta.path = to;
+    fs.mkdirSync(path.dirname(nextFile), { recursive:true });
+    fs.writeFileSync(nextFile, JSON.stringify(meta, null, 2), 'utf8');
+    fs.unlinkSync(oldFile);
+  } catch (_) {}
+}
+function readingTree() {
+  const rootDir = readingsDir();
+  const root = { type:'folder', name:'', path:'', children:[], count:0 };
+  const walkProject = (node, dir, prefix, projectPath) => {
+    let rows = [];
+    try { rows = fs.readdirSync(dir, { withFileTypes:true }).filter((entry) => ![READING_PROJECT_META,READING_FOLDER_META,'.codescope'].includes(entry.name)); } catch (_) {}
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+    let count = 0;
+    for (const entry of rows) {
+      const rel = prefix ? prefix + '/' + entry.name : entry.name;
+      if (entry.isDirectory()) {
+        count += walkProject(node, path.join(dir, entry.name), rel, projectPath);
+      } else if (readingAssetPath(rel)) {
+        let stat = { size:0, mtimeMs:0 }; try { stat = fs.statSync(path.join(dir, entry.name)); } catch (_) {}
+        const fragment = readingFragmentInfo(rel, stat, projectPath);
+        if (fragment.kind === 'pdf') {
+          const meta = loadReadingMeta(rel);
+          fragment.progress = { page:meta.page, translated:Object.keys(meta.translations || {}).length, fragments:meta.fragments.length };
+        }
+        node.children.push(fragment);
+        count += 1;
+      }
+    }
+    return count;
+  };
+  const directoryHasDirectAssets=(dir)=>{try{return fs.readdirSync(dir,{withFileTypes:true}).some((entry)=>entry.isFile()&&![READING_PROJECT_META,READING_FOLDER_META].includes(entry.name)&&readingAssetPath(entry.name));}catch(_){return false;}};
+  const walkFolders=(dir,prefix,depth)=>{let entries=[];try{entries=fs.readdirSync(dir,{withFileTypes:true}).filter((entry)=>entry.name!=='.codescope'&&![READING_PROJECT_META,READING_FOLDER_META].includes(entry.name));}catch(_){}entries.sort((a,b)=>a.name.localeCompare(b.name));const children=[];
+    for(const entry of entries){if(!entry.isDirectory())continue;const rel=prefix?prefix+'/'+entry.name:entry.name,full=path.join(dir,entry.name);const explicitFolder=fs.existsSync(path.join(full,READING_FOLDER_META)),explicitProject=fs.existsSync(path.join(full,READING_PROJECT_META));
+      if(explicitFolder){const folder={type:'folder',name:entry.name,path:rel,children:walkFolders(full,rel,depth+1)};folder.count=folder.children.reduce((sum,item)=>sum+(item.type==='project'?1:item.count||0),0);children.push(folder);continue;}
+      if(explicitProject||directoryHasDirectAssets(full)||depth===0){const meta=loadReadingProjectMeta(rel),project={type:'project',name:entry.name,path:rel,description:meta.description,tags:meta.tags,children:[],count:0};project.count=walkProject(project,full,rel,rel);children.push(project);root.count+=project.count;continue;}
+      const folder={type:'folder',name:entry.name,path:rel,children:walkFolders(full,rel,depth+1)};folder.count=folder.children.reduce((sum,item)=>sum+(item.type==='project'?1:item.count||0),0);children.push(folder);
+    }return children;};
+  root.children=walkFolders(rootDir,'',0);
+  return root;
+}
+let PDFJS_PROMISE = null;
+async function extractPdfPages(file) {
+  if (!PDFJS_PROMISE) PDFJS_PROMISE = import('pdfjs-dist/legacy/build/pdf.mjs');
+  const pdfjs = await PDFJS_PROMISE;
+  const bytes = new Uint8Array(fs.readFileSync(file));
+  const task = pdfjs.getDocument({ data:bytes, disableWorker:true, useSystemFonts:true });
+  const doc = await task.promise;
+  const pages = [];
+  for (let number = 1; number <= doc.numPages; number += 1) {
+    const page = await doc.getPage(number);
+    const content = await page.getTextContent();
+    let text = '', lastY = null;
+    for (const item of content.items || []) {
+      const y = item.transform && item.transform[5];
+      if (lastY != null && y != null && Math.abs(y - lastY) > 4) text += '\n';
+      else if (text && !text.endsWith('\n')) text += ' ';
+      text += String(item.str || ''); lastY = y;
+    }
+    pages.push(text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim());
+  }
+  await doc.destroy();
+  return pages;
+}
+
 function send(res, code, obj) {
   if (res.writableEnded || res.destroyed) return false;
   const body = typeof obj === 'string' ? obj : JSON.stringify(obj);
@@ -2246,7 +2381,153 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && u.pathname === '/api/version') {
       return send(res, 200, { ok: true, name: '码境 CodeScope', version: APP_VERSION, apiRevision: 2,
-        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links', 'live-web-search', 'search-history', 'editor-groups', 'drawio', 'drawio-xml', 'ai-drawio', 'full-text-search', 'quick-open', 'navigation-history', 'definition-peek', 'header-source-switch', 'lsp'] });
+        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links', 'live-web-search', 'search-history', 'editor-groups', 'drawio', 'drawio-xml', 'ai-drawio', 'full-text-search', 'quick-open', 'navigation-history', 'definition-peek', 'header-source-switch', 'lsp', 'pdf-library', 'pdf-translation', 'reading-fragments', 'reading-split-view', 'reading-projects', 'reading-code-notes', 'reading-folders', 'reading-project-metadata'] });
+    }
+    if (req.method === 'GET' && u.pathname === '/api/readings/tree') {
+      fs.mkdirSync(readingsDir(), { recursive:true });
+      const root = readingTree();
+      return send(res, 200, { ok:true, dir:readingsDir(), root, total:root.count });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/folder') {
+      const b = await readBody(req);
+      const parent = b.parent ? readingPath(String(b.parent), true) : '';
+      const name = readingPath(String(b.name || ''), true);
+      if ((b.parent && !parent) || !name || name.includes('/')) return send(res, 400, { ok:false, error:'文件夹名称或位置不合法' });
+      const rel = parent ? parent + '/' + name : name;
+      fs.mkdirSync(path.join(readingsDir(), rel), { recursive:true });
+      fs.writeFileSync(path.join(readingsDir(),rel,READING_FOLDER_META),JSON.stringify({version:1,updatedAt:Date.now()},null,2),'utf8');
+      return send(res, 200, { ok:true, path:rel });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/project/new') {
+      const b=await readBody(req),parent=b.parent?readingPath(String(b.parent),true):'',name=readingPath(String(b.name||''),true);
+      if((b.parent&&!parent)||!name||name.includes('/'))return send(res,400,{ok:false,error:'阅读项目名称或位置不合法'});const rel=parent?parent+'/'+name:name,target=path.join(readingsDir(),rel);if(fs.existsSync(target))return send(res,409,{ok:false,error:'同名阅读项目已存在'});
+      fs.mkdirSync(target,{recursive:true});const meta=saveReadingProjectMeta(rel,{description:b.description,tags:b.tags});return send(res,200,{ok:true,path:rel,meta});
+    }
+    if (u.pathname === '/api/readings/project/meta') {
+      if(req.method==='GET'){const project=readingPath(u.searchParams.get('project'),true);if(!project)return send(res,400,{ok:false,error:'阅读项目路径不合法'});return send(res,200,{ok:true,project,meta:loadReadingProjectMeta(project)});}
+      if(req.method==='POST'){const b=await readBody(req),project=readingPath(String(b.project||''),true);if(!project)return send(res,400,{ok:false,error:'阅读项目路径不合法'});return send(res,200,{ok:true,project,meta:saveReadingProjectMeta(project,b)});}
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/folder/rename') {
+      const b=await readBody(req),from=readingPath(String(b.folder||''),true),name=readingPath(String(b.name||''),true);if(!from||!name||name.includes('/'))return send(res,400,{ok:false,error:'阅读文件夹名称不合法'});const parent=path.posix.dirname(from)==='.'?'':path.posix.dirname(from),to=parent?parent+'/'+name:name,source=path.join(readingsDir(),from),target=path.join(readingsDir(),to);if(fs.existsSync(target))return send(res,409,{ok:false,error:'同名文件夹已存在'});
+      const pdfs=[];const scan=(dir,prefix)=>{for(const e of fs.readdirSync(dir,{withFileTypes:true})){const rel=prefix+'/'+e.name;if(e.isDirectory())scan(path.join(dir,e.name),rel);else if(/\.pdf$/i.test(e.name))pdfs.push(rel);}};try{scan(source,from);fs.renameSync(source,target);for(const oldRel of pdfs)moveReadingMeta(oldRel,to+oldRel.slice(from.length));return send(res,200,{ok:true,path:to});}catch(error){return send(res,500,{ok:false,error:'阅读文件夹重命名失败：'+String(error.message||error)});}
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/folder/delete') {
+      const b=await readBody(req),folder=readingPath(String(b.folder||''),true);if(!folder)return send(res,400,{ok:false,error:'阅读文件夹路径不合法'});const dir=path.join(readingsDir(),folder),pdfs=[];const scan=(current,prefix)=>{for(const e of fs.readdirSync(current,{withFileTypes:true})){const rel=prefix+'/'+e.name;if(e.isDirectory())scan(path.join(current,e.name),rel);else if(/\.pdf$/i.test(e.name))pdfs.push(rel);}};try{scan(dir,folder);fs.rmSync(dir,{recursive:true,force:false});for(const rel of pdfs)try{fs.unlinkSync(readingMetaFile(rel));}catch(_){}return send(res,200,{ok:true});}catch(error){return send(res,500,{ok:false,error:'删除阅读文件夹失败：'+String(error.message||error)});}
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/node/move') {
+      const b=await readBody(req),type=String(b.type||''),from=readingPath(String(b.path||''),true),toFolder=b.toFolder?readingPath(String(b.toFolder),true):'';
+      if(!['folder','project'].includes(type)||!from||(b.toFolder&&!toFolder))return send(res,400,{ok:false,error:'阅读节点或目标文件夹路径不合法'});if(type==='folder'&&toFolder&&(toFolder===from||toFolder.startsWith(from+'/')))return send(res,400,{ok:false,error:'不能把文件夹移动到自身或子文件夹中'});
+      const source=path.join(readingsDir(),from);if(!fs.existsSync(source)||!fs.statSync(source).isDirectory())return send(res,404,{ok:false,error:'待移动的阅读项目或文件夹不存在'});if(toFolder){const parent=path.join(readingsDir(),toFolder);if(!fs.existsSync(parent)||!fs.statSync(parent).isDirectory())return send(res,404,{ok:false,error:'目标阅读文件夹不存在'});}
+      const base=path.posix.basename(from),to=toFolder?toFolder+'/'+base:base;if(to===from)return send(res,200,{ok:true,path:from,unchanged:true});const target=path.join(readingsDir(),to);if(fs.existsSync(target))return send(res,409,{ok:false,error:'目标位置已有同名项目或文件夹'});
+      const pdfs=[];const scan=(dir,prefix)=>{for(const e of fs.readdirSync(dir,{withFileTypes:true})){const rel=prefix+'/'+e.name;if(e.isDirectory())scan(path.join(dir,e.name),rel);else if(/\.pdf$/i.test(e.name))pdfs.push(rel);}};try{scan(source,from);fs.mkdirSync(path.dirname(target),{recursive:true});fs.renameSync(source,target);for(const oldRel of pdfs)moveReadingMeta(oldRel,to+oldRel.slice(from.length));return send(res,200,{ok:true,path:to});}catch(error){return send(res,500,{ok:false,error:'移动失败：'+String(error.message||error)});}
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/text/new') {
+      const b=await readBody(req), project=readingPath(String(b.project||''),true), name=path.basename(String(b.name||'')).trim();
+      if(!project||!name||!READING_TEXT_EXTS.has(path.extname(name).toLowerCase())||!readingAssetPath(project+'/'+name))return send(res,400,{ok:false,error:'阅读项目或片段文件名不合法'});
+      const dir=path.join(readingsDir(),project);fs.mkdirSync(dir,{recursive:true});let target=path.join(dir,name);
+      if(fs.existsSync(target))return send(res,409,{ok:false,error:'同名片段已存在'});
+      const ext=path.extname(name).toLowerCase();const content=['.md','.markdown'].includes(ext)?'# '+name.replace(/\.[^.]+$/,'')+'\n\n':'// '+name+'\n';
+      fs.writeFileSync(target,content,'utf8');return send(res,200,{ok:true,path:project+'/'+name,kind:['.md','.markdown'].includes(ext)?'markdown':'code',content});
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/project/rename') {
+      const b=await readBody(req),from=readingPath(String(b.project||''),true),name=readingPath(String(b.name||''),true);const parent=from&&(path.posix.dirname(from)==='.'?'':path.posix.dirname(from)),to=parent?parent+'/'+name:name;
+      if(!from||!name||name.includes('/'))return send(res,400,{ok:false,error:'阅读项目名称不合法'});
+      const source=path.join(readingsDir(),from),target=path.join(readingsDir(),to);if(fs.existsSync(target))return send(res,409,{ok:false,error:'同名阅读项目已存在'});
+      const pdfs=[];const scan=(dir,prefix)=>{for(const e of fs.readdirSync(dir,{withFileTypes:true})){if(e.name==='.codescope')continue;const rel=prefix+'/'+e.name;if(e.isDirectory())scan(path.join(dir,e.name),rel);else if(/\.pdf$/i.test(e.name))pdfs.push(rel);}};
+      try{scan(source,from);fs.renameSync(source,target);for(const oldRel of pdfs)moveReadingMeta(oldRel,to+oldRel.slice(from.length));return send(res,200,{ok:true,project:to});}catch(error){return send(res,500,{ok:false,error:'阅读项目重命名失败：'+String(error.message||error)});}
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/project/delete') {
+      const b=await readBody(req),project=readingPath(String(b.project||''),true);if(!project)return send(res,400,{ok:false,error:'阅读项目名称不合法'});
+      const dir=path.join(readingsDir(),project),pdfs=[];const scan=(folder,prefix)=>{for(const e of fs.readdirSync(folder,{withFileTypes:true})){const rel=prefix+'/'+e.name;if(e.isDirectory())scan(path.join(folder,e.name),rel);else if(/\.pdf$/i.test(e.name))pdfs.push(rel);}};
+      try{scan(dir,project);fs.rmSync(dir,{recursive:true,force:false});for(const rel of pdfs)try{fs.unlinkSync(readingMetaFile(rel));}catch(_){}return send(res,200,{ok:true});}catch(error){return send(res,500,{ok:false,error:'删除阅读项目失败：'+String(error.message||error)});}
+    }
+    if (req.method === 'GET' && u.pathname === '/api/readings/text-fragment') {
+      const rel=readingAssetPath(u.searchParams.get('path'));
+      if(!rel||!READING_TEXT_EXTS.has(path.extname(rel).toLowerCase()))return send(res,400,{ok:false,error:'文本片段路径不合法'});
+      try{const stat=fs.statSync(path.join(readingsDir(),rel));if(stat.size>8*1024*1024)return send(res,413,{ok:false,error:'文本片段超过 8 MB'});return send(res,200,{ok:true,path:rel,content:fs.readFileSync(path.join(readingsDir(),rel),'utf8')});}
+      catch(_){return send(res,404,{ok:false,error:'文本片段不存在'});}
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/text-fragment') {
+      const b=await readBody(req,12e6),rel=readingAssetPath(b.path);
+      if(!rel||!READING_TEXT_EXTS.has(path.extname(rel).toLowerCase()))return send(res,400,{ok:false,error:'文本片段路径不合法'});
+      const content=String(b.content==null?'':b.content);if(Buffer.byteLength(content)>8*1024*1024)return send(res,413,{ok:false,error:'文本片段超过 8 MB'});
+      try{fs.writeFileSync(path.join(readingsDir(),rel),content,'utf8');return send(res,200,{ok:true,size:Buffer.byteLength(content)});}catch(error){return send(res,500,{ok:false,error:'保存失败：'+String(error.message||error)});}
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/upload-stream') {
+      let info;
+      try { info = JSON.parse(Buffer.from(String(req.headers['x-codescope-reading'] || ''), 'base64').toString('utf8')); }
+      catch (_) { return send(res, 400, { ok:false, error:'上传信息格式错误' }); }
+      const folder = info.folder ? readingPath(String(info.folder), true) : '';
+      let base = path.basename(String(info.name || '')).trim();
+      if ((info.folder && !folder) || !/^[A-Za-z0-9._\-\u00a0-\uffff ()\[\],+&]+\.pdf$/i.test(base)) return send(res, 400, { ok:false, error:'仅支持合法的 PDF 文件名和文库目录' });
+      const dir = path.join(readingsDir(), folder || '.'); fs.mkdirSync(dir, { recursive:true });
+      const stem = base.replace(/\.pdf$/i, ''); let target = path.join(dir, base), index = 2;
+      while (fs.existsSync(target)) { base = stem + '-' + index + '.pdf'; target = path.join(dir, base); index += 1; }
+      const temp = path.join(dir, '.' + crypto.randomUUID() + '.upload');
+      try {
+        await pipeline(req, fs.createWriteStream(temp, { flags:'wx' }));
+        const head = Buffer.alloc(5); const fd = fs.openSync(temp, 'r'); fs.readSync(fd, head, 0, 5, 0); fs.closeSync(fd);
+        if (head.toString('ascii') !== '%PDF-') throw new Error('文件不是有效的 PDF');
+        fs.renameSync(temp, target);
+        const rel = (folder ? folder + '/' : '') + base;
+        return send(res, 200, { ok:true, path:rel, size:fs.statSync(target).size });
+      } catch (error) {
+        try { fs.unlinkSync(temp); } catch (_) {}
+        return send(res, 400, { ok:false, error:'导入失败：' + String(error.message || error) });
+      }
+    }
+    if (req.method === 'GET' && u.pathname === '/api/readings/file') {
+      const rel = readingPath(u.searchParams.get('path'));
+      if (!rel) return send(res, 400, { ok:false, error:'PDF 路径不合法' });
+      const file = path.join(readingsDir(), rel);
+      let stat; try { stat = fs.statSync(file); } catch (_) { return send(res, 404, { ok:false, error:'PDF 不存在' }); }
+      const range = req.headers.range;
+      res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Accept-Ranges', 'bytes'); res.setHeader('Cache-Control', 'private, no-cache');
+      if (range) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+        if (!match) { res.writeHead(416, { 'Content-Range':'bytes */' + stat.size }); return res.end(); }
+        const start = match[1] ? Number(match[1]) : 0;
+        const end = match[2] ? Math.min(Number(match[2]), stat.size - 1) : stat.size - 1;
+        if (start > end || start >= stat.size) { res.writeHead(416, { 'Content-Range':'bytes */' + stat.size }); return res.end(); }
+        res.writeHead(206, { 'Content-Range':`bytes ${start}-${end}/${stat.size}`, 'Content-Length':end-start+1 });
+        return fs.createReadStream(file, { start, end }).pipe(res);
+      }
+      res.writeHead(200, { 'Content-Length':stat.size }); return fs.createReadStream(file).pipe(res);
+    }
+    if (req.method === 'GET' && u.pathname === '/api/readings/text') {
+      const rel = readingPath(u.searchParams.get('path'));
+      if (!rel) return send(res, 400, { ok:false, error:'PDF 路径不合法' });
+      try {
+        const pages = await extractPdfPages(path.join(readingsDir(), rel));
+        return send(res, 200, { ok:true, path:rel, pages, pageCount:pages.length });
+      } catch (error) { return send(res, 500, { ok:false, error:'PDF 文本解析失败：' + String(error.message || error).slice(0, 300) }); }
+    }
+    if (req.method === 'GET' && u.pathname === '/api/readings/meta') {
+      const rel = readingPath(u.searchParams.get('path'));
+      if (!rel) return send(res, 400, { ok:false, error:'PDF 路径不合法' });
+      return send(res, 200, { ok:true, meta:loadReadingMeta(rel) });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/meta') {
+      const b = await readBody(req, 25e6); const rel = readingPath(b.path);
+      if (!rel) return send(res, 400, { ok:false, error:'PDF 路径不合法' });
+      try { return send(res, 200, { ok:true, meta:saveReadingMeta(rel, b.meta) }); }
+      catch (error) { return send(res, 500, { ok:false, error:'阅读记录保存失败：' + String(error.message || error) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/rename') {
+      const b = await readBody(req); const rel = readingAssetPath(b.path);
+      const nextBase = path.basename(String(b.name || '')).trim();
+      if (!rel || !readingAssetPath((path.dirname(rel)==='.'?'':path.dirname(rel)+'/')+nextBase)) return send(res, 400, { ok:false, error:'文件名或类型不合法' });
+      const dir = path.dirname(rel) === '.' ? '' : path.dirname(rel).split(path.sep).join('/');
+      const next = dir ? dir + '/' + nextBase : nextBase;
+      if (next !== rel && fs.existsSync(path.join(readingsDir(), next))) return send(res, 409, { ok:false, error:'目标文件已存在' });
+      try { fs.renameSync(path.join(readingsDir(), rel), path.join(readingsDir(), next)); if(/\.pdf$/i.test(rel))moveReadingMeta(rel, next); return send(res, 200, { ok:true, path:next }); }
+      catch (error) { return send(res, 500, { ok:false, error:'重命名失败：' + String(error.message || error) }); }
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/delete') {
+      const b = await readBody(req); const rel = readingAssetPath(b.path);
+      if (!rel) return send(res, 400, { ok:false, error:'片段路径不合法' });
+      try { fs.unlinkSync(path.join(readingsDir(), rel)); if(/\.pdf$/i.test(rel))try { fs.unlinkSync(readingMetaFile(rel)); } catch (_) {} return send(res, 200, { ok:true }); }
+      catch (error) { return send(res, 500, { ok:false, error:'删除失败：' + String(error.message || error) }); }
     }
     if (req.method === 'GET' && u.pathname === '/api/env') {
       const force = u.searchParams.get('refresh') === '1';
