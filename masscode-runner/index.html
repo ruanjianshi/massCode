@@ -19,8 +19,6 @@
 </script>
 <script src="/assets/highlight.min.js" defer></script>
 <script src="/assets/xterm.js" defer></script>
-<script src="/vendor/markmap-lib.js"></script>
-<script src="/vendor/markmap-view.js"></script>
 <style>
   :root {
     --bg: #16181d; --panel: #1e2128; --panel2: #252932; --border: #30353f;
@@ -491,6 +489,20 @@
   #toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; position: sticky; top: 0; z-index: 20; background: var(--panel); }
   #toolbar .title { font-weight: 600; margin-right: auto; }
   #tabs { display: flex; gap: 6px; padding: 8px 14px 0; }
+  #code-context-bar { position:relative; display:flex; align-items:center; gap:4px; min-height:29px; padding:3px 10px; border-bottom:1px solid var(--border); background:color-mix(in srgb,var(--panel2) 68%,var(--panel)); color:var(--dim); font:9px var(--mono); }
+  #code-context-bar.hidden { display:none; }
+  #code-breadcrumbs { display:flex; align-items:center; min-width:0; overflow:hidden; }
+  #code-breadcrumbs button { flex:none; overflow:hidden; max-width:240px; padding:3px 6px; border:0; background:transparent; color:var(--dim); text-overflow:ellipsis; white-space:nowrap; font:9px var(--mono); }
+  #code-breadcrumbs button:hover { color:var(--text); background:var(--accent-soft); }
+  #code-breadcrumbs .sep { flex:none; color:color-mix(in srgb,var(--dim) 55%,transparent); }
+  #code-scope { min-width:0; overflow:hidden; color:var(--text); text-overflow:ellipsis; white-space:nowrap; }
+  #lsp-diagnostics { flex:none; margin-left:auto; padding:3px 8px; border-radius:10px; font:8px var(--mono); }
+  #lsp-diagnostics.ok { color:var(--ok); } #lsp-diagnostics.warn { color:#e5ae55; } #lsp-diagnostics.error { color:var(--err); }
+  #lsp-problems { position:absolute; z-index:85; top:calc(100% + 5px); right:8px; width:min(520px,calc(100vw - 40px)); max-height:300px; overflow:auto; padding:6px; border:1px solid var(--border); border-radius:8px; background:var(--theme-elevated,var(--panel)); box-shadow:0 14px 38px rgba(0,0,0,.45); }
+  #lsp-problems.hidden { display:none; }
+  .lsp-problem { display:grid; grid-template-columns:auto 1fr auto; gap:7px; align-items:start; width:100%; padding:7px 8px; border:0; border-radius:6px; background:transparent; text-align:left; }
+  .lsp-problem:hover { background:var(--accent-soft); } .lsp-problem .sev { color:#e5ae55; } .lsp-problem.error .sev { color:var(--err); }
+  .lsp-problem .msg { color:var(--text); white-space:normal; } .lsp-problem .where { color:var(--dim); white-space:nowrap; }
   .tab { padding: 5px 12px; border-radius: 6px 6px 0 0; border: 1px solid var(--border); border-bottom: none; background: transparent; color: var(--dim); }
   .tab.active { background: var(--panel2); color: var(--text); }
   #code-wrap { flex:1; min-width:0; display:flex; overflow:auto; position:relative; background:var(--panel2); margin:10px 14px 0; border:1px solid var(--border); border-radius:8px; }
@@ -669,6 +681,8 @@
   .definition-hover-name { min-width:0; overflow:hidden; color:var(--text); text-overflow:ellipsis; white-space:nowrap; font-weight:700; }
   .definition-hover-place { margin-left:auto; color:var(--dim); white-space:nowrap; font-size:8px; }
   .definition-hover-signature { flex:0 0 auto; overflow:auto hidden; padding:7px 10px; color:var(--accent); border-bottom:1px solid color-mix(in srgb,var(--border) 70%,transparent); white-space:pre; scrollbar-width:thin; }
+  .definition-hover-doc { flex:0 1 auto; max-height:120px; overflow:auto; padding:8px 10px; color:var(--text); border-bottom:1px solid color-mix(in srgb,var(--border) 70%,transparent); background:color-mix(in srgb,var(--accent-soft) 34%,transparent); font:9px/1.55 var(--sans); white-space:pre-wrap; }
+  .definition-hover-doc .server { float:right; color:var(--ok); font:8px var(--mono); }
   #definition-hover pre { flex:1 1 auto; min-height:72px; max-height:300px; overflow:auto; overscroll-behavior:contain; margin:0; padding:8px 10px; background:var(--theme-code,var(--panel2)); color:var(--text); font:10px/1.55 var(--mono); white-space:pre; scrollbar-width:thin; }
   .definition-hover-foot { padding:5px 10px; color:var(--dim); border-top:1px solid var(--border); font-size:8px; }
   #code.definition-link, #code-edit.definition-modifier, .split-editor-input.definition-modifier { cursor:pointer; }
@@ -1808,6 +1822,7 @@
       <span id="autosave-hint" title="代码修改后自动保存到 vault">⚡ 自动保存</span>
     </div>
     <div id="tabs"></div>
+    <div id="code-context-bar" class="hidden"><div id="code-breadcrumbs"></div><span id="code-scope"></span><button id="lsp-diagnostics" title="语言服务器诊断">LSP</button><div id="lsp-problems" class="hidden"></div></div>
     <div id="draw-editor">
       <div id="draw-ed-head">
         <button id="draw-back" title="返回片段列表（绘图会自动保存）">← 片段</button>
@@ -4368,6 +4383,7 @@ function jumpToLine(line) {
     document.querySelector('.ol-item[data-line="' + line + '"]');
   if (it) it.classList.add('active');
   syncRelationRoot(relationFunctionAtLine(line));
+  updateCodeContextBar(line);
 }
 
 /* 编辑模式：把光标（caret）移到目标行行首，并聚焦编辑框（跳转后输入落点应为目标行） */
@@ -4620,6 +4636,39 @@ function snippetIndex(snip) {
 function globalIndex() {
   if (!GLOBAL_INDEX) GLOBAL_INDEX = SNIPPETS.flatMap(snippetIndex);
   return GLOBAL_INDEX;
+}
+let LSP_DIAGNOSTICS=[],LSP_DIAG_TIMER=0,LSP_DIAG_SEQ=0;
+function readingContext() {
+  const active=activeSplitContext();
+  if(active)return{snippet:active.ref.snippet,index:active.ref.index,fragment:active.ref.frag,code:active.input.value,line:active.input.value.slice(0,active.input.selectionStart||0).split('\n').length};
+  if(!CURRENT||!CURRENT.fragments||!CURRENT.fragments[CINDEX])return null;
+  const fragment=CURRENT.fragments[CINDEX],ta=$('code-edit');let line=1,code=fragment.code||'';
+  if(EDITING&&ta&&ta.style.display!=='none'){code=ta.value;line=ta.value.slice(0,ta.selectionStart||0).split('\n').length;}
+  else {const cw=$('code-wrap'),lh=parseFloat(getComputedStyle($('code')).lineHeight)||20,pad=parseFloat(getComputedStyle($('code')).paddingTop)||0;line=Math.max(1,Math.floor((cw.scrollTop+cw.clientHeight*CODE_FOCUS_RATIO-pad)/lh)+1);}
+  return{snippet:CURRENT,index:CINDEX,fragment,code,line};
+}
+function updateCodeContextBar(forcedLine) {
+  const bar=$('code-context-bar'),crumbs=$('code-breadcrumbs'),scope=$('code-scope'),context=readingContext();
+  if(!context||['markdown','latex','plain_text'].includes(context.fragment.language)){bar.classList.add('hidden');$('lsp-problems').classList.add('hidden');return;}
+  bar.classList.remove('hidden');crumbs.replaceChildren();const line=forcedLine||context.line;
+  const symbols=snippetIndex(context.snippet).filter(item=>item.frag===context.index&&item.line<=line);
+  const enclosing=kind=>symbols.filter(item=>item.kind===kind&&(item.endLine||item.line)>=line).sort((a,b)=>b.line-a.line)[0];
+  const type=enclosing('type'),fn=enclosing('fn');
+  const parts=[{label:context.snippet.name,line:1},{label:context.fragment.filename||context.fragment.label||('片段 '+(context.index+1)),line:1}];
+  if(type)parts.push({label:'▣ '+type.name,line:type.line});if(fn)parts.push({label:'ƒ '+fn.name,line:fn.line});
+  parts.forEach((part,index)=>{if(index){const sep=document.createElement('span');sep.className='sep';sep.textContent='›';crumbs.appendChild(sep);}const button=document.createElement('button');button.textContent=part.label;button.title=part.label;button.onclick=()=>goToLocation({snippet:context.snippet,frag:context.index,line:part.line});crumbs.appendChild(button);});
+  scope.textContent=fn?symbolSignature(fn):(type?symbolSignature(type):'第 '+line+' 行');scope.title=scope.textContent;
+}
+function renderLspProblems() {
+  const box=$('lsp-problems');box.replaceChildren();
+  if(!LSP_DIAGNOSTICS.length){const empty=document.createElement('div');empty.className='ol-empty';empty.textContent='当前文件没有语言服务器诊断';box.appendChild(empty);return;}
+  const context=readingContext();LSP_DIAGNOSTICS.forEach(item=>{const row=document.createElement('button'),severity=Number(item.severity)||3,line=Number(item.range&&item.range.start&&item.range.start.line||0)+1;row.className='lsp-problem '+(severity===1?'error':'');const icon=document.createElement('span');icon.className='sev';icon.textContent=severity===1?'●':'▲';const message=document.createElement('span');message.className='msg';message.textContent=String(item.message||'诊断信息');const where=document.createElement('span');where.className='where';where.textContent=':'+line;row.append(icon,message,where);row.onclick=()=>{box.classList.add('hidden');if(context)goToLocation({snippet:context.snippet,frag:context.index,line});};box.appendChild(row);});
+}
+function scheduleLspDiagnostics(delay=650) {
+  clearTimeout(LSP_DIAG_TIMER);const context=readingContext(),badge=$('lsp-diagnostics');
+  if(!context||!['c','c_cpp','python','javascript','typescript','go'].includes(context.fragment.language)){badge.textContent='索引';badge.className='';return;}
+  const seq=++LSP_DIAG_SEQ;badge.textContent='LSP …';badge.className='';
+  LSP_DIAG_TIMER=setTimeout(async()=>{try{const result=await api('/api/lsp/query',{file:context.snippet.file,fragment:context.index,code:context.code,action:'diagnostics',line:context.line,column:1});if(seq!==LSP_DIAG_SEQ)return;if(!result.ok){LSP_DIAGNOSTICS=[];badge.textContent='本地索引';badge.className='';badge.title=result.error||'语言服务器不可用，已使用本地索引';return;}LSP_DIAGNOSTICS=Array.isArray(result.diagnostics)?result.diagnostics:[];const errors=LSP_DIAGNOSTICS.filter(item=>item.severity===1).length;badge.textContent=LSP_DIAGNOSTICS.length?(errors?'● '+errors+' 错误':'▲ '+LSP_DIAGNOSTICS.length+' 警告'):'✓ '+result.server;badge.className=errors?'error':(LSP_DIAGNOSTICS.length?'warn':'ok');badge.title='语言服务器：'+result.server+'；点击查看诊断';renderLspProblems();}catch(_){if(seq===LSP_DIAG_SEQ){badge.textContent='本地索引';badge.className='';}}},delay);
 }
 function invalidateSymIndexes() {
   SNIPPET_INDEX.clear(); REF_CACHE.clear(); GLOBAL_INDEX = null; SYM_SEL = null; REL_ROOT = null; REL_EXPANDED.clear();
@@ -5753,6 +5802,15 @@ function aiApply(code, selection) {
 }
 /* ==================== Markdown 思维导图 ==================== */
 let MM_ACTIVE = false;   /* true = 右侧渲染区已被思维导图替代 */
+let MM_LIB_PROMISE = null;
+function loadOptionalScript(src) {
+  return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.async=true;script.onload=resolve;script.onerror=()=>reject(new Error('资源加载失败：'+src));document.head.appendChild(script);});
+}
+function ensureMindmapLib() {
+  if(mmHasLib())return Promise.resolve();
+  if(!MM_LIB_PROMISE)MM_LIB_PROMISE=loadOptionalScript('/vendor/markmap-lib.js').then(()=>loadOptionalScript('/vendor/markmap-view.js')).catch(error=>{MM_LIB_PROMISE=null;throw error;});
+  return MM_LIB_PROMISE;
+}
 function openMindmap() {
   MM_ACTIVE = true;
   applyMmMode();
@@ -5762,6 +5820,11 @@ function mmRenderCurrent() {
   const f = CURRENT && CURRENT.fragments[CINDEX];
   if (!f || f.language !== 'markdown') return;
   $('mm-canvas').classList.add('on');   /* 先显示画布，markmap 需要 svg 有真实尺寸 */
+  if(!mmHasLib()){
+    $('mm-hint').textContent='正在按需加载思维导图库…';
+    ensureMindmapLib().then(()=>{$('mm-hint').textContent='滚轮缩放 · 拖动平移 · 点击节点折叠/展开 · 点击节点文字选中编辑 · Esc 返回渲染';if(MM_ACTIVE)mmRenderCurrent();}).catch(error=>{$('mm-hint').textContent=error.message;setStatus('err','思维导图库加载失败');});
+    return;
+  }
   renderMindmap(f, EDITING ? editText() : f.code);
   // 思维导图替代右侧渲染区域（源码/预览布局中预览部分被导图接管）
   $('edit-preview').style.display = 'none';
@@ -6755,7 +6818,7 @@ function wordAtEditorCaret() {
   if(!input||document.activeElement!==input)return null;
   const pos=input.selectionStart||0,text=input.value||'';let start=pos,end=pos;
   while(start>0&&/[A-Za-z0-9_$]/.test(text[start-1]))start--;while(end<text.length&&/[A-Za-z0-9_$]/.test(text[end]))end++;
-  const word=text.slice(start,end),line=text.slice(0,pos).split('\n').length;return/^[A-Za-z_$][\w$]*$/.test(word)?{word,line}:null;
+  const word=text.slice(start,end),before=text.slice(0,start),line=before.split('\n').length,lineStart=before.lastIndexOf('\n')+1,column=start-lineStart+1;return/^[A-Za-z_$][\w$]*$/.test(word)?{word,line,column}:null;
 }
 function focusedSymbol() {
   const active=activeSplitContext(),editingFocus=active||document.activeElement===$('code-edit'),token=wordAtEditorCaret();
@@ -6769,10 +6832,20 @@ function showNavigationNotice(message) {
   const note=$('nav-notice');clearTimeout(NAV_NOTICE_TIMER);note.textContent=message;note.className='error';note.style.display='inline-flex';
   NAV_NOTICE_TIMER=setTimeout(()=>{note.textContent='';note.className='';note.style.display='none';},2600);
 }
+async function goToLspDefinition(token,ref,fallback) {
+  const context=ref?{snippet:ref.snippet,index:ref.index,fragment:ref.frag,code:ref.frag.code}:readingContext();
+  if(token&&context&&token.column&&['c','c_cpp','python','javascript','typescript','go'].includes(context.fragment.language))try{
+    const result=await api('/api/lsp/query',{file:context.snippet.file,fragment:context.index,code:context.code,action:'definition',line:token.line,column:token.column});
+    const target=result&&result.ok&&result.locations&&result.locations.find(item=>item.fragment>=0);
+    if(target){goToLocation({snippet:context.snippet,frag:target.fragment,line:target.line});return true;}
+  }catch(_){}
+  if(fallback){goToSymbol(resolveDefinition(fallback)||fallback);return true;}
+  showNavigationNotice(token?'未找到 “'+token.word+'” 的项目内定义':'请把光标放在函数、类型、宏或变量上');return false;
+}
 function goToFocusedDefinition() {
-  const token=wordAtEditorCaret(),sym=focusedSymbol();
-  if(!sym){showNavigationNotice(token?'未找到 “'+token.word+'” 的项目内定义':'请把光标放在函数、类型、宏或变量上');return false;}
-  goToSymbol(resolveDefinition(sym)||sym);return true;
+  const active=activeSplitContext(),token=wordAtEditorCaret(),sym=focusedSymbol();
+  if(!token&&!sym){showNavigationNotice('请把光标放在函数、类型、宏或变量上');return false;}
+  goToLspDefinition(token,active&&active.ref,sym);return true;
 }
 let DEFINITION_HOVER_TIMER=0,DEFINITION_HOVER_HIDE_TIMER=0,DEFINITION_HOVER_KEY='',DEFINITION_HOVER_POS=null,DEFINITION_HOVER_INTERACTING=false;
 function hideDefinitionHover() {
@@ -6793,14 +6866,31 @@ function editorTokenAtPoint(input,event) {
   for(;column<line.length;column++){const next=visual+(line[column]==='\t'?(tabSize-visual%tabSize):1);if(x<(visual+next)*charWidth/2)break;visual=next;}
   if(column>=line.length||!/[A-Za-z0-9_$]/.test(line[column]))return null;
   let start=column,end=column+1;while(start>0&&/[A-Za-z0-9_$]/.test(line[start-1]))start--;while(end<line.length&&/[A-Za-z0-9_$]/.test(line[end]))end++;
-  const word=line.slice(start,end);return/^[A-Za-z_$][\w$]*$/.test(word)?{word,line:lineIndex+1}:null;
+  const word=line.slice(start,end);return/^[A-Za-z_$][\w$]*$/.test(word)?{word,line:lineIndex+1,column:start+1}:null;
 }
 function symbolInContext(token,ref) {
   if(!token)return null;if(!ref)return findBestSymbol(token.word,token.line);
   const previousCurrent=CURRENT,previousIndex=CINDEX;CURRENT=ref.snippet;CINDEX=ref.index;
   try{return findBestSymbol(token.word,token.line);}finally{CURRENT=previousCurrent;CINDEX=previousIndex;}
 }
-function showDefinitionHover(target,position) {
+const LSP_HOVER_CACHE=new Map();
+function lspHoverText(markdown) {
+  return String(markdown||'').replace(/^```[^\n]*\n?|```$/gm,'').replace(/^#{1,6}\s*/gm,'').replace(/^---+$/gm,'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/`([^`]+)`/g,'$1').replace(/\n{3,}/g,'\n\n').trim();
+}
+async function enrichDefinitionHover(token,ref,key) {
+  const context=ref?{snippet:ref.snippet,index:ref.index,code:ref.frag.code}:{snippet:CURRENT,index:CINDEX,code:EDITING?editText():CURRENT&&CURRENT.fragments[CINDEX]&&CURRENT.fragments[CINDEX].code};
+  if(!context.snippet||!token||!token.column)return;
+  const cacheKey=[context.snippet.file,context.index,token.line,token.column,context.code.length].join('|');
+  let pending=LSP_HOVER_CACHE.get(cacheKey);
+  if(!pending){pending=api('/api/lsp/query',{file:context.snippet.file,fragment:context.index,code:context.code,action:'hover',line:token.line,column:token.column});LSP_HOVER_CACHE.set(cacheKey,pending);if(LSP_HOVER_CACHE.size>120)LSP_HOVER_CACHE.delete(LSP_HOVER_CACHE.keys().next().value);}
+  try {
+    const result=await pending,text=result&&result.ok&&result.hover&&lspHoverText(result.hover.markdown);
+    if(!text||DEFINITION_HOVER_KEY!==key||$('definition-hover').style.display==='none')return;
+    const doc=document.createElement('div');doc.className='definition-hover-doc';const server=document.createElement('span');server.className='server';server.textContent='LSP · '+result.server;doc.append(server,document.createTextNode(text));
+    const pre=$('definition-hover').querySelector('pre');$('definition-hover').insertBefore(doc,pre);
+  } catch (_) {}
+}
+function showDefinitionHover(target,position,token,ref,key) {
   const fragment=fragmentOf(target);if(!fragment)return;const hint=$('definition-hover'),host=$('edit-split'),hostRect=host.getBoundingClientRect();hint.replaceChildren();
   const head=document.createElement('div');head.className='definition-hover-head';
   const kind=document.createElement('span');kind.className='definition-hover-kind';kind.textContent=DEFINITION_KIND_LABEL[target.kind]||'符号';
@@ -6813,19 +6903,20 @@ function showDefinitionHover(target,position) {
   hint.style.visibility='hidden';hint.style.display='flex';const width=hint.offsetWidth,height=hint.offsetHeight;
   const left=Math.max(8,Math.min(position.x-hostRect.left+14,host.clientWidth-width-8));let top=position.y-hostRect.top+20;if(top+height>host.clientHeight-8)top=Math.max(8,position.y-hostRect.top-height-12);
   hint.style.left=left+'px';hint.style.top=top+'px';hint.style.visibility='';
+  enrichDefinitionHover(token,ref,key);
 }
-function scheduleDefinitionHover(event,token,sym) {
+function scheduleDefinitionHover(event,token,sym,ref) {
   if(!token||!sym){scheduleDefinitionHoverHide();return;}clearTimeout(DEFINITION_HOVER_HIDE_TIMER);DEFINITION_HOVER_HIDE_TIMER=0;const target=resolveDefinition(sym)||sym,key=symbolId(target);DEFINITION_HOVER_POS={x:event.clientX,y:event.clientY};
   $('code').classList.toggle('definition-link',definitionModifier(event));if(DEFINITION_HOVER_KEY===key)return;
   clearTimeout(DEFINITION_HOVER_TIMER);$('definition-hover').style.display='none';DEFINITION_HOVER_KEY=key;
-  DEFINITION_HOVER_TIMER=setTimeout(()=>{DEFINITION_HOVER_TIMER=0;if(DEFINITION_HOVER_KEY===key&&DEFINITION_HOVER_POS)showDefinitionHover(target,DEFINITION_HOVER_POS);},550);
+  DEFINITION_HOVER_TIMER=setTimeout(()=>{DEFINITION_HOVER_TIMER=0;if(DEFINITION_HOVER_KEY===key&&DEFINITION_HOVER_POS)showDefinitionHover(target,DEFINITION_HOVER_POS,token,ref,key);},550);
 }
 function updateDefinitionHover(event) {
-  if(EDITING){hideDefinitionHover();return;}const token=codeTokenAt(event);scheduleDefinitionHover(event,token,token&&findBestSymbol(token.word,token.line));
+  if(EDITING){hideDefinitionHover();return;}const token=codeTokenAt(event);scheduleDefinitionHover(event,token,token&&findBestSymbol(token.word,token.line),null);
 }
 function updateEditorDefinitionHover(event,input,ref) {
   const fragment=ref?ref.frag:(CURRENT&&CURRENT.fragments&&CURRENT.fragments[CINDEX]);if(!fragment||['markdown','latex','plain_text'].includes(fragment.language)){hideDefinitionHover();return;}
-  const token=editorTokenAtPoint(input,event);scheduleDefinitionHover(event,token,symbolInContext(token,ref));
+  const token=editorTokenAtPoint(input,event);scheduleDefinitionHover(event,token,symbolInContext(token,ref),ref);
 }
 
 function goToLocation(loc) {
@@ -6860,8 +6951,8 @@ function codeTokenAt(e) {
   let s = idx, en = idx;
   while (s > 0 && isId(txt[s - 1])) s--;
   while (en < txt.length && isId(txt[en])) en++;
-  const word = txt.slice(s, en);
-  return /^[A-Za-z_$][\w$]*$/.test(word) ? { word, line: codeLineAt(e) } : null;
+  const word = txt.slice(s, en), line=codeLineAt(e), fragment=CURRENT&&CURRENT.fragments&&CURRENT.fragments[CINDEX],sourceLine=fragment&&String(fragment.code||'').replace(/\r\n/g,'\n').split('\n')[line-1]||'',column=Math.max(0,sourceLine.indexOf(word))+1;
+  return /^[A-Za-z_$][\w$]*$/.test(word) ? { word, line, column } : null;
 }
 function codeLineAt(e) {
   const cw = $('code-wrap'), rect = cw.getBoundingClientRect();
@@ -6885,9 +6976,9 @@ function onCodeClick(e) {
   const clickedLine = codeLineAt(e);
   syncRelationRoot(relationFunctionAtLine(clickedLine));
   const t = codeTokenAt(e), sym = t && findBestSymbol(t.word, t.line);
-  if(definitionModifier(e)&&t&&!sym){e.preventDefault();showNavigationNotice('未找到 “'+t.word+'” 的项目内定义');return;}
+  if(definitionModifier(e)&&t&&!sym){e.preventDefault();goToLspDefinition(t,null,null);return;}
   if (sym) {
-    if(definitionModifier(e)){e.preventDefault();hideDefinitionHover();goToSymbol(resolveDefinition(sym)||sym);return;}
+    if(definitionModifier(e)){e.preventDefault();hideDefinitionHover();goToLspDefinition(t,null,sym);return;}
     if(e.altKey){openDefinitionPeek(sym);return;}
     SYM_SEL = sym;
     if (SYM_MODE === 'relation' && sym.kind === 'fn') {
@@ -7239,7 +7330,7 @@ function markActiveEditor() {
 }
 function scheduleActiveReadingRefresh() {
   if(ACTIVE_READING_RAF)cancelAnimationFrame(ACTIVE_READING_RAF);
-  ACTIVE_READING_RAF=requestAnimationFrame(()=>{ACTIVE_READING_RAF=0;REL_ROOT=null;refreshReadingPanels();});
+  ACTIVE_READING_RAF=requestAnimationFrame(()=>{ACTIVE_READING_RAF=0;REL_ROOT=null;refreshReadingPanels();updateCodeContextBar();});
 }
 function activateSplitReading(entry,group,input,contentChanged) {
   const key=splitKey(entry.file,entry.fragment),changed=ACTIVE_SPLIT_KEY!==key;ACTIVE_SPLIT_KEY=key;
@@ -8258,6 +8349,8 @@ function renderMain() {
   setStatus('idle', '空闲'); $('elapsed').textContent = ''; $('out-body').innerHTML = '<span class="empty">选择片段并点击「运行」查看输出</span>';
   applyMdView();
   renderSplitEditors();
+  updateCodeContextBar();
+  scheduleLspDiagnostics();
   loadAiChat();   /* 切换片段/编辑状态：恢复该片段的 AI 对话记录 */
   updateAiChatCur();
   if (MM_ACTIVE) mmRenderCurrent();   /* 导图模式下切换片段：用新片段内容重渲染导图 */
@@ -9468,6 +9561,9 @@ function makeHResizer(handle, getter, setter) {
   $('definition-hover').addEventListener('mouseenter',()=>{DEFINITION_HOVER_INTERACTING=true;clearTimeout(DEFINITION_HOVER_HIDE_TIMER);DEFINITION_HOVER_HIDE_TIMER=0;});
   $('definition-hover').addEventListener('mouseleave',()=>{DEFINITION_HOVER_INTERACTING=false;scheduleDefinitionHoverHide(120);});
   $('definition-hover').addEventListener('wheel',event=>event.stopPropagation(),{passive:true});
+  $('lsp-diagnostics').addEventListener('click',(event)=>{event.stopPropagation();renderLspProblems();$('lsp-problems').classList.toggle('hidden');});
+  $('lsp-problems').addEventListener('click',event=>event.stopPropagation());
+  document.addEventListener('click',()=>$('lsp-problems').classList.add('hidden'));
   document.addEventListener('keydown',(event)=>{if(event.key==='Control'||event.key==='Meta')document.querySelectorAll('#code-edit,.split-editor-input').forEach(input=>input.classList.add('definition-modifier'));});
   document.addEventListener('keyup',(event)=>{if(event.key==='Control'||event.key==='Meta'){document.querySelectorAll('#code-edit,.split-editor-input').forEach(input=>input.classList.remove('definition-modifier'));hideDefinitionHover();}});
   window.addEventListener('blur',()=>{document.querySelectorAll('#code-edit,.split-editor-input').forEach(input=>input.classList.remove('definition-modifier'));hideDefinitionHover();});
@@ -9479,6 +9575,7 @@ function makeHResizer(handle, getter, setter) {
       OL_SCROLL_RAF = 0;
       updateOutlineActive();
       syncRelationToCodeFocus();
+      updateCodeContextBar();
     });
   });
   // 编辑模式下输入时实时刷新大纲 + 实时渲染预览 + 代码实时高亮 + 自动保存
@@ -9491,6 +9588,8 @@ function makeHResizer(handle, getter, setter) {
     editOutlineTimer = setTimeout(() => { try { renderOutline(); } catch (_) {} }, 120);
     try { updateEditPreview(); } catch (_) {}
     try { syncHighlight(); } catch (_) {}
+    updateCodeContextBar();
+    scheduleLspDiagnostics(900);
     if (MM_ACTIVE) scheduleMmSync();   /* 导图模式：左侧编辑 → 防抖同步思维导图 */
     scheduleSyncMdPreview();
     scheduleSave();
@@ -9499,9 +9598,10 @@ function makeHResizer(handle, getter, setter) {
   $('code-edit').addEventListener('keyup', () => {
     scheduleSyncMdPreview();
     syncRelationToEditorCaret();
+    updateCodeContextBar();
   });
   // 点击只移动原生光标并收起已有补全，避免鼠标定位时出现弹层和布局干扰。
-  $('code-edit').addEventListener('click', (event) => { scheduleSyncMdPreview(); syncRelationToEditorCaret(); hideComp();hideDefinitionHover();if(definitionModifier(event)){event.preventDefault();goToFocusedDefinition();} });
+  $('code-edit').addEventListener('click', (event) => { scheduleSyncMdPreview(); syncRelationToEditorCaret(); updateCodeContextBar(); hideComp();hideDefinitionHover();if(definitionModifier(event)){event.preventDefault();goToFocusedDefinition();} });
   $('code-edit').addEventListener('mousemove',(event)=>updateEditorDefinitionHover(event,$('code-edit'),null));
   $('code-edit').addEventListener('mouseleave',()=>scheduleDefinitionHoverHide());
   $('code-edit').addEventListener('selectionchange', scheduleSyncMdPreview);

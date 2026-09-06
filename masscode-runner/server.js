@@ -17,6 +17,7 @@ const { pipeline } = require('stream/promises');
 const { WebSocketServer } = require('ws');
 const { Client: SshClient } = require('ssh2');
 const { SaxesParser } = require('saxes');
+const { createLspService } = require('./lib/lsp-service');
 const APP_VERSION = require('./package.json').version;
 
 const PORT_VALUE = Number(process.env.CODESCOPE_PORT || process.env.MASSCODE_RUNNER_PORT || 4877);
@@ -219,6 +220,10 @@ const TOOLS = [
   { key: 'latex',      probe: () => [latexCmd(), '--version'],  label: 'LaTeX 引擎',            for: 'LaTeX 实时 PDF 编译', group: '文档工具' },
   { key: 'biber',      probe: ['biber', '--version'],           label: 'Biber',                for: 'LaTeX 参考文献', group: '文档工具' },
   { key: 'ctex',       probe: ['kpsewhich', 'ctexart.cls'],     label: 'CTeX 中文宏包',          for: 'LaTeX 中文文档', group: '文档工具' },
+  { key: 'clangd',     probe: ['clangd', '--version'],          label: 'clangd',               for: 'C/C++ 精确跳转、悬停与诊断（可选）', group: '语言服务器', installable: false },
+  { key: 'pyrightlsp', probe: ['pyright-langserver', '--version'], label: 'Pyright LSP',         for: 'Python 精确跳转、悬停与诊断（可选）', group: '语言服务器', installable: false },
+  { key: 'tslsp',      probe: ['typescript-language-server', '--version'], label: 'TypeScript LSP', for: 'JS/TS 精确跳转、悬停与诊断（可选）', group: '语言服务器', installable: false },
+  { key: 'gopls',      probe: ['gopls', 'version'],             label: 'gopls',                for: 'Go 精确跳转、悬停与诊断（可选）', group: '语言服务器', installable: false },
   { key: 'ssh',        probe: ['ssh', '-V'],                    label: 'OpenSSH 客户端',          for: 'SSH 远程开发', group: '远程开发' },
   { key: 'drawio',     probeUrl: 'https://embed.diagrams.net/?embed=1&proto=json', label: 'Draw.io 在线编辑器', for: 'Draw.io 编辑与 AI XML 绘图', group: '绘图工具', installable: false },
 ];
@@ -406,6 +411,10 @@ function installHint(key) {
     black: mac ? 'pip3 install --user black' : win ? (pythonCmd() === 'py' ? 'py -m pip install black' : 'python -m pip install black') : linuxInstallHint(key),
     npx: mac ? 'brew install node（自带 npx）' : win ? '安装 Node.js（自带 npx）' : linuxInstallHint(key),
     latex: mac ? 'brew install --cask mactex-no-gui' : win ? 'winget install MiKTeX.MiKTeX' : linuxInstallHint(key),
+    clangd: mac ? 'xcode-select --install 或 brew install llvm' : win ? 'winget install LLVM.LLVM' : '使用系统包管理器安装 clangd',
+    pyrightlsp: 'npm install -g pyright',
+    tslsp: 'npm install -g typescript typescript-language-server',
+    gopls: 'go install golang.org/x/tools/gopls@latest',
     ssh: mac ? 'macOS 系统自带；缺失时安装 Xcode Command Line Tools' : win ? '设置 → 可选功能 → OpenSSH 客户端' : linuxInstallHint(key),
     drawio: '无需安装；请检查网络、代理或防火墙能否访问 embed.diagrams.net',
   };
@@ -1973,6 +1982,8 @@ function timelineItem(file, fragment, id, currentCode) {
 /* -------------------------- 通用工程：任务 / 编译数据库 / 健康 -------------------------- */
 
 function projectRoot() { return gitRoot() || path.resolve(vaultPath(), '..'); }
+const LSP = createLspService();
+process.once('exit', () => LSP.close());
 function safeProjectDir(value) {
   const root = projectRoot();
   const full = path.resolve(root, String(value || '.'));
@@ -2235,7 +2246,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && u.pathname === '/api/version') {
       return send(res, 200, { ok: true, name: '码境 CodeScope', version: APP_VERSION, apiRevision: 2,
-        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links', 'live-web-search', 'search-history', 'editor-groups', 'drawio', 'drawio-xml', 'ai-drawio', 'full-text-search', 'quick-open', 'navigation-history', 'definition-peek', 'header-source-switch'] });
+        features: ['git-diff', 'timeline', 'remote-files', 'remote-folder-transfer', 'stream-transfer', 'project-tasks', 'compile-database', 'project-health', 'markdown-code-links', 'live-web-search', 'search-history', 'editor-groups', 'drawio', 'drawio-xml', 'ai-drawio', 'full-text-search', 'quick-open', 'navigation-history', 'definition-peek', 'header-source-switch', 'lsp'] });
     }
     if (req.method === 'GET' && u.pathname === '/api/env') {
       const force = u.searchParams.get('refresh') === '1';
@@ -3246,6 +3257,20 @@ const server = http.createServer(async (req, res) => {
       catch (error) { return send(res, 200, { ok:false, error:String(error.message || error) }); }
     }
     if (req.method === 'GET' && u.pathname === '/api/project/health') return send(res, 200, await projectHealth());
+    if (req.method === 'GET' && u.pathname === '/api/lsp/status') return send(res, 200, LSP.status());
+    if (req.method === 'POST' && u.pathname === '/api/lsp/query') {
+      const b = await readBody(req), snippets = walkSnippets();
+      const snippet = snippets.find((item) => item.file === String(b.file || ''));
+      if (!snippet) return send(res, 404, { ok:false, error:'片段不存在（vault 可能已变动）' });
+      const fragment = Number(b.fragment);
+      if (!Number.isInteger(fragment) || fragment < 0 || fragment >= snippet.fragments.length) return send(res, 400, { ok:false, error:'片段索引无效' });
+      const source = snippet.fragments[fragment];
+      const action = String(b.action || 'hover');
+      if (!['hover', 'definition', 'references', 'diagnostics'].includes(action)) return send(res, 400, { ok:false, error:'不支持的 LSP 操作' });
+      const code = typeof b.code === 'string' ? b.code : source.code;
+      if (Buffer.byteLength(code, 'utf8') > 2 * 1024 * 1024) return send(res, 413, { ok:false, error:'LSP 文件内容超过 2 MB' });
+      return send(res, 200, await LSP.query({ snippet, fragment, language:source.language, code, action, line:b.line, column:b.column }));
+    }
     // ===== 远程开发：SSH 复用底部 PTY 终端；SFTP 浏览文件；VNC 由 WebSocket 代理 =====
     if (req.method === 'GET' && u.pathname === '/api/remote/status') {
       return send(res, 200, {

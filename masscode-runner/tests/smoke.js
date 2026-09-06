@@ -124,7 +124,7 @@ int main(void) { return 0; }
   await waitForServer(baseUrl, output);
 
   const version = await requestJson(baseUrl, '/api/version');
-  assert(version.ok && version.name === '码境 CodeScope' && version.version === '1.2.0' && version.apiRevision >= 2 && version.features.includes('project-health') && version.features.includes('live-web-search') && version.features.includes('search-history') && version.features.includes('editor-groups') && version.features.includes('drawio') && version.features.includes('drawio-xml') && version.features.includes('ai-drawio') && version.features.includes('full-text-search') && version.features.includes('quick-open') && version.features.includes('navigation-history') && version.features.includes('definition-peek') && version.features.includes('header-source-switch'), '版本接口返回异常');
+  assert(version.ok && version.name === '码境 CodeScope' && version.version === '1.2.0' && version.apiRevision >= 2 && version.features.includes('project-health') && version.features.includes('live-web-search') && version.features.includes('search-history') && version.features.includes('editor-groups') && version.features.includes('drawio') && version.features.includes('drawio-xml') && version.features.includes('ai-drawio') && version.features.includes('full-text-search') && version.features.includes('quick-open') && version.features.includes('navigation-history') && version.features.includes('definition-peek') && version.features.includes('header-source-switch') && version.features.includes('lsp'), '版本接口返回异常');
 
   const page = await fetch(baseUrl + '/');
   const html = await page.text();
@@ -153,6 +153,7 @@ int main(void) { return 0; }
   assert(html.includes('definitionModifier') && html.includes('goToFocusedDefinition') && html.includes('updateDefinitionHover') && html.includes('未找到 “'), 'VS Code 式跳转定义交互缺失');
   assert(html.includes('DEFINITION_HOVER_TIMER') && html.includes('editorTokenAtPoint') && html.includes('definition-hover-signature') && html.includes('},550)'), '函数与类型的延迟悬停定义卡片缺失');
   assert(html.includes('DEFINITION_HOVER_INTERACTING') && html.includes('scheduleDefinitionHoverHide') && html.includes('overscroll-behavior:contain') && html.includes('from+120'), '悬停定义卡片缺少鼠标移入、滚动或长定义查看能力');
+  assert(html.includes('/api/lsp/query') && html.includes('enrichDefinitionHover') && serverSource.includes("require('./lib/lsp-service')"), '通用 LSP 服务或悬停信息接入缺失');
   assert(html.includes('id="btn-pair-switch"') && html.includes('pairedCodeFile') && html.includes("key==='o'"), '头文件与源文件快速切换功能缺失');
   assert(html.includes('#pane-git, #pane-tags, #pane-draw { flex:0 1 auto; min-height:37px; }') && html.includes('#pane-tree { min-height:96px; }') && html.includes('#pane-draw { min-height:108px; }'), '左侧多面板在低高度窗口中缺少自适应收缩');
   assert(html.includes('html[data-theme] .split-editor-input') && html.includes("classList.toggle('plain',!exact)"), '多栏编辑器高亮层遮挡修复或纯文本降级缺失');
@@ -241,6 +242,12 @@ int main(void) { return 0; }
   assert(compileDb.ok && compileDb.found && compileDb.entries === 1 && compileDb.defines.includes('DEMO_FEATURE=1'), '编译数据库解析失败');
   const health = await requestJson(baseUrl, '/api/project/health');
   assert(health.ok && health.summary.files >= 4 && health.summary.todos === 1 && health.languages.C === 1 && health.languages['C/C++'] === 1, '工程健康报告统计异常');
+  const lspStatus = await requestJson(baseUrl, '/api/lsp/status');
+  assert(lspStatus.ok && lspStatus.servers.some((item) => item.command === 'clangd' && item.languages.includes('c_cpp')), 'LSP 环境状态接口异常');
+  if (lspStatus.servers.some((item) => item.command === 'clangd' && item.available)) {
+    const lspHover = await postJson(baseUrl, '/api/lsp/query', { file:snippetFile, fragment:0, code:'int main(void) { return 0; }', action:'hover', line:1, column:5 });
+    assert(lspHover.ok && lspHover.server === 'clangd' && lspHover.hover && /main/.test(lspHover.hover.markdown), 'clangd 悬停信息查询失败');
+  }
 
   const invalidRemoteFiles = await postJson(baseUrl, '/api/remote/files/list', { host:'bad host', port:22, user:'robot', path:'.' });
   assert(!invalidRemoteFiles.ok && /主机/.test(invalidRemoteFiles.error), '远程文件接口未拒绝非法主机');

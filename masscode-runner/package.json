@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/smoke.js"
+    "test": "node tests/smoke.js",
+    "test:browser": "node tests/browser-smoke.js"
   },
   "engines": {
     "node": ">=18"
@@ -17,5 +18,8 @@
     "saxes": "^6.0.0",
     "ssh2": "^1.17.0",
     "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0"
   }
 }
