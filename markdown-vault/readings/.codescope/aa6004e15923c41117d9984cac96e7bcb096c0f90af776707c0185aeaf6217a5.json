@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "path": "我的论文/Sim-to-Real/Bao_2025_Sim-to-Real_Transfer_Bipedal_Locomotion/Bao_2025_Sim-to-Real_Transfer_Bipedal_Locomotion.pdf",
+  "page": 1,
+  "view": "original",
+  "translations": {},
+  "fragments": [
+    {
+      "id": "dbbfe83e-57dd-4f74-a46d-6e6ed856cfe8",
+      "page": 1,
+      "source": "To begin with the first question, learning locomotion behav-\niors requires millions of trials and inevitably explores unsafe\nor costly failure states on hardware. In contrast, simulation\nenables high-throughput parallel rollouts, precise control of\nconditions, and reproducibility, making data collection far\nmore efficient and easier to diagnose. Consequently, the prac-\ntical workflow is to train in a high-fidelity simulator and then\ntransfer the resulting policy to the robot.",
+      "translation": "",
+      "note": "",
+      "createdAt": 1788709406500,
+      "rects": [],
+      "scale": 1
+    }
+  ],
+  "updatedAt": 1788755876118
+}

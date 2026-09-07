@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "description": "Option-Critic 层级强化学习理论：端到端学习高层动作选项（Option），无需子目标/伪奖励/先验规范。",
+  "tags": [
+    "强化学习",
+    "层级决策",
+    "Option-Critic",
+    "动作抽象",
+    "算法理论"
+  ],
+  "updatedAt": 1788701805764
+}

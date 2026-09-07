@@ -397,6 +397,12 @@
   #git-head .count { margin-left: auto; color: var(--dim); font-size: 11px; background: var(--panel2); padding: 0 7px; border-radius: 9px; }
   #git-head .git-ah.ahead { color: var(--ok); }
   #git-head .git-ah.behind { color: #dbb904; }
+  #git-head .git-sync { flex:none; padding:1px 6px; border:1px solid var(--border); border-radius:9px; color:var(--dim); font-size:9px; white-space:nowrap; }
+  #git-head .git-sync.synced { color:var(--ok); border-color:rgba(63,185,80,.38); background:rgba(63,185,80,.08); }
+  #git-head .git-sync.ahead { color:#67d58a; border-color:rgba(63,185,80,.42); background:rgba(63,185,80,.1); }
+  #git-head .git-sync.behind { color:#e0bd35; border-color:rgba(219,185,4,.42); background:rgba(219,185,4,.1); }
+  #git-head .git-sync.diverged { color:#f0a45d; border-color:rgba(240,164,93,.45); background:rgba(240,164,93,.1); }
+  #git-head .git-sync.untracked { color:var(--dim); border-style:dashed; }
   #git-head button { background: none; border: none; color: var(--dim); font-size: 12px; padding: 2px 5px; border-radius: 4px; cursor: pointer; }
   #git-head button:hover { color: var(--text); background: var(--panel2); }
   #git-body { border-top: 1px solid rgba(255,255,255,.04); padding: 4px 6px 6px; flex: 1 1 auto; min-height: 0; overflow: auto; }
@@ -431,6 +437,10 @@
   #git-log .gcm-h { flex: none; color: var(--accent); font-family: ui-monospace, monospace; font-size: 11px; }
   #git-log .gcm-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #git-log .gcm-time { flex: none; color: var(--dim); font-size: 10px; }
+  #git-log .gcm-remote { flex:none; min-width:48px; padding:1px 5px; border:1px solid var(--border); border-radius:8px; color:var(--dim); text-align:center; font-size:8px; white-space:nowrap; }
+  #git-log .gcm-remote.pushed { color:var(--ok); border-color:rgba(63,185,80,.32); background:rgba(63,185,80,.07); }
+  #git-log .gcm-remote.unpushed { color:#67d58a; border-color:rgba(63,185,80,.42); background:rgba(63,185,80,.12); }
+  #git-log .gcm-remote.unknown { border-style:dashed; }
   #git-log .gcm-reset { flex: none; background: transparent; border: 1px solid transparent; color: var(--err); font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; opacity: .6; }
   #git-log .gcommit:hover .gcm-reset { opacity: 1; }
   #git-log .gcm-reset:hover { background: rgba(248,81,73,.14); border-color: var(--err); }
@@ -637,6 +647,64 @@
   .reading-page-input { width:45px; text-align:center; }
   .reading-col-body { flex:1; min-height:0; position:relative; overflow:auto; }
   .reading-pdf { width:100%; height:100%; border:0; background:#525659; }
+  /* ---- 自研 PDF 阅读器（pdfjs 渲染 + 高亮标注） ---- */
+  .reading-pdf-host { height:100%; min-height:0; display:flex; flex-direction:column; background:#363d4a; position:relative; }
+  .reading-pdf-host .pdf-toolbar { display:flex; align-items:center; gap:6px; padding:4px 8px; background:#2a313c; border-bottom:1px solid #3d4654; flex:none; }
+  .reading-pdf-host .pdf-toolbar button { padding:2px 8px; border:1px solid #3d4654; border-radius:5px; background:#333c49; color:#c9d6e8; font-size:10px; cursor:pointer; }
+  .reading-pdf-host .pdf-toolbar button:hover { border-color:var(--accent); color:#fff; }
+  .reading-pdf-host .pdf-toolbar .pdf-zoom-pct { min-width:38px; text-align:center; color:#9fb0c5; font:10px var(--mono); cursor:pointer; }
+  .reading-pdf-host .pdf-toolbar .pdf-zoom-pct:hover { color:#fff; }
+  .reading-pdf-host .pdf-toolbar .pdf-zoom-range { width:64px; accent-color:var(--accent); cursor:pointer; }
+  .reading-pdf-host .pdf-toolbar .fit-btn { padding:2px 7px; font-size:10px; border:1px solid var(--border); border-radius:5px; background:var(--panel); color:var(--dim); cursor:pointer; }
+  .reading-pdf-host .pdf-toolbar .fit-btn:hover { color:#cfe0ff; border-color:var(--accent); }
+  .reading-pdf-host .pdf-toolbar .fit-btn.on { color:#cfe0ff; border-color:var(--accent); background:rgba(79,140,255,.15); }
+  .reading-pdf-host .pdf-toolbar .pdf-anno-count { margin-left:auto; color:#8fa2b8; font-size:10px; }
+  .pdf-scroll { flex:1; min-height:0; overflow:auto; padding:12px; background:#363d4a; }
+  .pdf-page-wrap { position:relative; margin:0 auto 16px; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.38); transform-origin:0 0; }
+  .pdf-page-wrap canvas { display:block; }
+  .pdf-text-layer { position:absolute; inset:0; overflow:hidden; line-height:1; text-size-adjust:none; }
+  .pdf-text-layer span { position:absolute; color:transparent; white-space:pre; transform-origin:0% 0%; }
+  .pdf-text-layer ::selection { background:rgba(0,110,255,.30); color:transparent; }
+  .pdf-anno-overlay { position:absolute; inset:0; pointer-events:none; }
+  .pdf-anno-hl { position:absolute; border-radius:2px; pointer-events:none; }
+  .pdf-anno-hl:hover { outline:1px solid rgba(0,0,0,.35); }
+  .pdf-frag-mark { position:absolute; inset:0; pointer-events:none; }
+  .pdf-frag-mark > div { position:absolute; background:rgba(56,132,255,.16); border-radius:2px; box-shadow:inset 0 0 0 1px rgba(56,132,255,.35); }
+  .pdf-frag-mark.flash > div { animation:fragflash 0.9s ease-in-out 3; }
+  @keyframes fragflash { 50% { background:rgba(56,132,255,.6); box-shadow:inset 0 0 0 2px rgba(56,132,255,.95); } }
+  .reading-frag .note-editor, .pdf-anno-pop .pop-edit { width:100%; margin:6px 0 0; padding:6px 8px; border:1px solid var(--border); border-radius:6px; background:var(--bg); color:var(--text); font:11px/1.5 var(--mono); resize:vertical; min-height:52px; box-sizing:border-box; }
+  .reading-frag .note-editor-row, .pdf-anno-pop .pop-edit-row { display:flex; gap:6px; justify-content:flex-end; margin:6px 0 2px; }
+  .reading-frag .note-editor-row button, .pdf-anno-pop .pop-edit-row button { padding:2px 12px; border:1px solid var(--border); border-radius:5px; background:var(--panel); color:var(--text); font-size:10px; cursor:pointer; }
+  .reading-frag .note-editor-row button.primary, .pdf-anno-pop .pop-edit-row button.primary { background:#2f6fed; border-color:#2f6fed; color:#fff; }
+  .reading-frag .frag-note { cursor:pointer; margin-top:4px; border-left:2px solid rgba(56,132,255,.6); padding:2px 6px; border-radius:0 4px 4px 0; white-space:pre-wrap; }
+  .reading-frag .frag-note:hover { background:rgba(56,132,255,.08); }
+  .reading-pdf-host .pdf-toolbar button.on { border-color:var(--accent); color:#fff; }
+  .pdf-outline-panel { position:absolute; top:38px; right:8px; bottom:8px; width:min(300px,58%); background:#262c36; border:1px solid #3d4654; border-radius:9px; box-shadow:0 12px 36px rgba(0,0,0,.5); z-index:40; display:flex; flex-direction:column; overflow:hidden; }
+  .pdf-outline-head { display:flex; align-items:center; gap:6px; padding:7px 10px; border-bottom:1px solid #3d4654; font-size:11px; color:#c9d6e8; background:#2a313c; }
+  .pdf-outline-head .sp { flex:1; }
+  .pdf-outline-head .tag { flex:none; color:#8fa2bd; font:9px var(--mono); }
+  .pdf-outline-head button { padding:1px 8px; border:1px solid #3d4654; border-radius:5px; background:#333c49; color:#c9d6e8; font-size:10px; cursor:pointer; }
+  .pdf-outline-body { flex:1; overflow:auto; padding:6px 4px; }
+  .pdf-toc-row { display:flex; align-items:baseline; gap:6px; padding:3px 6px; border-radius:5px; cursor:pointer; font-size:11px; color:#c9d6e8; line-height:1.45; }
+  .pdf-toc-row:hover { background:rgba(56,132,255,.14); color:#fff; }
+  .pdf-toc-row.active { background:rgba(56,132,255,.22); color:#fff; }
+  .pdf-toc-row .pg { margin-left:auto; flex:none; color:#8fa2bd; font:9px var(--mono); }
+  .pdf-toc-empty { padding:20px 12px; text-align:center; color:#8fa2bd; font-size:11px; line-height:1.7; }
+  .pdf-sel-toolbar { position:fixed; z-index:120; display:flex; align-items:center; gap:5px; padding:5px 8px; border:1px solid #3d4654; border-radius:9px; background:#20262f; box-shadow:0 8px 24px rgba(0,0,0,.45); }
+  .pdf-sel-toolbar button { width:20px; height:20px; border:1px solid rgba(255,255,255,.28); border-radius:50%; cursor:pointer; }
+  .pdf-sel-toolbar .sep { width:1px; height:16px; background:#3d4654; }
+  .pdf-sel-toolbar .act { width:auto; height:auto; padding:2px 8px; border-radius:6px; border:1px solid #3d4654; background:#333c49; color:#c9d6e8; font-size:10px; }
+  .pdf-sel-toolbar .act:hover { border-color:var(--accent); color:#fff; }
+  .pdf-anno-pop { position:fixed; z-index:121; min-width:180px; max-width:320px; padding:8px 10px; border:1px solid #3d4654; border-radius:9px; background:#20262f; box-shadow:0 10px 30px rgba(0,0,0,.5); font-size:11px; color:#d5e0ef; }
+  .pdf-anno-pop .txt { max-height:120px; overflow:auto; white-space:pre-wrap; margin-bottom:6px; color:#b8c7da; }
+  .pdf-anno-pop .note { max-height:120px; overflow:auto; white-space:pre-wrap; margin-bottom:6px; padding:4px 6px; border-radius:5px; background:#171c24; color:#ffd9a0; }
+  .pdf-anno-pop .note:empty { display:none; }
+  .pdf-anno-pop .row { display:flex; gap:6px; align-items:center; }
+  .pdf-anno-pop button { padding:2px 9px; border:1px solid #3d4654; border-radius:6px; background:#333c49; color:#c9d6e8; font-size:10px; cursor:pointer; }
+  .pdf-anno-pop button:hover { border-color:var(--accent); }
+  .pdf-anno-pop button.danger:hover { border-color:#ff7b72; color:#ff9c94; }
+  .pdf-anno-pop textarea { width:100%; box-sizing:border-box; min-height:54px; resize:vertical; padding:4px 6px; border:1px solid #3d4654; border-radius:5px; background:#171c24; color:#e2eaf5; font-size:11px; }
+  .reading-pdf-fallback { width:100%; height:100%; border:0; background:#525659; }
   .reading-paper { min-height:100%; box-sizing:border-box; padding:24px clamp(18px,5%,54px); background:var(--theme-code,var(--panel2)); color:var(--text); font:14px/1.82 Georgia,"Noto Serif SC",serif; }
   .reading-paper h3 { margin:0 0 16px; color:var(--accent); font:600 13px var(--ui); }
   .reading-paper .source,.reading-paper .translation { white-space:pre-wrap; overflow-wrap:anywhere; }
@@ -645,6 +713,34 @@
   .reading-text-shell { height:100%; min-height:0; display:grid; grid-template-rows:minmax(0,1fr) auto; background:var(--theme-code,var(--bg)); }
   .reading-text-editor { width:100%; height:100%; min-height:0; resize:none; box-sizing:border-box; padding:22px 24px; border:0; outline:0; background:transparent; color:var(--text); font:13px/1.7 var(--mono); tab-size:2; }
   .reading-text-editor.markdown { font-family:var(--ui); line-height:1.75; }
+  .reading-md-editor { height:100%; min-height:0; overflow:auto; outline:0; box-sizing:border-box; padding:18px 24px; background:transparent; color:var(--text); font:12px/1.7 var(--ui); caret-color:var(--accent); }
+  .reading-md-editor:empty::before { content:'在这里记录论文笔记、结论与引用…（所见即所得：直接在文中编辑，自动保存）'; color:var(--muted); font-size:11px; }
+  .reading-md-editor h1,.reading-md-editor h2,.reading-md-editor h3,.reading-md-editor h4,.reading-md-editor h5,.reading-md-editor h6 { margin:10px 0 6px; line-height:1.4; }
+  .reading-md-editor h1 { font-size:20px; } .reading-md-editor h2 { font-size:17px; } .reading-md-editor h3 { font-size:15px; } .reading-md-editor h4 { font-size:13.5px; } .reading-md-editor h5,.reading-md-editor h6 { font-size:12.5px; }
+  .reading-md-editor p { margin:5px 0; }
+  .reading-md-editor ul,.reading-md-editor ol { margin:6px 0; padding-left:22px; }
+  .reading-md-editor li { margin:2px 0; }
+  .reading-md-editor code { background:rgba(127,127,127,.16); padding:1px 5px; border-radius:4px; font:11px/1.5 var(--mono); }
+  .reading-md-editor table { border-collapse:collapse; margin:8px 0; font-size:11.5px; }
+  .reading-md-editor th,.reading-md-editor td { border:1px solid var(--border); padding:3px 9px; text-align:left; }
+  .reading-md-editor th { background:rgba(127,127,127,.14); }
+  .reading-md-editor blockquote { margin:8px 0; padding:2px 10px; border-left:3px solid var(--accent); color:var(--muted); }
+  .reading-md-editor hr { border:0; border-top:1px solid var(--border); margin:12px 0; }
+  .reading-md-editor a { color:var(--accent); }
+  .reading-md-editor ::selection { background:rgba(56,132,255,.3); }
+  .reading-frag .frag-note { display:flex; gap:4px; align-items:flex-start; }
+  .reading-frag .frag-note .fn-pre { flex:none; color:var(--muted); }
+  .reading-frag .frag-note .fn-md { flex:1; min-width:0; }
+  .reading-frag .frag-note.md h1,.reading-frag .frag-note.md h2,.reading-frag .frag-note.md h3,.reading-frag .frag-note.md h4,.reading-frag .frag-note.md h5 { margin:4px 0 2px; font-size:12px; line-height:1.45; }
+  .reading-frag .frag-note.md p { margin:2px 0; }
+  .reading-frag .frag-note.md li { margin-left:14px; }
+  .reading-frag .frag-note.md code { background:rgba(127,127,127,.16); padding:0 4px; border-radius:3px; font:10px var(--mono); }
+  .reading-frag .frag-note.md table { display:none; }
+  .pdf-anno-pop .note { white-space:normal; }
+  .pdf-anno-pop .note h1,.pdf-anno-pop .note h2,.pdf-anno-pop .note h3,.pdf-anno-pop .note h4,.pdf-anno-pop .note h5 { margin:4px 0 2px; font-size:12px; line-height:1.45; }
+  .pdf-anno-pop .note p { margin:2px 0; }
+  .pdf-anno-pop .note li { margin-left:14px; }
+  .pdf-anno-pop .note code { background:rgba(127,127,127,.16); padding:0 4px; border-radius:3px; font:10px var(--mono); }
   .reading-text-foot { display:flex; align-items:center; justify-content:flex-end; min-height:28px; padding:3px 9px; border-top:1px solid var(--border); color:var(--dim); font-size:9px; }
   #reading-divider { position:relative; cursor:col-resize; }
   #reading-divider::after { content:''; position:absolute; top:0; bottom:0; left:3px; width:1px; background:var(--border); }
@@ -1846,6 +1942,7 @@
         <span>⎇ Git</span>
         <span id="git-branch" class="count"></span>
         <span id="git-ah" class="git-ah"></span>
+        <span id="git-sync" class="git-sync untracked"></span>
         <button id="git-refresh" title="刷新 Git 状态">↻</button>
       </div>
       <div id="git-body">
@@ -2455,7 +2552,10 @@ async function api(path, body) {
   try {
     response = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined);
   } catch (error) {
-    return { ok:false, networkError:true, error:'无法连接 CodeScope 后端：' + String((error&&error.message)||error) };
+    try { response = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined); }
+    catch (error2) {
+      return { ok:false, networkError:true, error:'无法连接 CodeScope 后端（' + String((error2&&error2.message)||error2) + '）。请确认码境服务仍在运行（原启动终端未被关闭），然后刷新页面重试。' };
+    }
   }
   const text = await response.text();
   let data;
@@ -3195,17 +3295,33 @@ async function renderReadingSlot(slot) {
   if(fragment&&fragment.kind!=='pdf'){
     els.view.style.display='none';els.page.style.display='none';els.pages.style.display='none';els.col.querySelector('.reading-prev').style.display='none';els.col.querySelector('.reading-next').style.display='none';
     let record=READING_TEXT_DOCS.get(path);if(!record){const result=await api('/api/readings/text-fragment?path='+encodeURIComponent(path));record={content:result.ok?result.content:'',error:result.ok?'':result.error};READING_TEXT_DOCS.set(path,record);}
-    const shell=document.createElement('div');shell.className='reading-text-shell';const editor=document.createElement('textarea');editor.className='reading-text-editor '+fragment.kind;editor.spellcheck=false;editor.value=record.content||'';editor.placeholder=fragment.kind==='markdown'?'在这里记录论文笔记、结论与引用…':'在这里添加与论文相关的代码…';
+    const shell=document.createElement('div');shell.className='reading-text-shell';const editor=document.createElement('textarea');editor.className='reading-text-editor '+fragment.kind;editor.spellcheck=false;editor.value=record.content||'';editor.placeholder=fragment.kind==='markdown'?'在这里记录论文笔记、结论与引用…（所见即所得：直接在文中编辑）':'在这里添加与论文相关的代码…';
     const foot=document.createElement('div');foot.className='reading-text-foot';foot.textContent=record.error||((record.content||'').length+' 字符 · 自动保存');
-    editor.addEventListener('input',()=>{record.content=editor.value;foot.textContent='正在编辑…';clearTimeout(READING_TEXT_SAVE_TIMERS.get(path));READING_TEXT_SAVE_TIMERS.set(path,setTimeout(async()=>{const result=await api('/api/readings/text-fragment',{path,content:record.content});foot.textContent=result.ok?'已自动保存 · '+record.content.length+' 字符':'保存失败：'+(result.error||'未知错误');if(result.ok)loadReadings(true);},500));});
-    shell.append(editor,foot);els.body.appendChild(shell);if(slot===READING_ACTIVE_SLOT)syncReadingTools();return;
+    const scheduleSave=()=>{clearTimeout(READING_TEXT_SAVE_TIMERS.get(path));READING_TEXT_SAVE_TIMERS.set(path,setTimeout(async()=>{const result=await api('/api/readings/text-fragment',{path,content:record.content});foot.textContent=result.ok?'已自动保存 · '+record.content.length+' 字符':'保存失败：'+(result.error||'未知错误');if(result.ok)loadReadings(true);},500));};
+    if(fragment.kind==='markdown'){
+      const live=document.createElement('div');live.className='reading-md-editor';live.contentEditable='true';live.spellcheck=false;
+      live.innerHTML=renderMd(record.content||'');
+      live.addEventListener('input',()=>{
+        record.content=mdFromHtml(live.innerHTML);
+        if(!live.textContent.trim()) live.innerHTML='';
+        foot.textContent='正在编辑…';
+        scheduleSave();
+      });
+      live.addEventListener('paste',(e)=>{e.preventDefault();const t=e.clipboardData.getData('text/plain');if(t)document.execCommand('insertText',false,t);});
+      shell.append(live,foot);
+    }else{
+      editor.addEventListener('input',()=>{record.content=editor.value;foot.textContent='正在编辑…';scheduleSave();});
+      shell.append(editor,foot);
+    }
+    els.body.appendChild(shell);if(slot===READING_ACTIVE_SLOT)syncReadingTools();return;
   }
   const doc=await ensureReadingDoc(path),versions=readingPdfVersions(fragment),view=els.view.value;syncReadingViewOptions(els,versions);let page=Math.max(1,Math.min(doc.pageCount||9999,Number(els.page.value)||doc.meta.page||1));els.page.value=page;els.page.disabled=false;els.page.max=doc.pageCount||9999;els.pages.textContent='/ '+(doc.pageCount||'?');
   if(slot===READING_ACTIVE_SLOT){doc.meta.page=page;doc.meta.view=view;saveReadingDoc(doc);}
   if(slot===READING_ACTIVE_SLOT)syncReadingTools();
-  const physical=view==='original'?(versions.original||fragment):view==='translation'?versions.translation:view==='bilingual'?versions.bilingual:null;
+  const physical=view==='original'?(fragment&&fragment.kind==='pdf'?fragment:(versions.original||fragment)):view==='translation'?versions.translation:view==='bilingual'?versions.bilingual:null;
   if(physical){
     const physicalDoc=physical.path===path?doc:await ensureReadingDoc(physical.path);page=Math.max(1,Math.min(physicalDoc.pageCount||9999,page));els.page.value=page;els.page.max=physicalDoc.pageCount||9999;els.pages.textContent='/ '+(physicalDoc.pageCount||'?');els.name.textContent=readingBase(physical.name)+(physical.path===path?'':' · '+readingRoleLabel(physical));
+    if (window.__pdfViewerReady) { await renderPdfViewer(els.body, physical.path, page); return; }
     const frame=document.createElement('iframe');frame.className='reading-pdf';frame.title=readingBase(physical.path);frame.src='/api/readings/file?path='+encodeURIComponent(physical.path)+'#page='+page+'&zoom=page-width';els.body.appendChild(frame);return;
   }
   const sourceFragment=versions.original||fragment,sourceDoc=sourceFragment.path===path?doc:await ensureReadingDoc(sourceFragment.path);const translatedDoc=view==='bilingual'&&versions.translation?await ensureReadingDoc(versions.translation.path):null;
@@ -3238,7 +3354,7 @@ async function openReading(path,slot) {
   updateReadingColumnLayout();
   const project=READING_PROJECT_INDEX.get(READING_PROJECT_CURRENT);document.body.classList.add('reading-mode');$('reading-title').textContent=project?project.name:(READING_PROJECT_CURRENT||readingBase(path));$('reading-project-context').textContent=project?[project.description,(project.tags||[]).map((tag)=>'#'+tag).join(' ')].filter(Boolean).join(' · '):'';renderReadingList();renderReadingProjectTabs();readingStatus(fragment&&fragment.kind!=='pdf'?'正在打开项目片段…':'正在解析 PDF…');
   if(fragment&&fragment.kind!=='pdf'){await renderReadingSlot(READING_ACTIVE_SLOT);renderReadingFragments();readingStatus(readingRoleLabel(fragment)+' · 编辑内容会自动保存');return;}
-  const doc=await ensureReadingDoc(path);const primary=readingSlotElements(READING_ACTIVE_SLOT);primary.page.value=doc.meta.page||1;primary.view.value=['original','source','translation','bilingual'].includes(doc.meta.view)?doc.meta.view:'original';
+  const doc=await ensureReadingDoc(path);const primary=readingSlotElements(READING_ACTIVE_SLOT);primary.page.value=doc.meta.page||1;const roleView=fragment&&fragment.kind==='pdf'?(fragment.role==='translation'?'translation':fragment.role==='bilingual'?'bilingual':'original'):'original';primary.view.value=doc.meta.view&&doc.meta.view!=='original'?doc.meta.view:roleView;
   await renderReadingSlot(READING_ACTIVE_SLOT);renderReadingFragments();readingStatus(doc.error?doc.error:(doc.pageCount+' 页 · 可选择文字保存摘录'),!!doc.error);
 }
 function closeReading(){document.body.classList.remove('reading-mode');READING_CURRENT='';READING_PROJECT_CURRENT='';$('reading-project-context').textContent='';renderReadingList();renderReadingProjectTabs();}
@@ -3246,15 +3362,19 @@ function activeReadingDoc(){const path=READING_SLOTS[READING_ACTIVE_SLOT]||READI
 function currentReadingPage(){return Number(readingSlotElements(READING_ACTIVE_SLOT).page.value)||1;}
 async function setReadingPage(slot,value){const doc=READING_DOCS.get(READING_SLOTS[slot]);const max=(doc&&doc.pageCount)||9999;readingSlotElements(slot).page.value=Math.max(1,Math.min(max,Number(value)||1));READING_ACTIVE_SLOT=slot;await renderReadingSlot(slot);renderReadingFragments();}
 async function translateReadingText(text,label) {
-  const cfg=getAiCfg();if(!cfg.url||!cfg.model)throw new Error('请先在右侧 AI 助手设置 API URL 与模型');
+  const cfg=aiCfg();if(!cfg.url||!cfg.model)throw new Error('请先在右侧 AI 助手设置 API URL 与模型');
   const chunks=[];let rest=String(text||'').trim();while(rest){let at=Math.min(6000,rest.length);if(at<rest.length){const boundary=Math.max(rest.lastIndexOf('\n',at),rest.lastIndexOf('. ',at));if(boundary>2000)at=boundary+1;}chunks.push(rest.slice(0,at));rest=rest.slice(at).trim();}
   const out=[];for(let i=0;i<chunks.length;i++){readingStatus((label||'AI 翻译')+' '+(i+1)+'/'+chunks.length+'…');const r=await api('/api/ai/chat',{url:cfg.url,key:cfg.key,model:cfg.model,timeoutMs:300000,messages:[{role:'system',content:'你是专业技术文献翻译。把英文准确翻译为简体中文，保留标题层级、公式编号、变量、API、代码、引用编号和专业术语；只输出译文，不解释。'},{role:'user',content:chunks[i]}]});if(!r.ok)throw new Error(r.error||'AI 翻译失败');out.push(r.content.trim());}
   return out.join('\n\n');
 }
-function selectedReadingText(){const sel=window.getSelection();if(!sel||sel.isCollapsed)return '';const node=sel.anchorNode&&sel.anchorNode.parentElement;if(!node||!node.closest('.reading-paper'))return '';return String(sel.toString()).trim();}
+function selectedReadingText(){const sel=window.getSelection();if(!sel||sel.isCollapsed)return '';const node=sel.anchorNode&&sel.anchorNode.parentElement;if(!node)return '';if(node.closest('.reading-paper'))return String(sel.toString()).trim();if(node.closest('.pdf-text-layer')){const v=window.__readingPdfViewer;if(!v||!v.alive||!v.alive())return '';return String(sel.toString()).trim();}return '';}
 async function requireSelectableReadingText(action){
   const text=selectedReadingText();if(text)return text;const els=readingSlotElements(READING_ACTIVE_SLOT),fragment=readingFragment(READING_SLOTS[READING_ACTIVE_SLOT]);
-  if(fragment&&fragment.kind==='pdf'&&els.view.value==='original'){els.view.value='source';await renderReadingSlot(READING_ACTIVE_SLOT);readingStatus('已切换到“可选文本”：请重新划选文字，再点击“'+action+'”',true);return '';}
+  if(fragment&&fragment.kind==='pdf'){
+    const viewer=window.__readingPdfViewer;
+    if(window.__pdfViewerReady&&viewer&&viewer.alive&&viewer.alive()){readingStatus('请在 PDF 页面上直接划选文字后再点击“'+action+'”',true);return '';}
+    if(els.view.value==='original'){els.view.value='source';await renderReadingSlot(READING_ACTIVE_SLOT);readingStatus('已切换到“可选文本”：请重新划选文字，再点击“'+action+'”',true);return '';}
+  }
   readingStatus('请先在“可选文本”或“双语对照”区域划选文字',true);return '';
 }
 async function translateReadingPage() {
@@ -3272,12 +3392,44 @@ async function translateReadingAll() {
 }
 async function addReadingFragment() {
   const doc=activeReadingDoc(),text=await requireSelectableReadingText('摘录'),page=currentReadingPage();if(!doc||!text)return;
-  doc.meta.fragments.unshift({id:cryptoRandomId(),page,source:text,translation:'',note:'',createdAt:Date.now()});await saveReadingDoc(doc);renderReadingFragments();readingStatus('摘录已保存');
+  const frag={id:cryptoRandomId(),page,source:text,translation:'',note:'',createdAt:Date.now()};
+  const v=window.__readingPdfViewer;
+  if(v&&v.alive&&v.alive()){
+    const rec=v.pages.find(p=>p.pageNum===page);
+    const srf=window.__pdfSelectedRectsIn;
+    if(rec&&rec.textLayer&&srf){
+      const sr=srf(rec.textLayer);
+      if(sr&&sr.rects&&sr.rects.length){frag.rects=sr.rects;frag.scale=v.scale;}
+    }
+  }
+  doc.meta.fragments.unshift(frag);await saveReadingDoc(doc);renderReadingFragments();if(window.hidePdfToolbar)window.hidePdfToolbar();readingStatus('摘录已保存');
 }
 function renderReadingFragments() {
   const host=$('reading-frag-list'),doc=activeReadingDoc(),items=(doc&&doc.meta.fragments)||[];host.replaceChildren();$('reading-frag-count').textContent=items.length;
   if(!items.length){const e=document.createElement('div');e.className='draw-empty';e.textContent='选择原文后点击“摘录”，集中管理重要定义、结论和引用。';host.appendChild(e);return;}
-  for(const item of items){const card=document.createElement('div');card.className='reading-frag';const page=document.createElement('span');page.className='page';page.textContent='P.'+item.page;const src=document.createElement('div');src.className='src';src.textContent=item.source;card.append(page,src);if(item.translation){const zh=document.createElement('div');zh.className='zh';zh.textContent=item.translation;card.appendChild(zh);}const actions=document.createElement('div');actions.className='actions';const go=document.createElement('button');go.textContent='定位';go.onclick=()=>setReadingPage(READING_ACTIVE_SLOT,item.page);const note=document.createElement('button');note.textContent='笔记';note.onclick=async()=>{const value=prompt('片段笔记',item.note||'');if(value===null)return;item.note=value;await saveReadingDoc(doc);renderReadingFragments();};const del=document.createElement('button');del.textContent='删除';del.onclick=async()=>{doc.meta.fragments=items.filter(v=>v.id!==item.id);await saveReadingDoc(doc);renderReadingFragments();};actions.append(go,note,del);if(item.note){const n=document.createElement('div');n.className='zh';n.textContent='笔记：'+item.note;card.appendChild(n);}card.appendChild(actions);host.appendChild(card);}
+  for(const item of items){const card=document.createElement('div');card.className='reading-frag';const page=document.createElement('span');page.className='page';page.textContent='P.'+item.page;const src=document.createElement('div');src.className='src';src.textContent=item.source;card.append(page,src);if(item.translation){const zh=document.createElement('div');zh.className='zh';zh.textContent=item.translation;card.appendChild(zh);}const actions=document.createElement('div');actions.className='actions';const go=document.createElement('button');go.textContent='定位';go.onclick=async()=>{if(!window.locateReadingFragment||!(await window.locateReadingFragment(doc,item)))setReadingPage(READING_ACTIVE_SLOT,item.page);};const note=document.createElement('button');note.textContent=item.note?'✎ 笔记':'＋ 笔记';note.onclick=()=>startFragNoteEdit(card,doc,item);const del=document.createElement('button');del.textContent='删除';del.onclick=async()=>{doc.meta.fragments=items.filter(v=>v.id!==item.id);await saveReadingDoc(doc);renderReadingFragments();if(window.refreshFragmentMarksAll)window.refreshFragmentMarksAll();};actions.append(go,note,del);if(item.note){const n=document.createElement('div');n.className='frag-note zh md';n.title='点击编辑笔记（支持 Markdown 排版）';const pre=document.createElement('span');pre.className='fn-pre';pre.textContent='✎ ';const box=document.createElement('div');box.className='fn-md';box.innerHTML=renderMd(item.note)||'';n.append(pre,box);n.onclick=()=>startFragNoteEdit(card,doc,item);card.appendChild(n);}card.appendChild(actions);host.appendChild(card);}if(window.refreshFragmentMarksAll)window.refreshFragmentMarksAll();
+}
+function startFragNoteEdit(card, doc, item) {
+  if (!card || !doc || !item) return;
+  if (card.querySelector('textarea')) { card.querySelector('textarea').focus(); return; }
+  const oldNote = card.querySelector('.frag-note'); if (oldNote) oldNote.remove();
+  const ta = document.createElement('textarea'); ta.className = 'note-editor'; ta.placeholder = '直接在此处输入笔记…（回车保存，Esc 取消）'; ta.value = item.note || '';
+  const row = document.createElement('div'); row.className = 'note-editor-row';
+  const save = document.createElement('button'); save.className = 'primary'; save.textContent = '保存';
+  const cancel = document.createElement('button'); cancel.textContent = '取消';
+  row.append(save, cancel);
+  const commit = async () => { const v = ta.value.trim(); item.note = v; await saveReadingDoc(doc); renderReadingFragments(); };
+  save.onclick = (e) => { e.stopPropagation(); commit(); };
+  cancel.onclick = (e) => { e.stopPropagation(); renderReadingFragments(); };
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save.click(); }
+    else if (e.key === 'Escape') { e.stopPropagation(); cancel.click(); }
+  });
+  ta.addEventListener('blur', () => setTimeout(() => { if (!card.contains(document.activeElement)) cancel.click(); }, 150));
+  const actions = card.querySelector('.actions');
+  card.insertBefore(ta, actions); card.insertBefore(row, actions);
+  window.__fragNoteEditorActive = true;
+  ta.focus();
 }
 async function importReadingFiles(files) {
   if(!files||!files.length)return;let folder=READING_IMPORT_PROJECT||READING_PROJECT_CURRENT;READING_IMPORT_PROJECT='';const projects=[...READING_PROJECT_INDEX.keys()];if(!folder){if(!projects.length)return readingStatus('请先创建一个阅读项目',true);const choice=prompt('导入到哪个阅读项目？\n可选：'+projects.join('、'),projects[0]);if(choice===null)return;folder=choice.trim();}if(!projects.includes(folder))return readingStatus('阅读项目不存在：'+folder,true);
@@ -4123,10 +4275,11 @@ async function refreshGit(silent) {
 }
 
 function renderGit(d) {
-  const branchEl = $('git-branch'), ahEl = $('git-ah'), listEl = $('git-list');
+  const branchEl = $('git-branch'), ahEl = $('git-ah'), syncEl=$('git-sync'), listEl = $('git-list');
   if (!d || !d.ok) {
     branchEl.textContent = 'git 不可用';
     ahEl.textContent = '';
+    syncEl.textContent='';syncEl.className='git-sync untracked';
     listEl.innerHTML = '<div class="git-empty">' + escapeHtml((d && d.error) || '未找到 Git 仓库') + '</div>';
     return;
   }
@@ -4138,8 +4291,17 @@ function renderGit(d) {
   ahEl.textContent = ah.join(' ');
   ahEl.classList.toggle('ahead', !!d.ahead);
   ahEl.classList.toggle('behind', !!d.behind);
+  syncEl.className='git-sync';
+  if(d.upstream){
+    if(d.ahead&&d.behind){syncEl.textContent='待同步';syncEl.classList.add('diverged');}
+    else if(d.ahead){syncEl.textContent=d.ahead+' 个未推送';syncEl.classList.add('ahead');}
+    else if(d.behind){syncEl.textContent=d.behind+' 个待拉取';syncEl.classList.add('behind');}
+    else{syncEl.textContent='✓ 已同步';syncEl.classList.add('synced');}
+    syncEl.title='上游分支：'+d.upstream+(d.remote?' · 远程：'+d.remote:'');
+  }else{syncEl.textContent=d.hasRemote?'未设置上游':'无远程';syncEl.classList.add('untracked');syncEl.title=d.hasRemote?'仓库已有远程，但当前分支尚未设置上游':'当前仓库没有配置远程地址';}
+  branchEl.title='仓库: '+d.root+(d.upstream?'\n上游: '+d.upstream:'');
   // 提交记录
-  renderGitLog(d.commits || [], d.lastCommit);
+  renderGitLog(d.commits || [], d.lastCommit, d);
   // 改动文件树（按目录分组）
   const changes = d.changes || [];
   listEl.innerHTML = '';
@@ -4237,7 +4399,7 @@ function relTime(ts) {
   return Math.floor(s / 86400) + ' 天前';
 }
 // 提交记录列表
-function renderGitLog(commits, lastCommit) {
+function renderGitLog(commits, lastCommit, status) {
   const head = $('git-log-head'), log = $('git-log');
   head.classList.toggle('hidden', !commits.length);
   $('git-log-count').textContent = commits.length ? commits.length + ' 条' : '';
@@ -4247,9 +4409,13 @@ function renderGitLog(commits, lastCommit) {
     const row = document.createElement('div');
     row.className = 'gcommit' + (c.short === headShort ? ' head' : '');
     const isHead = c.short === headShort;
+    const remoteClass=c.pushed===true?'pushed':c.pushed===false?'unpushed':'unknown';
+    const remoteLabel=c.pushed===true?'✓ 已推送':c.pushed===false?'↑ 未推送':'— 未跟踪';
+    const remoteTitle=c.pushed===true?'该提交已包含在 '+status.upstream:c.pushed===false?'该提交尚未推送到 '+status.upstream:'当前分支没有上游，无法判断是否已推送';
     row.innerHTML = `<span class="gcm-h">${escapeHtml(c.short)}</span>` +
       `<span class="gcm-msg" title="${escapeHtml(c.subject)}">${isHead ? '▶ ' : ''}${escapeHtml(c.subject)}</span>` +
       `<span class="gcm-time">${relTime(c.ts)}</span>` +
+      `<span class="gcm-remote ${remoteClass}" title="${escapeHtml(remoteTitle)}">${remoteLabel}</span>` +
       `<button class="gcm-reset" ${isHead ? 'disabled style="opacity:.3;cursor:default"' : ''} title="${isHead ? '当前 HEAD' : '回退到该提交（需双重确认）'}">↶ 回退</button>`;
     row.querySelector('.gcm-reset').onclick = isHead ? null : () => showResetConfirm(c);
     log.appendChild(row);
@@ -5900,6 +6066,59 @@ function renderMd(txt) {
    两 pass 级联：① 行级——连续行组整块重复（块内可含空行，模型常原样再来一遍）；
    ② 段落级——按空行分段的相邻相同段（单行/多行、间隔空行）。
    重复位置放合并提示占位符（由调用方替换成 HTML）。 */
+  /* 所见即所得：把 contenteditable 里的渲染结果逆向转回 Markdown 源码 */
+  function mdFromHtml(html) {
+    const doc = new DOMParser().parseFromString('<div id="__mdroot">' + String(html || '') + '</div>', 'text/html');
+    const root = doc.getElementById('__mdroot');
+    const inline = (node) => {
+      if (!node) return '';
+      if (node.nodeType === 3) return (node.textContent || '').replace(/\u00a0/g, ' ');
+      if (node.nodeType !== 1) return '';
+      const tag = node.tagName.toLowerCase();
+      const inner = Array.from(node.childNodes).map(inline).join('');
+      if (tag === 'strong' || tag === 'b') return '**' + inner + '**';
+      if (tag === 'em' || tag === 'i') return '*' + inner + '*';
+      if (tag === 'code') return '`' + inner + '`';
+      if (tag === 'a') { const href = node.getAttribute('href') || ''; return href ? '[' + inner + '](' + href + ')' : inner; }
+      if (tag === 'br') return '  \n';
+      return inner;
+    };
+    const blocks = [];
+    const visit = (node) => {
+      if (node.nodeType !== 1) return;
+      const tag = node.tagName.toLowerCase();
+      if (tag === 'ul' || tag === 'ol') {
+        const items = Array.from(node.children).filter((ch) => ch.tagName && ch.tagName.toLowerCase() === 'li').map((li) => '- ' + inline(li).trim());
+        if (items.length) blocks.push({ type: 'list', text: items.join('\n') });
+        return;
+      }
+      if (tag === 'table') {
+        const lines = [];
+        const head = node.querySelector('thead');
+        if (head && head.querySelector('tr')) {
+          const tr = head.querySelector('tr');
+          const cells = Array.from(tr.children).map((td) => inline(td).trim());
+          lines.push('| ' + cells.join(' | ') + ' |');
+          lines.push('| ' + cells.map(() => '---').join(' | ') + ' |');
+        }
+        Array.from(node.querySelectorAll('tbody tr')).forEach((tr) => { lines.push('| ' + Array.from(tr.children).map((td) => inline(td).trim()).join(' | ') + ' |'); });
+        if (lines.length) blocks.push({ type: 'table', text: lines.join('\n') });
+        return;
+      }
+      if (/^h[1-6]$/.test(tag)) { const t = inline(node).trim(); if (t) blocks.push({ type: 'head', text: '#'.repeat(Number(tag[1])) + ' ' + t }); return; }
+      if (tag === 'blockquote') { const t = inline(node).trim(); if (t) blocks.push({ type: 'quote', text: t.split('\n').map((l) => '> ' + l).join('\n') }); return; }
+      if (tag === 'hr') { blocks.push({ type: 'head', text: '---' }); return; }
+      if (tag === 'p' || tag === 'div') { const t = inline(node).trim(); if (t) blocks.push({ type: 'para', text: t }); return; }
+      Array.from(node.children).forEach(visit);
+    };
+    Array.from(root.childNodes).forEach(visit);
+    let out = ''; let prev = null;
+    for (const b of blocks) {
+      const sep = !prev ? '' : (prev.type === b.type && (prev.type === 'list' || prev.type === 'table')) ? '\n' : '\n\n';
+      out += sep + b.text; prev = b;
+    }
+    return out.trim();
+  }
 function collapseRepeats(txt) {
   return collapseSegBlocks(collapseLineBlocks(txt));
 }
@@ -10193,6 +10412,1294 @@ api('/api/project/compile-db').then((data) => { if (data && data.ok) { COMPILE_D
 loadEnv(false, true);
 setInterval(() => loadEnv(true, true), 60000);
 </script>
+<script>
+/* ================= 阅读 PDF 标注与摘要（自研 pdfjs 渲染 + 高亮 + AI 摘要） ================= */
+(function () {
+  'use strict';
+  let PDFJS_PROMISE = null;
+  function loadPdfJs() {
+    if (PDFJS_PROMISE) return PDFJS_PROMISE;
+    PDFJS_PROMISE = import('/assets/pdfjs/pdf.min.mjs').then((mod) => {
+      mod.GlobalWorkerOptions.workerSrc = '/assets/pdfjs/pdf.worker.min.mjs';
+      return mod;
+    });
+    return PDFJS_PROMISE;
+  }
+  const ANNO_COLORS = { yellow: '#ffe14d', green: '#7ee787', blue: '#79c0ff', pink: '#ff9ecf', orange: '#ffab70' };
+  window.__pdfSelectedRectsIn = window.__pdfSelectedRectsIn || ((tl) => (tl ? selectedRectsIn(tl) : null));
+  let pdfToolbar = null;      // 划选工具条
+  let pdfPopover = null;      // 标注气泡
+  let pdfToolbarState = null; // {viewer, page, text, rects}
+
+  function rgba(hex, a) {
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+  async function loadAnnotations(path) {
+    const res = await api('/api/readings/annotations?path=' + encodeURIComponent(path));
+    return { annotations: (res && res.annotations) || [], summary: (res && res.summary) || null };
+  }
+  async function saveAnnotations(path, viewer) {
+    await persistAnnotations(path, viewer);
+  }
+  async function persistAnnotations(path, viewer) {
+    await api('/api/readings/annotations', { path, annotations: viewer.ann.annotations, summary: viewer.ann.summary });
+  }
+  function pushUndo(viewer) {
+    (viewer._undoStack = viewer._undoStack || []).push(JSON.parse(JSON.stringify(viewer.ann.annotations)));
+    if (viewer._undoStack.length > 30) viewer._undoStack.shift();
+  }
+  function undoLastAnnotation(viewer) {
+    if (!viewer || !viewer._alive) return;
+    const prev = (viewer._undoStack || []).pop();
+    if (!prev) { readingStatus('没有可撤回的标注操作', true); return; }
+    viewer.ann.annotations = prev;
+    persistAnnotations(viewer.path, viewer);
+    viewer.refreshAnnotations();
+    readingStatus('↶ 已撤回上一条标注操作');
+  }
+
+  /* ---------- 划选工具条 ---------- */
+  function buildPdfToolbar() {
+    if (pdfToolbar) return pdfToolbar;
+    const bar = document.createElement('div'); bar.className = 'pdf-sel-toolbar'; bar.style.display = 'none';
+    Object.keys(ANNO_COLORS).forEach((name) => {
+      const hex = ANNO_COLORS[name];
+      const b = document.createElement('button'); b.style.background = hex; b.title = '高亮（' + name + '）';
+      b.onclick = (e) => { e.stopPropagation(); pdfToolbarAction('highlight', hex); };
+      bar.appendChild(b);
+    });
+    const sep = document.createElement('div'); sep.className = 'sep'; bar.appendChild(sep);
+    const askAi = document.createElement('button'); askAi.className = 'act'; askAi.textContent = '问 AI'; askAi.title = '针对选中文字向 AI 提问（输入框无需填写）';
+    askAi.onclick = (e) => { e.stopPropagation(); askAboutSelected(); };
+    const mark = document.createElement('button'); mark.className = 'act'; mark.textContent = '标记'; mark.title = '保存为标记（可附笔记）';
+    mark.onclick = (e) => { e.stopPropagation(); pdfToolbarAction('mark', null); };
+    const cancel = document.createElement('button'); cancel.className = 'act'; cancel.textContent = '取消';
+    cancel.onclick = (e) => { e.stopPropagation(); hidePdfToolbar(); };
+    bar.append(askAi, mark, cancel);
+    document.body.appendChild(bar);
+    pdfToolbar = bar;
+    return bar;
+  }
+  function hidePdfToolbar() {
+    if (pdfToolbar) pdfToolbar.style.display = 'none';
+    pdfToolbarState = null;
+    try { window.getSelection().removeAllRanges(); } catch (_) {}
+  }
+  function showPdfToolbar(x, y) {
+    const bar = buildPdfToolbar();
+    bar.style.display = 'flex';
+    bar.style.left = Math.max(8, Math.min(x, innerWidth - 260)) + 'px';
+    bar.style.top = Math.max(8, y - 48) + 'px';
+  }
+  function askAboutSelected() {
+    const t = pdfToolbarState; if (!t || !t.viewer || !t.text) return;
+    const viewer = t.viewer;
+    hidePdfToolbar();
+    const tab = document.getElementById('rf-tab-chat');
+    if (tab && !tab.classList.contains('on')) tab.click();
+    sendReadingChat('📎 引用选中内容（P.' + t.page + '）：「' + t.text.slice(0, 200) + (t.text.length > 200 ? '…' : '') + '」\n\n请结合论文上下文，解释这段原文的含义、作用与要点。');
+    if (viewer && viewer._alive) readingStatus('已向 AI 提问选中内容');
+  }
+  function pdfToolbarAction(kind, color) {
+    const t = pdfToolbarState; if (!t) return;
+    if (!t.rects || !t.rects.length) { hidePdfToolbar(); return; }
+    const viewer = t.viewer;
+    const f = (viewer._previewF && viewer._previewF !== 1) ? viewer._previewF : 1;
+    const rects = f === 1 ? t.rects : t.rects.map((r) => ({ x: r.x / f, y: r.y / f, width: r.width / f, height: r.height / f }));
+    const anno = {
+      id: 'a' + Math.random().toString(36).slice(2, 10),
+      page: t.page, type: kind, color: color || '#ffe14d', text: t.text, rects,
+      note: '', scale: viewer.scale, createdAt: Date.now(),
+    };
+    if (kind === 'mark') {
+      const note = prompt('为这条标记添加笔记（可留空）', '');
+      if (note === null) return;
+      anno.note = note || '';
+    }
+    pushUndo(viewer);
+    viewer.ann.annotations.push(anno);
+    renderPdfOverlay(viewer, t.page);
+    saveAnnotations(viewer.path, viewer);
+    window.renderReadingAnnotationsList && renderReadingAnnotationsList();
+    updatePdfAnnoCount(viewer);
+    hidePdfToolbar();
+  }
+
+  /* ---------- 高亮 overlay ---------- */
+  function renderPdfOverlay(viewer, pageNum) {
+    const rec = viewer.pages.find((p) => p.pageNum === pageNum);
+    if (!rec) return;
+    if (!viewer._annoClickBound && viewer.scroll) {
+      viewer._annoClickBound = true;
+      viewer.scroll.addEventListener('click', (ev) => pdfAnnoScrollClick(ev, viewer));
+    }
+    const ov = rec.ov; ov.replaceChildren();
+    for (const a of viewer.ann.annotations) {
+      if (a.page !== pageNum) continue;
+      const sf = viewer.scale / (a.scale || viewer.scale);
+      for (const r of (a.rects || [])) {
+        const d = document.createElement('div');
+        d.className = 'pdf-anno-hl';
+        d.style.cssText = 'left:' + (r.x * sf) + 'px;top:' + (r.y * sf) + 'px;width:' + Math.max(2, r.width * sf) + 'px;height:' + Math.max(2, r.height * sf) + 'px;background:' + rgba(a.color, a.type === 'mark' ? 0.5 : 0.3) + ';' + (a.type === 'mark' ? 'outline:1px solid ' + rgba(a.color, 0.8) + ';' : '');
+        d.dataset.id = a.id;
+        d.title = (a.text || '').slice(0, 100);
+        ov.appendChild(d);
+      }
+    }
+    renderFragmentMarks(viewer, pageNum);
+  }
+  function renderFragmentMarks(viewer, pageNum) {
+    if (!viewer || !viewer._alive) return;
+    const doc = window.activeReadingDoc ? activeReadingDoc() : null;
+    const frags = (doc && doc.meta && doc.meta.fragments) || [];
+    const rec = viewer.pages.find((p) => p.pageNum === pageNum);
+    if (!rec || !rec.ov) return;
+    rec.ov.querySelectorAll('.pdf-frag-mark').forEach((el) => el.remove());
+    if (viewer._previewF && viewer._previewF !== 1) return;
+    const sfBase = viewer.scale;
+    for (const f of frags) {
+      if (!f || Number(f.page) !== pageNum || !Array.isArray(f.rects) || !f.rects.length) continue;
+      const sf = sfBase / (Number(f.scale) || 1);
+      const g = document.createElement('div');
+      g.className = 'pdf-frag-mark'; g.dataset.id = f.id;
+      g.title = (f.source || '').slice(0, 120);
+      for (const r of f.rects) {
+        const d = document.createElement('div');
+        d.style.left = (r.x * sf) + 'px'; d.style.top = (r.y * sf) + 'px';
+        d.style.width = Math.max(2, r.width * sf) + 'px'; d.style.height = Math.max(2, r.height * sf) + 'px';
+        g.appendChild(d);
+      }
+      rec.ov.appendChild(g);
+    }
+  }
+  function refreshFragmentMarksAll() {
+    const v = window.__readingPdfViewer;
+    if (!v || !v.alive || !v.alive()) return;
+    v.pages.forEach((p) => renderFragmentMarks(v, p.pageNum));
+  }
+  function fragSegmentsFromLoc(viewer, loc) {
+    const rec = viewer.pages.find((x) => x.pageNum === loc.page);
+    if (!rec) return [];
+    const hostRect = rec.textLayer.getBoundingClientRect();
+    const segs = []; let acc = 0;
+    for (const sp of loc.spans) { const t = (sp.textContent || '').replace(/\s+/g, ' '); segs.push({ sp, s: acc, e: acc + t.length }); acc += t.length; }
+    const rects = [];
+    for (const seg of segs) {
+      if (seg.e <= loc.start || seg.s >= loc.end) continue;
+      const sr = seg.sp.getBoundingClientRect();
+      if (sr.width < 1 || sr.height < 1) continue;
+      const spanLen = seg.e - seg.s;
+      const cutS = Math.max(0, loc.start - seg.s), cutE = Math.min(spanLen, loc.end - seg.s);
+      const f0 = spanLen ? cutS / spanLen : 0, f1 = spanLen ? cutE / spanLen : 1;
+      const x0 = sr.left + sr.width * f0, x1 = sr.left + sr.width * f1;
+      if (x1 - x0 < 1) continue;
+      rects.push({ x: x0 - hostRect.left, y: sr.top - hostRect.top, width: x1 - x0, height: sr.height });
+    }
+    return rects;
+  }
+  function flashFragmentMark(viewer, frag) {
+    if (!viewer || !viewer._alive) return;
+    const page = Number(frag.page) || 1;
+    const rec = viewer.pages.find((p) => p.pageNum === page);
+    if (!rec || !rec.ov) return;
+    let els = [];
+    if (Array.isArray(frag.rects) && frag.rects.length) {
+      els = [...rec.ov.querySelectorAll('.pdf-frag-mark[data-id="' + frag.id + '"]')];
+    } else {
+      const loc = locateQuoteInViewer(viewer, frag.source || '');
+      if (loc) {
+        const rects = fragSegmentsFromLoc(viewer, loc);
+        const g = document.createElement('div'); g.className = 'pdf-frag-mark';
+        for (const r of rects) {
+          const d = document.createElement('div');
+          d.style.left = r.x + 'px'; d.style.top = r.y + 'px';
+          d.style.width = Math.max(2, r.width) + 'px'; d.style.height = Math.max(2, r.height) + 'px';
+          g.appendChild(d);
+        }
+        rec.ov.appendChild(g);
+        els = [g];
+      }
+    }
+    if (!els.length) { if (rec.canvas) rec.canvas.scrollIntoView({ block: 'center' }); return; }
+    for (const el of els) el.classList.add('flash');
+    setTimeout(() => {
+      for (const el of els) {
+        el.classList.remove('flash');
+        if (!Array.isArray(frag.rects) || !frag.rects.length) el.remove();
+      }
+    }, 2800);
+    if (rec.canvas) rec.canvas.scrollIntoView({ block: 'center' });
+  }
+  async function locateReadingFragment(doc, frag) {
+    const v0 = window.__readingPdfViewer;
+    if (!v0 || !v0.alive || !v0.alive()) return false;
+    const page = Math.max(1, Number(frag.page) || 1);
+    await setReadingPage(READING_ACTIVE_SLOT, page);
+    let v = window.__readingPdfViewer;
+    for (let i = 0; i < 50; i++) {
+      await new Promise((r) => setTimeout(r, 120));
+      v = window.__readingPdfViewer;
+      if (v && v.pages.length === v.numPages && v.currentPage === page) break;
+    }
+    if (v) flashFragmentMark(v, frag);
+    return true;
+  }
+  window.refreshFragmentMarksAll = refreshFragmentMarksAll;
+  window.locateReadingFragment = locateReadingFragment;
+  window.flashFragmentMark = flashFragmentMark;
+  window.hidePdfToolbar = () => { try { hidePdfToolbar(); } catch (_) {} };
+  async function buildAutoOutline(pdf) {
+    const rows = [];
+    if (!pdf || !pdf.numPages) return { rows, source: 'none' };
+    const sizes = []; const perPage = [];
+    const MAX_PER_PAGE = 8;
+    const BY = 10; // 同页内把 y 相差小于 BY 的文本项聚合为一行
+    for (let p = 1; p <= Math.min(pdf.numPages, 200); p++) {
+      const lines = [];
+      try {
+        const pg = await pdf.getPage(p);
+        const tc = await pg.getTextContent();
+        const cur = [];
+        let lastY = null;
+        for (const it of tc.items || []) {
+          const t = (it.str || '').replace(/\s+/g, ' ').trim();
+          if (!t) continue;
+          const fs = Math.abs(it.transform ? it.transform[3] : 0) || 0;
+          if (fs > 0) sizes.push(fs);
+          const y = it.transform ? it.transform[5] : 0;
+          if (lastY !== null && Math.abs(y - lastY) > BY) { lines.push(cur.splice(0)); }
+          let bold = false;
+          if (it.fontName && tc.styles) {
+            const st = tc.styles.get ? tc.styles.get(it.fontName) : tc.styles[it.fontName];
+            if (st && st.fontFamily) bold = /bold|black|heavy|semibold/i.test(st.fontFamily);
+          }
+          cur.push({ t, fs, bold });
+          lastY = y;
+        }
+        if (cur.length) lines.push(cur);
+      } catch (_) {}
+      perPage.push(lines.map((parts) => {
+        const t = parts.map((x) => x.t).join(' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+        const fs = Math.max.apply(null, parts.map((x) => x.fs)) || 0;
+        return { t, fs, bold: parts.some((x) => x.bold) };
+      }));
+    }
+    if (!sizes.length) return { rows, source: 'none' };
+    const sorted = sizes.filter((x) => x > 1).sort((a, b) => a - b);
+    const base = sorted[Math.floor(sorted.length / 2)] || sorted[0] || 10;
+    const p95 = sorted[Math.floor(sorted.length * 0.95)] || base * 1.3;
+    const thr = Math.max(base * 1.14, p95 * 0.86);
+    const flat = [];
+    perPage.forEach((arr, idx) => {
+      const ok = arr.filter((c) => {
+        const t = c.t;
+        if (/^[0-9.,]+\s*[a-zA-Z*()°\-·]*$/.test(t)) return false;
+        if (/^(19|20)\d{2,}/.test(t)) return false;
+        if (/^\[[0-9,]+\]/.test(t)) return false;
+        if (/^[0-9][0-9.,\s°\-·]*[a-zA-Z°][a-zA-Z°\s\-·*]*$/.test(t) && t.length <= 16) return false;
+        if (/[.;:]$/.test(t)) return false;
+        if (t.length > 80 || t.length < 3) return false;
+        const numPre = t.match(/^(?:[A-Z]\.|[IVX]+\.|\d+(?:\.\d+)*)[.、\s]/);
+        const capsOnly = t.replace(/\s+/g, '');
+        const allCaps = /^[A-Z][A-Z&()\-]{3,40}$/.test(capsOnly);
+        if (c.fs >= thr) return true;
+        if (numPre) {
+          const rest = t.replace(numPre[0], '').trim();
+          if (rest.length >= 2 && !/^[.]/.test(rest) && !/^(m|s|kg|cm|mm|km|Hz|rad|deg|meter|meters|second|seconds|min|ms|µs|°)/i.test(rest)) return true;
+        }
+        if (allCaps) return true;
+        return false;
+      }).slice(0, MAX_PER_PAGE);
+      ok.forEach((c) => flat.push({ t: c.t, fs: c.fs, bold: c.bold, page: idx + 1 }));
+    });
+    const levels = [...new Set(flat.map((c) => c.fs))].sort((a, b) => b - a).slice(0, 4);
+    for (const c of flat) {
+      let depth = Math.max(0, Math.min(levels.indexOf(c.fs), 3));
+      const m = c.t.match(/^(\d+(?:\.\d+)*)[.、\s]/);
+      if (m) depth = Math.max(depth, Math.min(m[1].split('.').length - 1, 3));
+      rows.push({ title: c.t, page: c.page, depth });
+    }
+    return { rows, source: 'auto' };
+  }
+  async function loadPdfOutline(viewer) {
+    if (viewer._tocCache) return viewer._tocCache;
+    if (!viewer.pdf) return { rows: [], source: 'none' };
+    const rows = [];
+    try {
+      const outline = await viewer.pdf.getOutline();
+      const walk = async (items, depth) => {
+        for (const it of items || []) {
+          let page = 0;
+          try {
+            let dest = Array.isArray(it.dest) ? it.dest : null;
+            if (!dest && typeof it.dest === 'string') dest = await viewer.pdf.getDestination(it.dest);
+            if (dest && Array.isArray(dest) && dest[0]) page = (await viewer.pdf.getPageIndex(dest[0])) + 1;
+          } catch (_) {}
+          const title = ((it.title || '').replace(/\s+/g, ' ').trim() || '').slice(0, 120);
+          if (page >= 1 && title) rows.push({ title, page, depth });
+          if (it.items && it.items.length) await walk(it.items, depth + 1);
+        }
+      };
+      await walk(outline || [], 0);
+    } catch (_) {}
+    if (rows.length) { viewer._tocCache = { rows, source: 'bookmark' }; return viewer._tocCache; }
+    const auto = await buildAutoOutline(viewer.pdf);
+    viewer._tocCache = auto;
+    return auto;
+  }
+  function togglePdfOutline(viewer) {
+    if (!viewer || !viewer._alive) return;
+    if (viewer._tocPanel) { viewer._tocPanel.remove(); viewer._tocPanel = null; viewer._tocBtn && viewer._tocBtn.classList.remove('on'); return; }
+    const panel = document.createElement('div'); panel.className = 'pdf-outline-panel';
+    const head = document.createElement('div'); head.className = 'pdf-outline-head';
+    const title = document.createElement('span'); title.textContent = '大纲';
+    const tag = document.createElement('span'); tag.className = 'tag';
+    const sp = document.createElement('span'); sp.className = 'sp';
+    const close = document.createElement('button'); close.textContent = '关闭';
+    close.onclick = () => togglePdfOutline(viewer);
+    head.append(title, tag, sp, close);
+    const body = document.createElement('div'); body.className = 'pdf-outline-body';
+    body.textContent = '正在识别大纲…';
+    panel.append(head, body);
+    viewer.host.appendChild(panel);
+    viewer._tocPanel = panel; viewer._tocBtn && viewer._tocBtn.classList.add('on');
+    panel.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault ? e.preventDefault() : 0; });
+    const onDoc = (e) => { if (viewer._tocPanel && !viewer._tocPanel.contains(e.target) && !(viewer._tocBtn && viewer._tocBtn.contains(e.target))) togglePdfOutline(viewer); };
+    document.addEventListener('mousedown', onDoc);
+    const onKey = (e) => { if (e.key === 'Escape') togglePdfOutline(viewer); };
+    document.addEventListener('keydown', onKey);
+    loadPdfOutline(viewer).then((data) => {
+      if (!viewer._tocPanel || !viewer._alive) return;
+      body.replaceChildren();
+      tag.textContent = data.source === 'bookmark' ? 'PDF 书签' : data.source === 'auto' ? '自动识别' : '';
+      if (!data.rows.length) {
+        const e = document.createElement('div'); e.className = 'pdf-toc-empty';
+        e.textContent = '该 PDF 没有书签，也未识别到明显的章节标题。';
+        body.appendChild(e); return;
+      }
+      let activeRow = null;
+      for (const r of data.rows) {
+        const row = document.createElement('div'); row.className = 'pdf-toc-row';
+        row.style.paddingLeft = (6 + (r.depth || 0) * 14) + 'px';
+        const t = document.createElement('span'); t.className = 't'; t.textContent = r.title;
+        const pg = document.createElement('span'); pg.className = 'pg'; pg.textContent = 'P.' + r.page;
+        row.append(t, pg);
+        row.onclick = () => {
+          if (activeRow) activeRow.classList.remove('active');
+          row.classList.add('active'); activeRow = row;
+          const rec = viewer.pages.find((x) => x.pageNum === r.page);
+          if (rec) viewer.goToPage(r.page);
+          else if (viewer.slotEls) setReadingPage(viewer.slotEls === readingSlotElements(READING_ACTIVE_SLOT) ? READING_ACTIVE_SLOT : Number(viewer.slotEls.closest('.reading-col') && viewer.slotEls.closest('.reading-col').dataset.slot), r.page);
+        };
+        body.appendChild(row);
+      }
+    }).catch(() => {
+      if (!viewer._tocPanel) return;
+      body.replaceChildren();
+      const e = document.createElement('div'); e.className = 'pdf-toc-empty'; e.textContent = '大纲识别失败，可重试或手动翻页。'; body.appendChild(e);
+    });
+    const cleanup = () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+    const origRemove = panel.remove.bind(panel);
+    panel.remove = () => { cleanup(); origRemove(); };
+  }
+  window.__buildPdfOutline = buildAutoOutline;
+  function updatePdfAnnoCount(viewer) {
+    const el = viewer.host && viewer.host.querySelector('.pdf-anno-count');
+    if (el) el.textContent = '标注 ' + viewer.ann.annotations.length;
+  }
+  function pdfAnnoScrollClick(ev, viewer) {
+    if (!ev.target || ev.target.closest('.pdf-toolbar') || ev.target.closest('.pdf-sel-toolbar') || ev.target.closest('.pdf-anno-pop')) return;
+    if (ev.button !== 0) return;
+    // 坐标命中高亮（hl 为 pointer-events:none，须手动判定）
+    for (const rec of viewer.pages) {
+      const ovr = rec.ov.getBoundingClientRect();
+      if (ev.clientX < ovr.left || ev.clientX > ovr.right || ev.clientY < ovr.top || ev.clientY > ovr.bottom) continue;
+      for (const a of viewer.ann.annotations) {
+        if (a.page !== rec.pageNum) continue;
+        const sf = viewer.scale / (a.scale || viewer.scale);
+        for (const r of (a.rects || [])) {
+          const l = ovr.left + r.x * sf, t = ovr.top + r.y * sf;
+          const w = Math.max(2, r.width * sf), h = Math.max(2, r.height * sf);
+          if (ev.clientX >= l && ev.clientX <= l + w && ev.clientY >= t && ev.clientY <= t + h) {
+            ev.stopPropagation();
+            showAnnoPopover(ev, viewer, a, rec.pageNum);
+            return;
+          }
+        }
+      }
+    }
+  }
+  function showAnnoPopover(ev, viewer, anno, pageNum) {
+    if (pdfPopover) pdfPopover.remove();
+    const pop = document.createElement('div'); pop.className = 'pdf-anno-pop';
+    const txt = document.createElement('div'); txt.className = 'txt'; txt.textContent = anno.text || '';
+    const note = document.createElement('div'); note.className = 'note'; note.innerHTML = anno.note ? (renderMd(anno.note) || '') : '';
+    const row = document.createElement('div'); row.className = 'row';
+    const edit = document.createElement('button'); edit.textContent = '✎ 笔记'; edit.onclick = () => startAnnoNoteEdit(pop, viewer, anno, pageNum, note, edit);
+    const del = document.createElement('button'); del.className = 'danger'; del.textContent = '删除'; del.onclick = async () => {
+      pushUndo(viewer); viewer.ann.annotations = viewer.ann.annotations.filter((x) => x.id !== anno.id);
+      await saveAnnotations(viewer.path, viewer); renderPdfOverlay(viewer, pageNum); window.renderReadingAnnotationsList && renderReadingAnnotationsList(); updatePdfAnnoCount(viewer); pop.remove();
+    };
+    const cls = document.createElement('button'); cls.textContent = '关闭'; cls.onclick = () => pop.remove();
+    row.append(edit, del, cls);
+    pop.append(txt, note, row);
+    document.body.appendChild(pop);
+    const rr = ev && ev.target && ev.target.getBoundingClientRect ? ev.target.getBoundingClientRect() : { right: ev.clientX, top: ev.clientY };
+    pop.style.left = Math.max(4, Math.min(rr.right + 8, innerWidth - pop.offsetWidth - 8)) + 'px';
+    pop.style.top = Math.max(4, Math.min(rr.bottom + 4, innerHeight - pop.offsetHeight - 4)) + 'px';
+    pdfPopover = pop;
+    setTimeout(() => {
+      const dismiss = (e2) => { if (pop.querySelector('textarea')) return; if (!pop.contains(e2.target)) { pop.remove(); document.removeEventListener('mousedown', dismiss); } };
+      document.addEventListener('mousedown', dismiss);
+    }, 0);
+  }
+
+  function startAnnoNoteEdit(pop, viewer, anno, pageNum, noteDiv, editBtn) {
+    if (pop.querySelector('textarea')) { pop.querySelector('textarea').focus(); return; }
+    const ta = document.createElement('textarea'); ta.className = 'pop-edit'; ta.value = anno.note || ''; ta.placeholder = '直接在此处输入笔记…（回车保存，Esc 取消）';
+    const row = document.createElement('div'); row.className = 'pop-edit-row';
+    const save = document.createElement('button'); save.className = 'primary'; save.textContent = '保存';
+    const cancel = document.createElement('button'); cancel.textContent = '取消';
+    row.append(save, cancel);
+    const commit = async () => { const v = ta.value.trim(); pushUndo(viewer); anno.note = v; await saveAnnotations(viewer.path, viewer); renderPdfOverlay(viewer, pageNum); window.renderReadingAnnotationsList && window.renderReadingAnnotationsList(); pop.remove(); };
+    save.onclick = (e) => { e.stopPropagation(); commit(); };
+    cancel.onclick = (e) => { e.stopPropagation(); ta.remove(); row.remove(); noteDiv.innerHTML = anno.note ? (renderMd(anno.note) || '') : ''; editBtn.style.display = ''; };
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save.click(); }
+      else if (e.key === 'Escape') { e.stopPropagation(); cancel.click(); }
+    });
+    ta.addEventListener('blur', () => setTimeout(() => { if (!pop.contains(document.activeElement)) cancel.click(); }, 150));
+    noteDiv.textContent = '';
+    editBtn.style.display = 'none';
+    const btnRow = pop.querySelector('.row');
+    pop.insertBefore(ta, btnRow); pop.insertBefore(row, btnRow);
+    ta.focus();
+  }
+
+  /* ---------- 选区 → 矩形 ---------- */
+  function selectedRectsIn(textLayer) {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
+    const text = String(sel.toString() || '').trim();
+    if (!text) return null;
+    const range = sel.getRangeAt(0);
+    let inside = false;
+    try {
+      const c = range.commonAncestorContainer;
+      inside = c.nodeType === 3 ? textLayer.contains(c.parentElement) : textLayer.contains(c);
+    } catch (_) { inside = false; }
+    if (!inside) return null;
+    // 基于 span 几何生成高亮矩形：垂直贴 span 行框（与 canvas 对齐），水平裁剪到选区范围
+    const hostRect = textLayer.getBoundingClientRect();
+    const rangeBox = range.getBoundingClientRect();
+    const rects = [];
+    for (const sp of textLayer.querySelectorAll('span')) {
+      const sr = sp.getBoundingClientRect();
+      if (sr.width < 1 || sr.height < 1) continue;
+      const ix = Math.min(rangeBox.right, sr.right) - Math.max(rangeBox.left, sr.left);
+      if (ix <= 0) continue;
+      const iy = Math.min(rangeBox.bottom, sr.bottom) - Math.max(rangeBox.top, sr.top);
+      if (iy < sr.height * 0.5) continue;
+      const x0 = Math.max(sr.left, rangeBox.left), x1 = Math.min(sr.right, rangeBox.right);
+      rects.push({
+        x: x0 - hostRect.left, y: sr.top - hostRect.top,
+        width: x1 - x0, height: sr.height,
+      });
+    }
+    return { text, rects };
+  }
+
+  function attachPageInteractions(viewer, rec) {
+    const tl = rec.textLayer;
+    tl.addEventListener('mouseup', (e) => {
+      setTimeout(() => {
+        const r = selectedRectsIn(tl);
+        if (r) {
+          pdfToolbarState = { viewer, page: rec.pageNum, text: r.text, rects: r.rects };
+          showPdfToolbar(e.clientX, e.clientY);
+        }
+      }, 10);
+    });
+    tl.addEventListener('mousedown', () => { hidePdfToolbar(); if (pdfPopover) pdfPopover.remove(); });
+  }
+
+  /* ---------- 把 PDF 真实字体挂到文本层 span（解决划选/高亮错位） ---------- */
+  async function applyRealFonts(page, textLayer, textContent) {
+    try {
+      // 1) 收集 fontName → CSS font-family 映射，并确保 FontFace 已注册
+      const fontNames = new Set();
+      for (const it of textContent.items) if (it.fontName) fontNames.add(it.fontName);
+      const name2family = new Map();
+      const loads = [];
+      for (const fn of fontNames) {
+        let fo = null;
+        try { fo = page.commonObjs.get(fn); } catch (_) {}
+        if (!fo) continue;
+        let family = null;
+        if (fo.cssFontInfo && fo.cssFontInfo.fontFamily) family = String(fo.cssFontInfo.fontFamily);
+        else if (fo.systemFontInfo && fo.systemFontInfo.baseFontName) family = String(fo.systemFontInfo.baseFontName).replace(/[",]/g, '');
+        else family = fo.loadedName;
+        if (!family) continue;
+        name2family.set(fn, family);
+        if (fo.createNativeFontFace && ![...document.fonts].some(f => f.family === family)) {
+          try {
+            const ff = fo.createNativeFontFace();
+            if (ff && ff.family) { document.fonts.add(ff); loads.push(ff.loaded ? ff.loaded.catch(() => {}) : Promise.resolve()); }
+          } catch (_) {}
+        }
+      }
+      // 2) 字符流（与 span 顺序一致；保 UTC 顺序含换行）
+      const seq = [];
+      for (const it of textContent.items) {
+        for (let k = 0; k < it.str.length; k++) seq.push(it.fontName || null);
+        if (it.hasEOL) seq.push(null);
+      }
+      // 3) 逐 span：按字符流取 fontName，设置真实字体并移除 pdfjs 的近似 scaleX 压缩
+      const spans = textLayer.querySelectorAll('span');
+      let idx = 0;
+      for (const sp of spans) {
+        const txt = sp.textContent || '';
+        const start = idx, len = txt.length;
+        idx += len;
+        let fn = null;
+        for (let k = start; k < start + len && k < seq.length; k++) { if (seq[k]) { fn = seq[k]; break; } }
+        if (!fn) continue;
+        const fam = name2family.get(fn);
+        if (!fam) continue;
+        sp.style.fontFamily = "'" + fam + "', sans-serif";
+        if (sp.style.transform && sp.style.transform.includes('scaleX')) {
+          sp.style.transform = sp.style.transform.replace(/scaleX\([^)]*\)/g, 'scaleX(1)');
+        }
+      }
+      if (loads.length) await Promise.race([Promise.all(loads), new Promise(r => setTimeout(r, 3000))]);
+    } catch (_) { /* 字体修正失败不影响画布渲染 */ }
+  }
+
+  /* ---------- 渲染一页 ---------- */
+  async function renderPdfPage(viewer, pageNum) {
+    const pdf = viewer.pdf;
+    const page = await pdf.getPage(pageNum);
+    const vp = page.getViewport({ scale: viewer.scale });
+    const wrap = document.createElement('div'); wrap.className = 'pdf-page-wrap'; wrap.dataset.page = pageNum;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(vp.width * 2); canvas.height = Math.floor(vp.height * 2);
+    canvas.style.width = vp.width + 'px'; canvas.style.height = vp.height + 'px';
+    const ctx = canvas.getContext('2d');
+    wrap.appendChild(canvas);
+    await page.render({ canvasContext: ctx, viewport: vp, transform: [2, 0, 0, 2, 0, 0] }).promise;
+    const textLayer = document.createElement('div'); textLayer.className = 'pdf-text-layer';
+    wrap.appendChild(textLayer);
+    const textContent = await page.getTextContent();
+    const pdfjs = await loadPdfJs();
+    try {
+      textLayer.style.setProperty('--scale-factor', vp.scale);
+      const tl = new pdfjs.TextLayer({ textContentSource: textContent, container: textLayer, viewport: vp });
+      await tl.render();
+      await applyRealFonts(page, textLayer, textContent);
+    } catch (_) { /* 文本层失败不影响画布 */ }
+    const ov = document.createElement('div'); ov.className = 'pdf-anno-overlay';
+    wrap.appendChild(ov);
+    const rec = { pageNum, wrap, canvas, textLayer, ov, page, viewport: vp };
+    viewer.pages.push(rec);
+    insertPdfPageWrap(viewer, wrap, pageNum);
+    attachPageInteractions(viewer, rec);
+    renderPdfOverlay(viewer, pageNum);
+    return rec;
+  }
+  /* 按页码顺序把渲染完成的页面插入滚动容器 —— 并发渲染完成顺序与页码无关，直接 appendChild 会把页面顺序打乱 */
+  function insertPdfPageWrap(viewer, wrap, pageNum) {
+    const kids = viewer.scroll.children;
+    for (let i = 0; i < kids.length; i++) {
+      const dp = Number(kids[i].dataset.page);
+      if (dp > pageNum) { viewer.scroll.insertBefore(wrap, kids[i]); return; }
+    }
+    viewer.scroll.appendChild(wrap);
+  }
+
+  /* ---------- 页码 / 缩放 ---------- */
+  function currentVisiblePage(viewer) {
+    const top = viewer.scroll.scrollTop + 16;
+    for (const p of viewer.pages) {
+      if (p.wrap.offsetTop <= top && p.wrap.offsetTop + p.wrap.offsetHeight >= top) return p.pageNum;
+    }
+    return viewer.currentPage;
+  }
+  function updatePageDisplay(viewer) {
+    const els = viewer.slotEls;
+    if (!els) return;
+    els.page.value = viewer.currentPage;
+    els.pages.textContent = '/ ' + viewer.numPages;
+    const doc = READING_DOCS.get(viewer.path);
+    if (doc) { doc.meta.page = viewer.currentPage; saveReadingDoc(doc); }
+  }
+  const clampZoom = (s) => Math.max(0.2, Math.min(4, s));
+  function updateZoomUI(viewer) {
+    const zl = viewer._zoomPct;
+    if (zl) zl.textContent = Math.round(viewer.scale * 100) + '%';
+    const rng = viewer._zoomRange;
+    if (rng && document.activeElement !== rng) rng.value = String(Math.round(viewer.scale * 100));
+    const fw = viewer._fitWBtn, fp = viewer._fitPBtn;
+    if (fw) fw.classList.toggle('on', viewer.fitMode === 'width');
+    if (fp) fp.classList.toggle('on', viewer.fitMode === 'page');
+  }
+  function applyPdfTransform(viewer, s) {
+    const f = s / viewer.baseScale;
+    viewer._previewF = f;
+    for (const rec of viewer.pages) rec.wrap.style.transform = f === 1 ? '' : 'scale(' + f + ')';
+  }
+  function wrapTopAt(viewer, docY) {
+    let best = 0;
+    for (const p of viewer.pages) {
+      if (p.wrap.offsetTop <= docY && docY <= p.wrap.offsetTop + p.wrap.offsetHeight) return p.wrap.offsetTop;
+      if (p.wrap.offsetTop <= docY) best = p.wrap.offsetTop;
+    }
+    return best;
+  }
+  function previewPdfZoomAt(viewer, s, clientX, clientY, opts) {
+    if (!viewer._alive) return;
+    s = clampZoom(s);
+    const o = opts || {};
+    const rect = viewer.scroll.getBoundingClientRect();
+    const vpTop = viewer.scroll.scrollTop;
+    const oldScale = viewer.scale || viewer.baseScale;
+    const vpOff = clientY - rect.top;
+    const docY = (vpTop + vpOff) / oldScale;                       // 锚点（scale=1 文档坐标）
+    const p = docY * oldScale;                                     // 锚点布局坐标
+    const T = wrapTopAt(viewer, p);
+    const f = s / oldScale;
+    applyPdfTransform(viewer, s);                                  // 即时 CSS 缩放
+    viewer.scroll.scrollTop = Math.max(0, vpTop + (p - T) * (f - 1)); // 光标锚定
+    viewer._pendingZoom = { s, anchorDocY: docY, vpOff, mode: o.fitMode !== undefined ? o.fitMode : undefined };
+    if (o.fitMode !== undefined) viewer.fitMode = o.fitMode;
+    updateZoomUI(viewer);
+    clearTimeout(viewer._zoomTimer);
+    viewer._zoomTimer = setTimeout(() => commitPdfZoom(viewer), 320); // 防抖精确重建
+  }
+  function commitPdfZoom(viewer) {
+    if (!viewer._alive) return;
+    const z = viewer._pendingZoom; viewer._pendingZoom = null;
+    applyPdfTransform(viewer, 1);                                  // 还原 transform
+    viewer._previewF = 1;
+    const s = z ? clampZoom(z.s) : viewer.scale;
+    viewer.baseScale = s; viewer.scale = s;
+    if (z && z.mode !== undefined) viewer.fitMode = z.mode;
+    updateZoomUI(viewer);
+    const docY = z ? z.anchorDocY : null, vpOff = z ? z.vpOff : 8;
+    const topPage = viewer.currentPage;
+    viewer.scroll.replaceChildren();
+    viewer.pages = [];
+    renderPdfPage(viewer, 1).then(() => {
+      for (let i = 2; i <= viewer.numPages; i++) renderPdfPage(viewer, i).catch(() => {});
+      setTimeout(() => {
+        if (docY !== null) viewer.scroll.scrollTop = Math.max(0, docY * viewer.scale - vpOff);
+        else {
+          const rec = viewer.pages.find((p) => p.pageNum === topPage);
+          if (rec) viewer.scroll.scrollTop = rec.wrap.offsetTop - 8;
+        }
+      }, 60);
+    });
+  }
+  function fitPdfMode(viewer, mode) {
+    if (!viewer._alive || !viewer._pageW) return;
+    const w = Math.max(120, viewer.scroll.clientWidth - 26);
+    const h = Math.max(120, viewer.scroll.clientHeight - 14);
+    const s = mode === 'page' ? Math.min(w / viewer._pageW, h / viewer._pageH) : w / viewer._pageW;
+    const rect = viewer.scroll.getBoundingClientRect();
+    previewPdfZoomAt(viewer, s, rect.left + 12, rect.top + 8, { fitMode: mode });
+    commitPdfZoom(viewer);                                        // fit 立即精确重建
+  }
+  function quickZoom(viewer, s) {
+    const rect = viewer.scroll.getBoundingClientRect();
+    previewPdfZoomAt(viewer, s, rect.left + 12, rect.top + viewer.scroll.clientHeight / 2, {});
+  }
+
+  /* ---------- 主入口：渲染 PDF 查看器 ---------- */
+  async function renderPdfViewer(body, physicalPath, startPage) {
+    const oldHost = body.querySelector('.reading-pdf-host');
+    if (oldHost) { const v = window.__readingPdfViewer; if (v && v.alive && v.alive()) v.destroy(); }
+    body.replaceChildren();
+    hidePdfToolbar();
+    ensureReadingPanelTabs();
+    const host = document.createElement('div'); host.className = 'reading-pdf-host';
+    const toolbar = document.createElement('div'); toolbar.className = 'pdf-toolbar';
+    const zo = document.createElement('button'); zo.textContent = '−'; zo.title = '缩小（或 ⌘/Ctrl + 滚轮）';
+    const zl = document.createElement('span'); zl.className = 'pdf-zoom-pct'; zl.textContent = '100%'; zl.title = '点击输入缩放百分比';
+    const range = document.createElement('input'); range.type = 'range'; range.className = 'pdf-zoom-range'; range.min = 20; range.max = 300; range.step = 1; range.value = 100; range.title = '缩放';
+    const zi = document.createElement('button'); zi.textContent = '＋'; zi.title = '放大';
+    const fitW = document.createElement('button'); fitW.className = 'fit-btn'; fitW.textContent = '适配宽度'; fitW.title = '页面宽度铺满容器';
+    const fitP = document.createElement('button'); fitP.className = 'fit-btn'; fitP.textContent = '适配页面'; fitP.title = '整页完整显示';
+    const ac = document.createElement('span'); ac.className = 'pdf-anno-count'; ac.textContent = '标注 0';
+    const undoBtn = document.createElement('button'); undoBtn.textContent = '↶ 撤回'; undoBtn.title = '撤销上一条标注操作（高亮 / 标记 / AI 重点 / 删除）';
+    undoBtn.onclick = () => undoLastAnnotation(viewer);
+    const tocBtn = document.createElement('button'); tocBtn.textContent = '☰ 大纲'; tocBtn.title = '章节大纲（优先 PDF 自带书签，无书签时自动识别章节标题）';
+    toolbar.append(zo, zl, range, zi, fitW, fitP, undoBtn, tocBtn, ac);
+    tocBtn.onclick = () => togglePdfOutline(viewer);
+    const scroll = document.createElement('div'); scroll.className = 'pdf-scroll';
+    host.append(toolbar, scroll);
+    body.appendChild(host);
+    const slot = Number((body.closest('.reading-col') || {}).dataset && body.closest('.reading-col').dataset.slot);
+    const viewer = {
+      _alive: true, path: physicalPath, host, scroll, slotEls: readingSlotElements(slot),
+      scale: 1.25, baseScale: 1.25, pages: [], numPages: 0,
+      currentPage: Math.max(1, Number(startPage) || 1),
+      ann: { annotations: [], summary: null }, pdf: null,
+      fitMode: 'width', _pageW: 600, _pageH: 800, _previewF: 1, _pendingZoom: null, _zoomTimer: null,
+      _zoomPct: zl, _zoomRange: range, _fitWBtn: fitW, _fitPBtn: fitP, _undoBtn: undoBtn, _tocBtn: tocBtn, _tocPanel: null, _tocCache: null, _undoStack: [],
+      alive() { return this._alive; },
+      goToPage(n) {
+        if (!this._alive) return;
+        const target = Math.max(1, Math.min(this.numPages || target || 1, Number(n) || 1));
+        const rec = this.pages.find((p) => p.pageNum === target);
+        if (rec) this.scroll.scrollTop = rec.wrap.offsetTop - 8;
+        this.currentPage = target;
+        updatePageDisplay(this);
+      },
+      refreshAnnotations() {
+        this.pages.forEach((p) => renderPdfOverlay(this, p.pageNum));
+        updatePdfAnnoCount(this);
+        window.renderReadingAnnotationsList && renderReadingAnnotationsList();
+      },
+      destroy() {
+        this._alive = false;
+        if (window.__readingPdfViewer === this) window.__readingPdfViewer = null;
+        this.scroll.onmouseup = null;
+        clearTimeout(this._zoomTimer);
+        if (typeof onWinResize === 'function') window.removeEventListener('resize', onWinResize);
+      },
+    };
+    window.__readingPdfViewer = viewer;
+    try {
+      const pdfjs = await loadPdfJs();
+      const pdf = await pdfjs.getDocument('/api/readings/file?path=' + encodeURIComponent(physicalPath)).promise;
+      viewer.pdf = pdf; viewer.numPages = pdf.numPages;
+      const page1 = await pdf.getPage(1);
+      const vp1 = page1.getViewport({ scale: 1 });
+      viewer._pageW = vp1.width; viewer._pageH = vp1.height;
+      const avail = Math.max(200, scroll.clientWidth - 26);
+      viewer.scale = clampZoom(avail / vp1.width);
+      viewer.baseScale = viewer.scale;
+      viewer.fitMode = 'width';
+      updateZoomUI(viewer);
+      viewer.ann = await loadAnnotations(physicalPath);
+      await renderPdfPage(viewer, 1);
+      for (let i = 2; i <= pdf.numPages; i++) renderPdfPage(viewer, i).catch(() => {});
+      updatePdfAnnoCount(viewer);
+      const els = viewer.slotEls;
+      if (els) {
+        els.page.max = pdf.numPages;
+        els.page.onchange = () => viewer.goToPage(els.page.value);
+        els.col.querySelector('.reading-prev').onclick = () => viewer.goToPage(Number(els.page.value || 1) - 1);
+        els.col.querySelector('.reading-next').onclick = () => viewer.goToPage(Number(els.page.value || 1) + 1);
+        viewer.goToPage(viewer.currentPage);
+      }
+      scroll.addEventListener('wheel', (e) => {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        const steps = Math.max(1, Math.round(Math.abs(e.deltaY) / 60));
+        const s2 = viewer.scale * Math.pow(1.12, (e.deltaY < 0 ? 1 : -1) * steps);
+        viewer.fitMode = null;
+        previewPdfZoomAt(viewer, s2, e.clientX, e.clientY, {});
+      }, { passive: false });
+      scroll.addEventListener('dblclick', (e) => {
+        if (!viewer._alive) return;
+        if (e.target.closest('.pdf-toolbar') || e.target.closest('.pdf-sel-toolbar') || e.target.closest('.pdf-anno-pop')) return;
+        if (e.target.closest('.pdf-text-layer span')) { quickZoom(viewer, viewer.scale * 1.5); return; }
+        fitPdfMode(viewer, viewer.fitMode === 'page' ? 'width' : 'page');
+      });
+      let scrollTimer = null;
+      scroll.addEventListener('scroll', () => {
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+          const p = currentVisiblePage(viewer);
+          if (p && p !== viewer.currentPage) { viewer.currentPage = p; updatePageDisplay(viewer); }
+        }, 130);
+      });
+      let winResizeTimer = null;
+      const onWinResize = () => {
+        clearTimeout(winResizeTimer);
+        winResizeTimer = setTimeout(() => {
+          if (viewer._alive && viewer.fitMode) fitPdfMode(viewer, viewer.fitMode);
+        }, 350);
+      };
+      window.addEventListener('resize', onWinResize);
+      zo.onclick = () => quickZoom(viewer, viewer.scale / 1.15);
+      zi.onclick = () => quickZoom(viewer, viewer.scale * 1.15);
+      zl.onclick = () => {
+        const v = prompt('输入缩放百分比（20–300）', String(Math.round(viewer.scale * 100)));
+        if (v === null) return;
+        const val = Number(v); if (!isFinite(val)) return;
+        const rect = viewer.scroll.getBoundingClientRect();
+        previewPdfZoomAt(viewer, clampZoom(val / 100), rect.left + 12, rect.top + viewer.scroll.clientHeight / 2, {});
+      };
+      range.oninput = () => {
+        viewer.fitMode = null;
+        const rect = viewer.scroll.getBoundingClientRect();
+        previewPdfZoomAt(viewer, Number(range.value) / 100, rect.left + 12, rect.top + viewer.scroll.clientHeight / 2, {});
+      };
+      range.onchange = () => commitPdfZoom(viewer);
+      fitW.onclick = () => fitPdfMode(viewer, 'width');
+      fitP.onclick = () => fitPdfMode(viewer, 'page');
+      window.renderReadingAnnotationsList && renderReadingAnnotationsList();
+      return viewer;
+    } catch (err) {
+      viewer.destroy();
+      const iframe = document.createElement('iframe');
+      iframe.className = 'reading-pdf-fallback';
+      iframe.src = '/api/readings/file?path=' + encodeURIComponent(physicalPath) + '#page=' + viewer.currentPage + '&zoom=page-width';
+      body.appendChild(iframe);
+      return null;
+    }
+  }
+
+  /* ---------- 摘录面板 tab：摘录 / 标注 / 摘要 ---------- */
+  let _chatRenderedKey = null;          // 当前已在 #chat-msgs 中渲染的 PDF 标识
+  function readingChatKey(path) { return 'mc-reading-chat:' + path; }
+  function loadReadingChat(path) {
+    try { const raw = localStorage.getItem(readingChatKey(path)); const d = raw ? JSON.parse(raw) : null; return (d && Array.isArray(d.messages)) ? d.messages : []; }
+    catch (_) { return []; }
+  }
+  function saveReadingChat(path, messages) {
+    try { const list = Array.isArray(messages) ? messages.slice(-100) : []; localStorage.setItem(readingChatKey(path), JSON.stringify({ messages: list, updatedAt: Date.now() })); } catch (_) {}
+  }
+  function chatClearMsgs() {
+    const msgs = document.getElementById('chat-msgs'); if (!msgs) return;
+    const hint = msgs.querySelector('#chat-sel-hint');
+    msgs.replaceChildren(); if (hint) msgs.appendChild(hint);
+    _chatRenderedKey = null;
+  }
+  function ensureChatRestored() {
+    const v = window.__readingPdfViewer;
+    const msgs = document.getElementById('chat-msgs');
+    if (!v || !v.path || !msgs) return;
+    if (_chatRenderedKey === v.path && msgs.children.length > 1) return;
+    _chatRenderedKey = v.path;
+    const hint = msgs.querySelector('#chat-sel-hint');
+    msgs.replaceChildren(); if (hint) msgs.appendChild(hint);
+    loadReadingChat(v.path).forEach((m) => {
+      const d = document.createElement('div'); d.className = 'chat-msg ' + (m.role === 'user' ? 'user' : 'ai');
+      const b = document.createElement('div'); b.className = 'chat-bubble';
+      b.innerHTML = chatRender(m.content || '');
+      d.appendChild(b); msgs.appendChild(d);
+    });
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+  function ensureReadingPanelTabs() {
+    const head = document.querySelector('#reading-fragments .reading-frag-head');
+    if (!head || head.querySelector('.rf-tabs')) return;
+    const tabs = document.createElement('div'); tabs.className = 'rf-tabs';
+    const mk = (label, id) => { const b = document.createElement('button'); b.textContent = label; b.id = 'rf-tab-' + id; b.onclick = () => setReadingPanelTab(id); tabs.appendChild(b); return b; };
+    mk('摘录', 'frag'); mk('标注', 'anno'); mk('AI 对话', 'chat');
+    head.insertBefore(tabs, head.querySelector('.sp'));
+    const fragList = document.getElementById('reading-frag-list');
+    const annoList = document.createElement('div'); annoList.id = 'reading-anno-list'; annoList.className = 'rf-pane'; annoList.style.display = 'none';
+    const chatBox = document.createElement('div'); chatBox.id = 'reading-chat-box'; chatBox.className = 'rf-pane'; chatBox.style.display = 'none';
+    const actions = document.createElement('div'); actions.className = 'chat-actions';
+    const bSum = document.createElement('button'); bSum.className = 'c-quick'; bSum.dataset.act = 'sum'; bSum.textContent = '📌 总结论文';
+    const bPt = document.createElement('button'); bPt.className = 'c-quick'; bPt.dataset.act = 'points'; bPt.textContent = '🎯 提取重点并高亮';
+    const bClear = document.createElement('button'); bClear.textContent = '🗑'; bClear.title = '清空该论文的 AI 对话记录'; bClear.className = 'c-clear';
+    bClear.onclick = () => {
+      if (!confirm('清空该论文的 AI 对话记录？（不可恢复）')) return;
+      const vv = window.__readingPdfViewer;
+      if (vv && vv.path) { try { localStorage.removeItem(readingChatKey(vv.path)); } catch (_) {} }
+      chatClearMsgs();
+    };
+    actions.append(bSum, bPt, bClear);
+    const msgs = document.createElement('div'); msgs.id = 'chat-msgs';
+    const hint = document.createElement('div'); hint.id = 'chat-sel-hint'; hint.className = 'chat-hint';
+    hint.textContent = '在 PDF 上划选文字，点浮出工具条上的“问 AI”即可针对该段提问；输入框可随时直接提问。';
+    msgs.appendChild(hint);
+    const irow = document.createElement('div'); irow.className = 'chat-input-row';
+    const inp = document.createElement('textarea'); inp.id = 'chat-input'; inp.placeholder = '针对这篇论文提问 · 回车发送 · 划选文字可点“问 AI”';
+    const send = document.createElement('button'); send.id = 'chat-send'; send.className = 'primary'; send.textContent = '发送';
+    irow.append(inp, send);
+    chatBox.append(actions, msgs, irow);
+    fragList.insertAdjacentElement('afterend', annoList);
+    annoList.insertAdjacentElement('afterend', chatBox);
+    const st = document.createElement('style');
+    st.textContent = '#reading-fragments .rf-tabs{display:flex;gap:4px;margin-right:6px}.rf-tabs button{padding:1px 8px;border:1px solid var(--border);border-radius:5px;background:var(--panel);color:var(--dim);font-size:10px;cursor:pointer}.rf-tabs button.on{color:#cfe0ff;border-color:var(--accent);background:rgba(79,140,255,.15)}#reading-anno-list{overflow:auto;max-height:100%;padding-bottom:8px}#reading-anno-list .rf-anno{position:relative;display:flex;flex-direction:column;gap:4px;margin:6px 8px;padding:7px 10px 7px 12px;border:1px solid var(--border);border-left:3px solid var(--ac,#8ab4ff);border-radius:8px;background:var(--panel);cursor:pointer;transition:border-color .15s,background .15s,transform .1s}#reading-anno-list .rf-anno:hover{border-color:var(--ac,#8ab4ff);background:var(--panel2);transform:translateY(-1px)}#reading-anno-list .rf-anno .a-h{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:10px;color:var(--dim)}#reading-anno-list .rf-anno .a-pg{flex:none;padding:1px 6px;border-radius:4px;background:rgba(79,140,255,.13);color:#b9d0ff;font-weight:600}#reading-anno-list .rf-anno .a-tm{font-size:9.5px;color:var(--dim);flex:none}#reading-anno-list .rf-anno .a-t{font-size:11.5px;line-height:1.55;color:var(--text);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;white-space:pre-wrap}#reading-anno-list .rf-anno .a-t.empty{color:var(--muted);font-style:italic}#reading-anno-list .rf-anno .a-n{margin-top:2px;padding:4px 7px;border-radius:5px;background:rgba(127,127,127,.09);font-size:10.5px;line-height:1.6;color:var(--text);overflow-wrap:anywhere;border-top:1px dashed rgba(127,127,127,.2)}#reading-anno-list .rf-anno .a-n p{margin:2px 0}#reading-anno-list .rf-anno .a-n h1,#reading-anno-list .rf-anno .a-n h2,#reading-anno-list .rf-anno .a-n h3,#reading-anno-list .rf-anno .a-n h4,#reading-anno-list .rf-anno .a-n h5{font-size:11px;margin:3px 0 2px}#reading-anno-list .rf-anno .a-n ul,#reading-anno-list .rf-anno .a-n ol{margin:2px 0;padding-left:16px}#reading-anno-list .rf-anno .a-n code{background:rgba(127,127,127,.16);padding:0 3px;border-radius:3px;font:9.5px var(--mono)}#reading-chat-box{display:flex;flex-direction:column;overflow:hidden;height:100%}.chat-actions{display:flex;gap:5px;padding:6px 7px;border-bottom:1px solid var(--border);flex:none}.chat-actions button{padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--panel2);color:var(--text);font-size:10px;cursor:pointer}.chat-actions button:hover{border-color:var(--accent);color:#cfe0ff}#chat-msgs{flex:1;overflow-y:auto;padding:7px;display:flex;flex-direction:column;gap:6px}.chat-msg{display:flex}.chat-msg.user{justify-content:flex-end}.chat-bubble{max-width:94%;padding:5px 8px;border-radius:8px;font-size:10.5px;line-height:1.65;white-space:normal;overflow-wrap:anywhere;background:var(--panel2);color:var(--text);border:1px solid var(--border)}.chat-msg.user .chat-bubble{background:rgba(79,140,255,.16);border-color:var(--accent)}.chat-bubble .c-h2{font-weight:700;color:var(--accent);margin:4px 0 1px}.chat-bubble .c-b{font-weight:700;margin:4px 0 1px}.chat-bubble .c-li{margin:1px 0}.chat-input-row{display:flex;gap:5px;padding:6px 7px;border-top:1px solid var(--border);flex:none;align-items:center}#chat-input{flex:1;min-height:32px;max-height:90px;resize:vertical;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:10.5px;font-family:inherit}#chat-input:disabled{opacity:.55}#chat-send{padding:4px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel2);color:var(--text);font-size:10px;cursor:pointer;flex:none}#chat-send.primary{border-color:var(--accent);color:#cfe0ff;background:rgba(79,140,255,.15)}#chat-send:disabled{opacity:.55;cursor:default}.chat-hint{color:var(--dim);font-size:9.5px;padding:5px 7px;text-align:center}';
+    document.head.appendChild(st);
+  }
+  function setReadingPanelTab(id) {
+    ensureReadingPanelTabs();
+    const fragList = document.getElementById('reading-frag-list');
+    const annoList = document.getElementById('reading-anno-list');
+    const chatBox = document.getElementById('reading-chat-box');
+    if (fragList) fragList.style.display = id === 'frag' ? '' : 'none';
+    if (annoList) annoList.style.display = id === 'anno' ? '' : 'none';
+    if (chatBox) chatBox.style.display = id === 'chat' ? '' : 'none';
+    ['frag', 'anno', 'chat'].forEach((x) => { const b = document.getElementById('rf-tab-' + x); if (b) b.classList.toggle('on', x === id); });
+    if (id === 'anno') window.renderReadingAnnotationsList && renderReadingAnnotationsList();
+    if (id === 'chat') { initReadingChatPanel(); ensureChatRestored(); }
+  }
+  function renderReadingAnnotationsList() {
+    const box = document.getElementById('reading-anno-list'); if (!box) return;
+    const v = window.__readingPdfViewer;
+    const anns = (v && v.ann && v.ann.annotations) || [];
+    box.replaceChildren();
+    const count = document.createElement('div');
+    count.style.cssText = 'padding:6px 8px;color:var(--dim);font-size:10px';
+    count.textContent = '共 ' + anns.length + ' 条标注 · 在 PDF 页面上划选文字即可高亮/标记';
+    box.appendChild(count);
+    [...anns].sort((a, b) => (a.page - b.page) || (a.createdAt - b.createdAt)).forEach((a) => {
+      const card = document.createElement('div'); card.className = 'rf-anno'; card.style.setProperty('--ac', a.color || '#8ab4ff');
+      const head = document.createElement('div'); head.className = 'a-h';
+      const pg = document.createElement('span'); pg.className = 'a-pg'; pg.textContent = 'P.' + a.page + ' · ' + (a.type === 'mark' ? '标记' : '高亮');
+      const tm = document.createElement('span'); tm.className = 'a-tm';
+      const d = new Date(a.createdAt || Date.now());
+      tm.textContent = (d.getMonth() + 1) + '-' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      head.append(pg, tm);
+      const t = document.createElement('div'); t.className = 'a-t' + (a.text ? '' : ' empty'); t.textContent = a.text || '(无文字)'; t.title = a.text || '';
+      card.append(head, t);
+      if (a.note) { const n = document.createElement('div'); n.className = 'a-n'; n.innerHTML = renderMd(a.note) || ''; card.appendChild(n); }
+      card.onclick = () => { const v2 = window.__readingPdfViewer; if (v2 && v2.alive && v2.alive()) v2.goToPage(a.page); };
+      box.appendChild(card);
+    });
+  }
+  /* ---------- 基于当前论文的 AI 对话（提问 / 选中咨询 / 总结 / 提取重点并高亮） ---------- */
+  const CHAT_STOPWORDS = new Set(['the','a','an','and','of','to','in','for','on','with','is','are','was','were','this','that','how','what','why','请','帮我','一下','请问','论文','pdf','问题','什么','怎么','如何','可以','不能','的','了','是','在','和','与','吗','呢','吧','啊','这篇','这篇论文']);
+  let _chatInited = false;
+  function initReadingChatPanel() {
+    if (_chatInited) return; _chatInited = true;
+    const box = document.getElementById('reading-chat-box'); if (!box) return;
+    box.addEventListener('click', (e) => {
+      const q = e.target.closest('.c-quick');
+      if (q) { if (q.dataset.act === 'sum') readingChatSummary(); else if (q.dataset.act === 'points') readingChatExtractPoints(); }
+    });
+    const send = document.getElementById('chat-send');
+    if (send) send.onclick = () => sendReadingChat();
+    const inp = document.getElementById('chat-input');
+    if (inp) inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReadingChat(); } });
+  }
+  function chatRender(text) {
+    const esc = String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return esc
+      .replace(/^### (.*)$/gm, '<div class="c-h3">$1</div>')
+      .replace(/^## (.*)$/gm, '<div class="c-h2">$1</div>')
+      .replace(/^\*\*(.+?)\*\*$/gm, '<div class="c-b">$1</div>')
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/^[-*] (.*)$/gm, '<div class="c-li">• $1</div>')
+      .replace(/\n/g, '<br>');
+  }
+  function chatPushMsg(role, text) {
+    const msgs = document.getElementById('chat-msgs'); if (!msgs) return;
+    ensureChatRestored();
+    const d = document.createElement('div'); d.className = 'chat-msg ' + role;
+    const b = document.createElement('div'); b.className = 'chat-bubble';
+    b.innerHTML = chatRender(text);
+    d.appendChild(b);
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+    const v = window.__readingPdfViewer;
+    if (v && v.path && text && !text.startsWith('⚠️')) {
+      const entry = { role: role === 'user' ? 'user' : 'assistant', content: text, at: Date.now() };
+      v._chatHistory = [...(v._chatHistory || []), entry];
+      saveReadingChat(v.path, v._chatHistory);
+    }
+  }
+  function chatSetBusy(busy) {
+    const send = document.getElementById('chat-send');
+    if (send) { send.disabled = busy; send.textContent = busy ? '…' : '发送'; }
+    const inp = document.getElementById('chat-input');
+    if (inp) inp.disabled = busy;
+  }
+  function extractJson(text) {
+    text = String(text || '').trim();
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try { return JSON.parse(m[0]); } catch (_) {
+      try { return JSON.parse(m[0].replace(/,\s*}/g, '}')); } catch (_2) { return null; }
+    }
+  }
+  async function readingChatCtx() {
+    const v = window.__readingPdfViewer;
+    if (!v || !v.alive()) return null;
+    if (v._chatCtx && v._chatCtx.path === v.path) return v._chatCtx;
+    const textRes = await api('/api/readings/text?path=' + encodeURIComponent(v.path));
+    if (!textRes.ok || !textRes.pages) return null;
+    const pages = textRes.pages;
+    const chunks = [];
+    let cur = '', curPage = 1;
+    for (let i = 0; i < pages.length; i++) {
+      cur += pages[i] + '\n';
+      curPage = i + 1;
+      while (cur.length >= 2400) { chunks.push({ text: cur.slice(0, 2400), page: curPage }); cur = cur.slice(2400); }
+    }
+    if (cur.trim()) chunks.push({ text: cur, page: curPage });
+    v._chatCtx = { path: v.path, pages, full: pages.join('\n'), chunks };
+    return v._chatCtx;
+  }
+  function chatRank(query, chunkText) {
+    const words = (String(query).toLowerCase().match(/[a-z]{3,}|\p{Script=Han}{1,3}/gu) || []).filter(w => !CHAT_STOPWORDS.has(w));
+    const t = chunkText.toLowerCase();
+    let score = 0;
+    for (const w of words) { const n = t.split(w).length - 1; if (n > 0) score += 1 + n; }
+    return score;
+  }
+  function pickChatContext(query, ctx, selText) {
+    const ranked = ctx.chunks.map((c, i) => ({ c, i, s: chatRank(query, c.text) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s);
+    const picked = ranked.slice(0, 3);
+    const lines = [];
+    for (const p of picked) lines.push('【第 ' + p.c.page + ' 页附近】\n' + p.c.text.trim());
+    if (selText) {
+      lines.push('【用户选中的原文】\n' + selText);
+      const i2 = ctx.chunks.findIndex(c => c.text.includes(selText.slice(0, 60)));
+      if (i2 >= 0) lines.push('【选中内容的上下文】\n' + ctx.chunks[Math.max(0, i2 - 1)].text.trim().slice(-1300));
+    }
+    if (!lines.length) lines.push('【论文开头】\n' + ctx.chunks[0].text.trim().slice(0, 1600));
+    return lines.join('\n\n').slice(0, 13000);
+  }
+  async function sendReadingChat(forcedText) {
+    const v = window.__readingPdfViewer;
+    if (!v || !v.alive()) { readingStatus('请先打开 PDF', true); return; }
+    if (v._chatBusy) return;
+    const inp = document.getElementById('chat-input');
+    const text = (forcedText !== undefined ? forcedText : inp ? inp.value : '').trim();
+    if (!text) return;
+    if (inp) inp.value = '';
+    chatPushMsg('user', text);
+    v._chatBusy = true; chatSetBusy(true);
+    try {
+      const cfg = aiCfg();
+      if (!cfg.url || !cfg.model) throw new Error('请先在右侧 AI 助手设置 API URL 与模型');
+      const ctx = await readingChatCtx();
+      if (!ctx) throw new Error('无法提取论文文本（扫描版不支持对话）');
+      const ctxText = pickChatContext(text, ctx, '');
+      const histFull = (v._chatHistory) || [];
+      const history = (histFull.length && histFull[histFull.length - 1].role === 'user') ? histFull.slice(-6, -1) : histFull.slice(-6);
+      const messages = [
+        { role: 'system', content: '你是论文阅读助手。基于给出的论文上下文回答。要求：用中文；优先引用原文原句；可标注页码（如 P.3）；不确定就说不确定。' },
+        { role: 'user', content: '论文上下文（分块，已标注页码）：\n\n' + ctxText },
+      ];
+      messages.push(...history);
+      messages.push({ role: 'user', content: text });
+      readingStatus('AI 思考中…');
+      const r = await api('/api/ai/chat', { url: cfg.url, key: cfg.key, model: cfg.model, timeoutMs: 300000, messages });
+      if (!r.ok) throw new Error(r.error || 'AI 响应失败');
+      chatPushMsg('ai', r.content.trim());
+      readingStatus('AI 已回复');
+    } catch (error) {
+      chatPushMsg('ai', '⚠️ ' + (error && error.message || error));
+      readingStatus('对话失败：' + (error && error.message || error), true);
+    } finally { v._chatBusy = false; chatSetBusy(false); }
+  }
+  async function readingChatSummary() {
+    const v = window.__readingPdfViewer;
+    if (!v || !v.alive()) return;
+    if (v._chatBusy) return;
+    chatPushMsg('user', '📌 请总结这篇论文（结构化：一句话概括 / 研究目标 / 方法 / 主要结果 / 创新点 / 可借鉴之处）');
+    v._chatBusy = true; chatSetBusy(true);
+    try {
+      const cfg = aiCfg(); if (!cfg.url || !cfg.model) throw new Error('请先在右侧 AI 助手设置 AI 配置');
+      const textRes = await api('/api/readings/text?path=' + encodeURIComponent(v.path));
+      if (!textRes.ok) throw new Error(textRes.error || '无法提取 PDF 文本');
+      const full = (textRes.pages || []).join('\n\n');
+      if (!full.trim()) throw new Error('该 PDF 无可选文字（可能是扫描版）');
+      const chunks = [];
+      let rest = full.trim();
+      while (rest) { let at = Math.min(5000, rest.length); if (at < rest.length) { const b = Math.max(rest.lastIndexOf('\n', at), rest.lastIndexOf('. ', at)); if (b > 1500) at = b + 1; } chunks.push(rest.slice(0, at)); rest = rest.slice(at).trim(); }
+      const parts = [];
+      for (let i = 0; i < chunks.length; i++) {
+        readingStatus('AI 总结 ' + (i + 1) + '/' + chunks.length + '…');
+        const r = await api('/api/ai/chat', { url: cfg.url, key: cfg.key, model: cfg.model, timeoutMs: 300000, messages: [{ role: 'system', content: '你是科研论文阅读助手。提炼论文片段核心信息，中文要点，不超过 250 字。' }, { role: 'user', content: chunks[i] }] });
+        if (!r.ok) throw new Error(r.error || 'AI 总结失败');
+        parts.push(r.content.trim());
+      }
+      readingStatus('正在汇总生成结构化总结…');
+      const merged = await api('/api/ai/chat', { url: cfg.url, key: cfg.key, model: cfg.model, timeoutMs: 300000, messages: [{ role: 'system', content: '基于分段摘要生成整篇论文的结构化中文总结，严格用：\n## 📌 一句话概括\n## 🎯 研究目标\n## 🛠 方法\n## 📊 主要结果\n## 💡 创新点\n## 🔗 可借鉴之处\n直接输出。' }, { role: 'user', content: parts.join('\n\n') }] });
+      if (!merged.ok) throw new Error(merged.error || '总结汇总失败');
+      v.ann.summary = { status: 'done', content: merged.content.trim(), model: cfg.model, updatedAt: Date.now() };
+      await saveAnnotations(v.path, v);
+      chatPushMsg('ai', merged.content.trim());
+      readingStatus('结构化总结已生成并保存');
+    } catch (error) {
+      chatPushMsg('ai', '⚠️ ' + (error && error.message || error));
+    } finally { v._chatBusy = false; chatSetBusy(false); }
+  }
+  async function readingChatExtractPoints() {
+    const v = window.__readingPdfViewer;
+    if (!v || !v.alive()) return;
+    if (v._chatBusy) return;
+    chatPushMsg('user', '🎯 请提取这篇论文的重点（核心方法、关键结果、重要结论），定位原文并自动高亮 + 笔记');
+    v._chatBusy = true; chatSetBusy(true);
+    try {
+      const cfg = aiCfg(); if (!cfg.url || !cfg.model) throw new Error('请先在右侧 AI 助手设置 AI 配置');
+      const ctx = await readingChatCtx();
+      if (!ctx) throw new Error('无法提取论文文本（扫描版不支持）');
+      if (v.pages.length < v.numPages) { for (let i = v.pages.length + 1; i <= v.numPages; i++) { await renderPdfPage(v, i).catch(() => {}); } }
+      const picks = [];
+      // 剔除参考文献列表节（否则 AI 会把文献条目误当重点），只从正文提取
+      let bodyText = (ctx.full || '');
+      const refMatch = bodyText.search(/\n\s*(References|REFERENCES)\s*\n|\n\s*References\s*\(?\s*\[\d+\]/);
+      if (refMatch > 0) bodyText = bodyText.slice(0, refMatch);
+      const big = []; let cur = '';
+      for (const seg of bodyText.split(/(?<=\n)/)) { cur += seg; if (cur.length >= 15000) { big.push(cur); cur = ''; } }
+      if (cur && cur.trim()) big.push(cur);
+      if (!big.length) throw new Error('无法获取可提取的正文文本');
+      const runPick = async (txt) => {
+        const r = await api('/api/ai/chat', { url: cfg.url, key: cfg.key, model: cfg.model, timeoutMs: 300000, messages: [{ role: 'system', content: '你是论文阅读助手。只从给定论文片段的正文（不含参考文献列表、致谢、页眉页脚、作者单位）中找出最重要的 1-2 个要点（核心方法、关键结果、重要结论）。严格只输出 JSON：{"points":[{"quote":"原文原句（必须逐字取自该片段，不改写、不缩写、不翻译、不省略；若原文有多处相近表述，取最完整的一句）","note":"中文要点说明","color":"yellow|green|blue|pink|orange"}]}。禁止选择参考文献条目、致谢、表格、图注、作者与单位信息。没有重要句子输出 {"points":[]}。' }, { role: 'user', content: txt }] });
+        if (!r.ok) throw new Error(r.error || 'AI 提取失败');
+        const js = extractJson(r.content);
+        const out = [];
+        if (js && Array.isArray(js.points)) {
+          for (const p of js.points) {
+            if (p && p.quote && String(p.quote).trim()) {
+              out.push({ quote: repairQuoteAgainstText(String(p.quote).trim(), txt), note: String(p.note || '').trim(), color: ANNO_COLORS[p.color] ? String(p.color) : 'yellow' });
+            }
+          }
+        }
+        return out;
+      };
+      let extracted = 0;
+      for (let i = 0; i < big.length; i += 3) {
+        const batch = big.slice(i, i + 3);
+        const results = await Promise.all(batch.map(async (txt, j) => {
+          readingStatus('提取重点 ' + Math.min(i + j + 1, big.length) + '/' + big.length + '…');
+          const out = await runPick(txt);
+          extracted += out.length;
+          readingStatus('提取重点 ' + Math.min(i + j + 1, big.length) + '/' + big.length + '（已得 ' + extracted + ' 条）…');
+          return out;
+        }));
+        for (const rs of results) picks.push(...rs);
+      }
+      const seen = new Set(); const uniq = [];
+      for (const p of picks) { const k = p.quote.slice(0, 50); if (!seen.has(k)) { seen.add(k); uniq.push(p); } }
+      if (!uniq.length) { chatPushMsg('ai', '⚠️ AI 未能提取出可定位的重点。可重新点击“提取重点”，或手动划选后“问选中”。'); readingStatus('未提取到重点'); return; }
+      pushUndo(v);
+      const statuses = [];
+      let located = 0;
+      for (const p of uniq) {
+        const loc = locateQuoteInViewer(v, p.quote);
+        if (loc) { createAutoHighlights(v, loc, p); located++; statuses.push(true); }
+        else statuses.push(false);
+      }
+      await saveAnnotations(v.path, v);
+      v.pages.forEach(rec => renderPdfOverlay(v, rec.pageNum));
+      updatePdfAnnoCount(v);
+      window.renderReadingAnnotationsList && renderReadingAnnotationsList();
+      const lines = ['🎯 共提取 ' + uniq.length + ' 条重点，成功定位并高亮 ' + located + ' 条：'];
+      uniq.forEach((p, i) => { lines.push((i + 1) + '. ' + (p.note || p.quote.slice(0, 70)) + ' ——「' + p.quote.slice(0, 70) + (p.quote.length > 70 ? '…' : '') + '」' + (statuses[i] ? '' : '（未定位原文）')); });
+      if (located < uniq.length) lines.push('⚠️ 有 ' + (uniq.length - located) + ' 条未能定位原文，可手动划选后“问选中”高亮。');
+      chatPushMsg('ai', lines.join('\n'));
+      readingStatus('已高亮 ' + located + ' 条重点');
+    } catch (error) {
+      chatPushMsg('ai', '⚠️ ' + (error && error.message || error));
+      readingStatus('提取失败：' + (error && error.message || error), true);
+    } finally { v._chatBusy = false; chatSetBusy(false); }
+  }
+  function normQuoteText(s) {
+    return String(s).replace(/[\u201c\u201d"'“”‘’]/g, ' ').replace(/[—–‐‒-]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  /* AI 常把原句改写：在给定片段里找与 quote 最相似的完整句，用原文替换，保证能定位 */
+  function repairQuoteAgainstText(quote, chunkText) {
+    const qn = normQuoteText(quote);
+    if (!qn || !chunkText) return qn;
+    const qToks = tokenize(qn).toks;
+    if (!qToks.length) return qn;
+    const qArr = [...new Set(qToks)];
+    const sentences = String(chunkText).split(/\n+|(?<=[.!?])\s+/).map((s) => s.replace(/\s+/g, ' ').trim()).filter((s) => s.length >= 8);
+    let best = null, bestScore = 0;
+    for (const s of sentences) {
+      const sToks = [...new Set(tokenize(s).toks)];
+      if (!sToks.length) continue;
+      const sSet = new Set(sToks);
+      let hit = 0;
+      for (const t of qArr) if (sSet.has(t)) hit++;
+      const denom = new Set([...qArr, ...sToks]).size;
+      const score = denom ? hit / denom : 0;
+      if (score > bestScore) { bestScore = score; best = s; }
+    }
+    if (best && bestScore >= 0.45) return best;
+    return qn;
+  }
+  function tokenize(text) {
+    const toks = [], map = [];
+    const re = /[A-Za-z0-9]+|[\u4e00-\u9fff]/g;
+    let m;
+    while ((m = re.exec(text))) { toks.push(m[0].toLowerCase()); map.push({ s: m.index, e: m.index + m[0].length }); }
+    return { toks, map };
+  }
+  function locateQuoteInViewer(v, quote) {
+    const qn = normQuoteText(quote);
+    const qt = tokenize(qn);
+    if (!qt.toks.length) return null;
+    for (const rec of v.pages) {
+      const spans = [...rec.textLayer.querySelectorAll('span')];
+      const joinedN = normQuoteText(spans.map(x => x.textContent || '').join(''));
+      if (!joinedN) continue;
+      const at = joinedN.indexOf(qn);
+      if (at >= 0) return { page: rec.pageNum, spans, start: at, end: at + qn.length };
+      // 词序模糊定位：逐个 quote 词在 joinedN 中按位置单调查找，
+      // 容忍粘连词（Controlthrough）、标点/空白差异（Li 1 , vs Li1,）
+      const jn = joinedN.toLowerCase();
+      const seq = [];
+      let lastEnd = -1, skip = 0;
+      for (let i = 0; i < qt.toks.length; i++) {
+        const t = qt.toks[i];
+        if (t.length === 1 && i > 0 && qt.toks[i - 1].length === 1) continue; // 连续单字符（编号噪声）跳过
+        const from = Math.max(0, (lastEnd >= 0 ? lastEnd - 24 : 0));
+        let p = jn.indexOf(t, from);
+        if (p < 0 && seq.length) p = jn.indexOf(t, 0);
+        if (p < 0) { skip++; if (skip > 3) break; continue; }
+        if (seq.length && (p - (seq[seq.length - 1].p + seq[seq.length - 1].len)) > 130) { skip++; if (skip > 3) break; continue; }
+        seq.push({ p, len: t.length });
+        lastEnd = p + t.length;
+      }
+      if (seq.length >= Math.max(5, Math.ceil(qt.toks.length * 0.6))) {
+        const start = Math.min.apply(null, seq.map(x => x.p));
+        const end = Math.max.apply(null, seq.map(x => x.p + x.len));
+        if (end - start > 3) return { page: rec.pageNum, spans, start, end };
+      }
+    }
+    return null;
+  }
+  function createAutoHighlights(v, loc, p) {
+    const rec = v.pages.find(x => x.pageNum === loc.page);
+    if (!rec) return;
+    const hostRect = rec.textLayer.getBoundingClientRect();
+    const segs = [];
+    let acc = 0;
+    for (const sp of loc.spans) {
+      const t = (sp.textContent || '').replace(/\s+/g, ' ');
+      segs.push({ sp, s: acc, e: acc + t.length }); acc += t.length;
+    }
+    const rects = [];
+    for (const seg of segs) {
+      if (seg.e <= loc.start || seg.s >= loc.end) continue;
+      const sr = seg.sp.getBoundingClientRect();
+      if (sr.width < 1 || sr.height < 1) continue;
+      const spanLen = seg.e - seg.s;
+      const cutS = Math.max(0, loc.start - seg.s), cutE = Math.min(spanLen, loc.end - seg.s);
+      const f0 = spanLen ? cutS / spanLen : 0, f1 = spanLen ? cutE / spanLen : 1;
+      const x0 = sr.left + sr.width * f0, x1 = sr.left + sr.width * f1;
+      if (x1 - x0 < 1) continue;
+      rects.push({ x: x0 - hostRect.left, y: sr.top - hostRect.top, width: x1 - x0, height: sr.height });
+    }
+    if (!rects.length) return;
+    const pageText = (v._chatCtx && v._chatCtx.pages[loc.page - 1]) || '';
+    v.ann.annotations.push({
+      id: 'a' + Math.random().toString(36).slice(2, 10) + 'x',
+      page: loc.page, type: 'highlight', color: ANNO_COLORS[p.color] || '#ffe14d',
+      text: (pageText.slice(loc.start, loc.end).replace(/\s+/g, ' ').trim() || p.quote).slice(0, 500),
+      rects, note: p.note, scale: v.scale, createdAt: Date.now(), auto: true,
+    });
+  }
+  function openAIChatPanel() {
+    ensureReadingPanelTabs();
+    setReadingPanelTab('chat');
+    const inp = document.getElementById('chat-input');
+    if (inp) setTimeout(() => inp.focus(), 60);
+  }
+
+  window.renderPdfViewer = renderPdfViewer;
+  window.renderReadingAnnotationsList = renderReadingAnnotationsList;
+  window.ensureReadingPanelTabs = ensureReadingPanelTabs;
+  window.__readingChatExtractPoints = readingChatExtractPoints;
+  window.__openAIChatPanel = openAIChatPanel;
+  window.__pdfViewerReady = true;
+})();
+</script>
+
 
 <!-- 新建文件 / 文件夹 对话框 -->
 <div id="new-dialog">

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "description": "选择性 AMP 让单一策略学习行走、奔跑、跳跃多步态，并实现零样本 Sim-to-Real 人形迁移。",
+  "tags": [
+    "人形机器人",
+    "多步态",
+    "AMP",
+    "强化学习",
+    "Sim-to-Real"
+  ],
+  "updatedAt": 1788701805764
+}

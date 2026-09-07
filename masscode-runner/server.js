@@ -1786,7 +1786,7 @@ function gitStatus() {
     const out = execFileSync('git', ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '-b', '-z'], { cwd: root, encoding: 'utf8', timeout: 15000 });
     const recs = out.split('\0').filter(Boolean);
     const changes = [];
-    let branch = '', ahead = 0, behind = 0;
+    let branch = '', ahead = 0, behind = 0, upstream = '', remote = '', hasRemote = false;
     for (const r of recs) {
       if (r.startsWith('## ')) {
         const m = /^##\s+([^\s]+)(?:\s+\[(.*)\])?/.exec(r);
@@ -1806,6 +1806,10 @@ function gitStatus() {
       else if (xy[0] === 'R') kind = 'renamed';
       changes.push({ status: xy.trim() || '?', idx: xy[0], wt: xy[1], path, kind });
     }
+    try { branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: root, encoding: 'utf8', timeout: 10000 }).trim() || branch; } catch (_) {}
+    try { upstream = execFileSync('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], { cwd: root, encoding: 'utf8', timeout: 10000 }).trim(); } catch (_) {}
+    try { const remotes=execFileSync('git', ['remote'], { cwd:root, encoding:'utf8', timeout:10000 }).trim().split(/\s+/).filter(Boolean);hasRemote=remotes.length>0;remote=upstream.includes('/')?upstream.split('/')[0]:(remotes[0]||''); } catch (_) {}
+    if(upstream){try{const counts=execFileSync('git',['rev-list','--left-right','--count','HEAD...'+upstream],{cwd:root,encoding:'utf8',timeout:10000}).trim().split(/\s+/);ahead=Number(counts[0])||0;behind=Number(counts[1])||0;}catch(_){}}
     let lastCommit = null;
     let commits = [];
     try {
@@ -1815,13 +1819,14 @@ function gitStatus() {
     } catch (_) {}
     try {
       // 最近 10 条提交记录：短hash|主题|时间戳
-      const lout = execFileSync('git', ['log', '--pretty=format:%h|%s|%at', '-n', '10'], { cwd: root, encoding: 'utf8', timeout: 10000 }).trim();
+      const lout = execFileSync('git', ['log', '--pretty=format:%H%x09%h%x09%s%x09%at', '-n', '10'], { cwd: root, encoding: 'utf8', timeout: 10000 }).trim();
+      let unpushed=new Set();if(upstream){try{unpushed=new Set(execFileSync('git',['rev-list','--left-only','HEAD...'+upstream],{cwd:root,encoding:'utf8',timeout:15000}).trim().split('\n').filter(Boolean));}catch(_){}}
       if (lout) commits = lout.split('\n').map(line => {
-        const p = line.split('|');
-        return { short: p[0] || '', subject: p[1] || '', ts: +(p[2] || 0) };
+        const p = line.split('\t');
+        return { hash:p[0]||'', short:p[1]||'', subject:p[2]||'', ts:+(p[3]||0), pushed:upstream?!unpushed.has(p[0]):null };
       });
     } catch (_) {}
-    return { ok: true, root, branch, ahead, behind, changes, lastCommit, commits };
+    return { ok: true, root, branch, upstream, remote, hasRemote, ahead, behind, changes, lastCommit, commits };
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
   }
@@ -2100,7 +2105,7 @@ async function projectHealth() {
 
 /* --------------------------------- HTTP 服务 ---------------------------------- */
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf', '.otf': 'font/otf', '.ttf': 'font/ttf', '.ttc': 'font/collection', '.woff': 'font/woff', '.woff2': 'font/woff2', '.bib': 'text/plain; charset=utf-8', '.csv': 'text/csv; charset=utf-8', '.json': 'application/json; charset=utf-8' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.pdf': 'application/pdf', '.otf': 'font/otf', '.ttf': 'font/ttf', '.ttc': 'font/collection', '.woff': 'font/woff', '.woff2': 'font/woff2', '.bib': 'text/plain; charset=utf-8', '.csv': 'text/csv; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 
 /* ------------------------------- PDF 阅读文库 ------------------------------- */
 
@@ -2160,12 +2165,67 @@ function saveReadingMeta(rel, value) {
     id:String(item.id || crypto.randomUUID()), page:Math.max(1, Number(item.page) || 1),
     source:String(item.source || '').slice(0, 30000), translation:String(item.translation || '').slice(0, 30000),
     note:String(item.note || '').slice(0, 10000), createdAt:Number(item.createdAt) || Date.now(),
+    rects:Array.isArray(item && item.rects) ? item.rects.slice(0, 200).map((r) => ({ x:Number(r && r.x) || 0, y:Number(r && r.y) || 0, width:Number(r && r.width) || 0, height:Number(r && r.height) || 0 })) : [],
+    scale:Number(item && item.scale) || 1,
   })) : [];
   clean.updatedAt = Date.now();
   const target = readingMetaFile(rel);
   fs.mkdirSync(path.dirname(target), { recursive:true });
   fs.writeFileSync(target, JSON.stringify(clean, null, 2), 'utf8');
   return clean;
+}
+/* ---- 阅读标注（高亮/标记/摘要），存项目内 .codescope-annotations/<pdf名>.json ---- */
+function readingAnnotationsFile(rel) {
+  const dir = path.dirname(rel) === '.' ? '' : path.dirname(rel);
+  const stem = path.basename(rel, path.extname(rel));
+  return path.join(readingsDir(), dir, '.codescope-annotations', stem + '.json');
+}
+function cleanAnnotation(item) {
+  return {
+    id: String(item && item.id || crypto.randomUUID()),
+    page: Math.max(1, Number(item && item.page) || 1),
+    type: (item && item.type === 'mark') ? 'mark' : 'highlight',
+    color: String(item && item.color || '#ffd54a'),
+    text: String(item && item.text || '').slice(0, 20000),
+    rects: Array.isArray(item && item.rects) ? item.rects.slice(0, 500).map((r) => ({
+      x: Number(r && r.x) || 0, y: Number(r && r.y) || 0, width: Number(r && r.width) || 0, height: Number(r && r.height) || 0,
+    })) : [],
+    note: String(item && item.note || '').slice(0, 20000),
+    scale: Number(item && item.scale) || 1,
+    createdAt: Number(item && item.createdAt) || Date.now(),
+  };
+}
+function loadReadingAnnotations(rel) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(readingAnnotationsFile(rel), 'utf8'));
+    return {
+      annotations: Array.isArray(parsed && parsed.annotations) ? parsed.annotations.map(cleanAnnotation) : [],
+      summary: parsed && parsed.summary && typeof parsed.summary === 'object' ? {
+        status: ['done', 'pending', 'error'].includes(parsed.summary.status) ? parsed.summary.status : 'done',
+        content: String(parsed.summary.content || ''),
+        model: String(parsed.summary.model || ''),
+        updatedAt: Number(parsed.summary.updatedAt) || 0,
+      } : null,
+    };
+  } catch (_) { return { annotations: [], summary: null }; }
+}
+function saveReadingAnnotations(rel, value) {
+  const current = loadReadingAnnotations(rel);
+  const annotations = Array.isArray(value.annotations) ? value.annotations.slice(0, 5000).map(cleanAnnotation) : current.annotations;
+  let summary = current.summary;
+  if (value.summary && typeof value.summary === 'object' && ('content' in value.summary || 'status' in value.summary)) {
+    summary = {
+      status: ['done', 'pending', 'error'].includes(value.summary.status) ? value.summary.status : 'done',
+      content: String(value.summary.content || ''),
+      model: String(value.summary.model || (current.summary && current.summary.model) || ''),
+      updatedAt: Date.now(),
+    };
+  }
+  const data = { version: 1, updatedAt: Date.now(), annotations, summary };
+  const target = readingAnnotationsFile(rel);
+  fs.mkdirSync(path.dirname(target), { recursive:true });
+  fs.writeFileSync(target, JSON.stringify(data, null, 2), 'utf8');
+  return { annotations, summary };
 }
 function moveReadingMeta(from, to) {
   const oldFile = readingMetaFile(from), nextFile = readingMetaFile(to);
@@ -2501,6 +2561,17 @@ const server = http.createServer(async (req, res) => {
         const pages = await extractPdfPages(path.join(readingsDir(), rel));
         return send(res, 200, { ok:true, path:rel, pages, pageCount:pages.length });
       } catch (error) { return send(res, 500, { ok:false, error:'PDF 文本解析失败：' + String(error.message || error).slice(0, 300) }); }
+    }
+    if (req.method === 'GET' && u.pathname === '/api/readings/annotations') {
+      const rel = readingAssetPath(u.searchParams.get('path'));
+      if (!rel || !/\.pdf$/i.test(rel)) return send(res, 400, { ok:false, error:'PDF 路径不合法' });
+      return send(res, 200, { ok:true, ...loadReadingAnnotations(rel) });
+    }
+    if (req.method === 'POST' && u.pathname === '/api/readings/annotations') {
+      const b = await readBody(req, 25e6); const rel = readingAssetPath(b && b.path);
+      if (!rel || !/\.pdf$/i.test(rel)) return send(res, 400, { ok:false, error:'PDF 路径不合法' });
+      try { return send(res, 200, { ok:true, ...saveReadingAnnotations(rel, b) }); }
+      catch (error) { return send(res, 500, { ok:false, error:'标注保存失败：' + String(error.message || error).slice(0, 300) }); }
     }
     if (req.method === 'GET' && u.pathname === '/api/readings/meta') {
       const rel = readingPath(u.searchParams.get('path'));
